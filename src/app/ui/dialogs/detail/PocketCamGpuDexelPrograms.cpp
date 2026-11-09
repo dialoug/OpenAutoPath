@@ -691,7 +691,9 @@ bool PocketCamOpenGLWidget::initializeGpuDexelPrograms()
                 if (code == 15) { int v[4] = int[4](0, 1, 2, 3); return v[index]; }
                 return 0;
             }
-            vec2 curvedRegionPoint(
+            )"
+            // Keep each literal below MSVC 2022's 16380-byte limit.
+            R"(vec2 curvedRegionPoint(
                 int code, int index, vec4 field) {
                 int pointIndex = curvedRegionVertexIndex(code, index);
                 return pointIndex == 8

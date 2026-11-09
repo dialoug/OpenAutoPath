@@ -30,7 +30,8 @@ set(CMAKE_RUNTIME_OUTPUT_DIRECTORY "${OAP_APP_RUNTIME_OUTPUT_DIR}")
 set(CMAKE_LIBRARY_OUTPUT_DIRECTORY "${OAP_APP_RUNTIME_OUTPUT_DIR}")
 set(CMAKE_ARCHIVE_OUTPUT_DIRECTORY "${OAP_OUTPUT_ROOT}/lib")
 set(CMAKE_PDB_OUTPUT_DIRECTORY "${OAP_OUTPUT_ROOT}/symbols")
-set(CMAKE_COMPILE_PDB_OUTPUT_DIRECTORY "${OAP_OUTPUT_ROOT}/symbols")
+# Keep compiler PDBs in CMake's per-target intermediate directories. Unlike
+# linker PDBs, they can share the default name (vc143.pdb) across targets.
 
 # ---------------------------------------------------------------------------
 # 可复用的核心模块
