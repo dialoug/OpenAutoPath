@@ -1,0 +1,92 @@
+# 第三方库
+/3rdparty-vc14-64/
+/opencascade-7.9.3-vc14-64/
+/AnalysisSitus-master/
+/AnalysisSitus-v2026.1/
+/FreeCAD-main/
+/external/
+/local-data/
+/artifacts/
+
+# 构建产物
+/build/
+/build-guidelines/
+/out/
+/cmake-build-*/
+
+# CMake 缓存
+CMakeCache.txt
+CMakeFiles/
+cmake_install.cmake
+*.cmake.stamp
+
+# IDE / 编辑器
+.vs/
+.vscode/*
+!.vscode/settings.json
+.claude/
+*.user
+*.suo
+*.sln.docstates
+
+# 编译输出
+*.obj
+*.o
+*.exe
+*.dll
+*.lib
+*.pdb
+*.ilk
+*.exp
+
+# 系统文件
+Thumbs.db
+.DS_Store
+
+# 大体积 STEP 样例（超过 GitHub 100MB 上限，不纳入版本库）
+/samples/
+/*.stp
+
+# 备份压缩包（产物，超过 GitHub 100MB 上限）
+*.rar
+/*.zip
+
+# 本地文档与记忆（不纳入版本库）
+/docs/*
+!/docs/15_freecad_cam_implementation.md
+!/docs/16_ui_coordination_audit.md
+/docs/14_code_commenting_guide.md
+/memory/
+/FreeCAD/
+/AGENTS.md
+/刀路模块P0_P1优化说明.md
+/scripts/generate_occt_documents.py
+/scripts/generate_project_documents.py
+/模座刀库.xls
+/普通钻头-小机.xls
+/中心出水钨钢钻.xlsx
+/冲压模具资料/
+/机床手册/
+
+# 运行时孔刀路诊断日志（生成在项目根目录，与 src 同级）
+/孔刀路避障日志.txt
+/腔清腔日志.txt
+/外轮廓刀路日志.txt
+/G-code/
+
+# 本地生成的参考 NC 对比目录
+/path-NC/
+/path-dzd/
+
+# Locally exported reference NC programs.
+/*.nc
+/.reasonix
+
+# CMake 直接配置模式；Preset 仅视为 IDE 可能生成的本地配置。
+/CMakePresets.json
+/CMakeUserPresets.json
+
+# 本地配置同步备份（由 Reasonix 自动生成）
+/reasonix.toml.local-before-sync-*
+/reasonix.toml
+/.codex_tmp

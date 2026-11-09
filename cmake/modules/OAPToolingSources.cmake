@@ -1,0 +1,39 @@
+# Source ownership for tooling targets.
+
+set(OAP_TOOLING_CORE_SOURCES
+    src/tooling/library/ToolAssetCatalog.cpp
+    src/tooling/library/ToolAssetCatalog.h
+    src/tooling/library/ToolLibrary.cpp
+    src/tooling/library/ToolLibrary.h
+    src/tooling/library/ToolLibraryStorage.cpp
+    src/tooling/library/ToolLibraryStorage.h)
+
+set(OAP_TOOLPATH_ADAPTER_SOURCES
+    src/tooling/adapter/hole/HoleStageIdentity.cpp
+    src/tooling/adapter/hole/HoleStageIdentity.h
+    src/tooling/adapter/AssignedToolContext.cpp
+    src/tooling/adapter/AssignedToolContext.h
+    src/tooling/adapter/pocket/PocketAutomaticToolpath.cpp
+    src/tooling/adapter/pocket/PocketAutomaticToolpath.h
+    src/tooling/adapter/pocket/detail/PocketPlanningScheduler.cpp
+    src/tooling/adapter/pocket/detail/PocketPlanningScheduler.h
+    src/tooling/adapter/profile/ProfileAutomaticToolpath.cpp
+    src/tooling/adapter/profile/ProfileAutomaticToolpath.h
+    src/tooling/adapter/hole/HoleMachiningInputMapper.cpp
+    src/tooling/adapter/hole/HoleMachiningInputMapper.h
+    src/tooling/adapter/hole/HoleAutomaticToolpath.cpp
+    src/tooling/adapter/hole/HoleAutomaticToolpath.h
+    src/tooling/adapter/hole/HoleToolSelectionPlanner.cpp
+    src/tooling/adapter/hole/HoleToolSelectionPlanner.h
+    src/tooling/adapter/hole/detail/HoleToolCatalog.cpp
+    src/tooling/adapter/hole/HoleToolCatalog.h
+    src/tooling/adapter/hole/detail/HolePhysicalPlan.cpp
+    src/tooling/adapter/hole/detail/HolePhysicalPlan.h
+    src/tooling/adapter/hole/detail/HolePlanningSupport.cpp
+    src/tooling/adapter/hole/detail/HolePlanningSupport.h
+    src/tooling/adapter/hole/detail/HolePhasePlanners.h
+    src/tooling/adapter/hole/detail/CenterSpotPlanner.cpp
+    src/tooling/adapter/hole/detail/DrillBatchPlanner.cpp
+    src/tooling/adapter/hole/detail/FlatEndMillPlanner.cpp
+    src/tooling/adapter/hole/detail/HoleSetupPlanner.cpp
+    src/tooling/adapter/hole/detail/HoleSetupPlanner.h)

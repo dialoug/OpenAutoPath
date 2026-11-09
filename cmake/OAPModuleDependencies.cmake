@@ -1,0 +1,267 @@
+# First-party module dependency graph.
+#
+# These lists are the single source of truth for both target_link_libraries()
+# and CheckModuleBoundaries.cmake. Every source-level cross-target include must
+# name a target in the owner's direct dependency list; relying only on another
+# target's PUBLIC/transitive dependencies is intentionally forbidden.
+
+set(OAP_FIRST_PARTY_LIBRARY_TARGETS
+    oap_app_cam_renderer
+    oap_analysis
+    oap_recognition
+    oap_toolpath_core
+    oap_toolpath_program
+    oap_toolpath_hole
+    oap_toolpath_pocket
+    oap_toolpath_profile
+    oap_toolpath_finishing
+    oap_toolpath_algorithms
+    oap_toolpath_workflow
+    oap_toollibrary
+    oap_toolpath_adapter
+    oap_manufacturing
+    oap_app_view
+    oap_app_workflow_base
+    oap_app_workflow_playback
+    oap_app_workflow_cam
+    oap_app_workflow_simulation
+    oap_app_dialogs
+    oap_app_presentation
+    oap_app_playback
+    oap_app_playback_ui
+    oap_app_recognition_ui
+    oap_app_document_ui
+    oap_app_cam_ui
+    oap_app_simulation_ui
+    oap_app_simulation
+    oap_app_recognition
+    oap_app_scene
+    oap_app_document
+    oap_app_machining
+    oap_app_orchestration
+    oap_app_analysis
+    oap_app_panels)
+
+set(OAP_FIRST_PARTY_TARGETS
+    ${OAP_FIRST_PARTY_LIBRARY_TARGETS}
+    OpenAutoPathApp)
+
+set(OAP_INTERNAL_DEPS_oap_analysis)
+set(OAP_INTERNAL_DEPS_oap_recognition
+    oap_analysis)
+set(OAP_INTERNAL_DEPS_oap_toolpath_core
+    oap_analysis)
+set(OAP_INTERNAL_DEPS_oap_toolpath_program
+    oap_analysis
+    oap_toolpath_core)
+set(OAP_INTERNAL_DEPS_oap_toolpath_hole
+    oap_analysis
+    oap_toolpath_core)
+set(OAP_INTERNAL_DEPS_oap_toolpath_pocket
+    oap_analysis
+    oap_toolpath_core
+    oap_toolpath_program)
+set(OAP_INTERNAL_DEPS_oap_toolpath_profile
+    oap_analysis
+    oap_toolpath_core
+    oap_toolpath_pocket
+    oap_toolpath_program)
+set(OAP_INTERNAL_DEPS_oap_toolpath_algorithms
+    oap_toolpath_hole
+    oap_toolpath_pocket
+    oap_toolpath_profile)
+set(OAP_INTERNAL_DEPS_oap_toolpath_finishing
+    oap_toolpath_core)
+set(OAP_INTERNAL_DEPS_oap_toolpath_workflow
+    oap_toolpath_algorithms
+    oap_toolpath_core
+    oap_toolpath_hole
+    oap_toolpath_pocket
+    oap_toolpath_profile)
+set(OAP_INTERNAL_DEPS_oap_toollibrary)
+set(OAP_INTERNAL_DEPS_oap_toolpath_adapter
+    oap_analysis
+    oap_toollibrary
+    oap_toolpath_core
+    oap_toolpath_hole
+    oap_toolpath_pocket
+    oap_toolpath_profile
+    oap_toolpath_workflow)
+set(OAP_INTERNAL_DEPS_oap_manufacturing
+    oap_toolpath_finishing
+    oap_analysis
+    oap_toollibrary
+    oap_toolpath_adapter
+    oap_toolpath_core
+    oap_toolpath_hole
+    oap_toolpath_pocket
+    oap_toolpath_profile
+    oap_toolpath_program
+    oap_toolpath_workflow)
+set(OAP_INTERNAL_DEPS_oap_app_view
+    oap_toollibrary)
+set(OAP_INTERNAL_DEPS_oap_app_workflow_base
+    oap_analysis
+    oap_app_view
+    oap_recognition
+    oap_toolpath_core
+    oap_toolpath_hole
+    oap_toolpath_pocket
+    oap_toolpath_profile
+    oap_toolpath_program
+    oap_toolpath_workflow)
+set(OAP_INTERNAL_DEPS_oap_app_workflow_playback
+    oap_app_workflow_base
+    oap_recognition
+    oap_toolpath_core
+    oap_toolpath_hole)
+set(OAP_INTERNAL_DEPS_oap_app_workflow_cam
+    oap_toolpath_finishing
+    oap_analysis
+    oap_app_workflow_base
+    oap_app_workflow_playback
+    oap_manufacturing
+    oap_recognition
+    oap_toolpath_adapter
+    oap_toolpath_algorithms
+    oap_toolpath_core
+    oap_toolpath_hole
+    oap_toolpath_pocket
+    oap_toolpath_profile
+    oap_toolpath_program
+    oap_toolpath_workflow
+    oap_toollibrary)
+set(OAP_INTERNAL_DEPS_oap_app_workflow_simulation
+    oap_analysis
+    oap_app_view
+    oap_app_workflow_base
+    oap_app_workflow_cam
+    oap_manufacturing
+    oap_toolpath_core
+    oap_toolpath_hole
+    oap_toolpath_pocket
+    oap_toolpath_profile
+    oap_toolpath_workflow)
+set(OAP_INTERNAL_DEPS_oap_app_dialogs
+    oap_app_workflow_base
+    oap_app_workflow_cam
+    oap_app_workflow_simulation)
+set(OAP_INTERNAL_DEPS_oap_app_presentation
+    oap_analysis
+    oap_app_view
+    oap_recognition)
+set(OAP_INTERNAL_DEPS_oap_app_playback
+    oap_analysis
+    oap_app_presentation
+    oap_app_view
+    oap_app_workflow_cam
+    oap_app_workflow_playback
+    oap_toolpath_hole
+    oap_toollibrary)
+set(OAP_INTERNAL_DEPS_oap_app_playback_ui
+    oap_app_machining
+    oap_app_playback
+    oap_app_workflow_playback)
+set(OAP_INTERNAL_DEPS_oap_app_recognition_ui
+    oap_app_panels)
+set(OAP_INTERNAL_DEPS_oap_app_document_ui)
+set(OAP_INTERNAL_DEPS_oap_app_cam_ui
+    oap_app_workflow_cam
+    oap_app_workflow_simulation
+    oap_toolpath_core
+    oap_toolpath_hole)
+set(OAP_INTERNAL_DEPS_oap_app_simulation_ui
+    oap_app_cam_ui
+    oap_app_simulation)
+set(OAP_INTERNAL_DEPS_oap_app_simulation
+    oap_app_presentation
+    oap_app_workflow_simulation
+    oap_manufacturing
+    oap_toolpath_workflow
+    oap_toolpath_profile)
+set(OAP_INTERNAL_DEPS_oap_app_recognition
+    oap_analysis
+    oap_app_analysis
+    oap_app_presentation
+    oap_app_workflow_base
+    oap_app_workflow_cam
+    oap_toolpath_adapter
+    oap_toolpath_core
+    oap_toolpath_pocket
+    oap_toolpath_profile)
+set(OAP_INTERNAL_DEPS_oap_app_scene
+    oap_analysis
+    oap_app_presentation
+    oap_app_workflow_base
+    oap_app_workflow_cam)
+set(OAP_INTERNAL_DEPS_oap_app_document
+    oap_analysis
+    oap_app_analysis
+    oap_app_workflow_base)
+set(OAP_INTERNAL_DEPS_oap_app_machining
+    oap_app_document
+    oap_app_recognition
+    oap_app_simulation
+    oap_app_workflow_cam
+    oap_app_workflow_simulation
+    oap_manufacturing
+    oap_toollibrary
+    oap_toolpath_core
+    oap_toolpath_hole
+    oap_toolpath_pocket
+    oap_toolpath_profile)
+set(OAP_INTERNAL_DEPS_oap_app_orchestration
+    oap_app_document
+    oap_app_machining
+    oap_app_playback
+    oap_app_recognition
+    oap_app_simulation
+    oap_app_workflow_cam
+    oap_manufacturing
+    oap_toolpath_core)
+set(OAP_INTERNAL_DEPS_oap_app_analysis
+    oap_analysis
+    oap_recognition
+    oap_toolpath_core)
+set(OAP_INTERNAL_DEPS_oap_app_panels
+    oap_analysis
+    oap_app_workflow_base
+    oap_recognition)
+set(OAP_INTERNAL_DEPS_OpenAutoPathApp
+    oap_app_cam_renderer
+    oap_toolpath_finishing
+    oap_analysis
+    oap_app_analysis
+    oap_app_document
+    oap_app_document_ui
+    oap_app_dialogs
+    oap_app_machining
+    oap_app_orchestration
+    oap_app_panels
+    oap_app_playback
+    oap_app_playback_ui
+    oap_app_recognition_ui
+    oap_app_cam_ui
+    oap_app_simulation_ui
+    oap_app_presentation
+    oap_app_recognition
+    oap_app_scene
+    oap_app_simulation
+    oap_app_view
+    oap_app_workflow_base
+    oap_app_workflow_playback
+    oap_app_workflow_cam
+    oap_app_workflow_simulation
+    oap_manufacturing
+    oap_recognition
+    oap_toollibrary
+    oap_toolpath_adapter
+    oap_toolpath_core
+    oap_toolpath_hole
+    oap_toolpath_pocket
+    oap_toolpath_profile
+    oap_toolpath_program
+    oap_toolpath_workflow)
+
+set(OAP_INTERNAL_DEPS_oap_app_cam_renderer
+    oap_app_workflow_cam oap_app_workflow_simulation oap_toolpath_core oap_toolpath_pocket)

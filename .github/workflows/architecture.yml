@@ -1,0 +1,24 @@
+name: Architecture
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: architecture-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  boundaries:
+    name: Module boundaries and documentation
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Check module boundaries
+        run: cmake -DOAP_SOURCE_DIR="$GITHUB_WORKSPACE" -P cmake/CheckModuleBoundaries.cmake
+      - name: Check documentation links
+        run: cmake -DOAP_SOURCE_DIR="$GITHUB_WORKSPACE" -P cmake/CheckDocumentationLinks.cmake

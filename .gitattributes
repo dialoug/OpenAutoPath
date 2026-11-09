@@ -1,0 +1,23 @@
+# 统一行尾:仓库内一律存 LF,避免 CRLF/LF 反复出现在 git status。
+# text=auto 让 Git 自动识别文本文件并在提交时归一化为 LF。
+* text=auto
+
+# 源码与文本明确按 LF 存储(检出时由 core.autocrlf 决定本地呈现)。
+*.cpp   text eol=lf
+*.h     text eol=lf
+*.hpp   text eol=lf
+*.c     text eol=lf
+*.txt   text eol=lf
+*.cmake text eol=lf
+*.md    text eol=lf
+*.json  text eol=lf
+*.qss   text eol=lf
+CMakeLists.txt text eol=lf
+
+# 二进制文件不做行尾转换。
+*.png  binary
+*.jpg  binary
+*.ico  binary
+*.rar  binary
+*.step binary
+*.stp  binary

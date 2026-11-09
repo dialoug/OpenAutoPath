@@ -1,0 +1,260 @@
+# Source ownership for toolpath targets.
+
+set(OAP_TOOLPATH_FINISHING_SOURCES
+    src/toolpath/finishing/SurfaceFinishingBatch.h
+    src/toolpath/finishing/SurfaceFinishing.h
+    src/toolpath/finishing/SurfaceFinishing.cpp
+    src/toolpath/finishing/detail/SurfaceFinishingMesh.h
+    src/toolpath/finishing/detail/SurfaceFinishingMesh.cpp)
+
+set(OAP_TOOLPATH_CORE_SOURCES
+    src/toolpath/core/simulation/FixedAxisToolpathView.h
+    src/toolpath/core/HeavyJobScheduler.h
+    src/toolpath/core/HeavyJobScheduler.cpp
+    src/toolpath/core/collision/CollisionScene.h
+    src/toolpath/core/simulation/InProcessStock.cpp
+    src/toolpath/core/simulation/InProcessStock.h
+    src/toolpath/core/simulation/DexelToolProfile.cpp
+    src/toolpath/core/simulation/DexelToolProfile.h
+    src/toolpath/core/simulation/StockComparison.cpp
+    src/toolpath/core/simulation/StockComparison.h
+    src/toolpath/core/simulation/StockBoxBuilder.cpp
+    src/toolpath/core/simulation/StockBoxBuilder.h
+    src/toolpath/core/simulation/StockModelLoader.cpp
+    src/toolpath/core/simulation/StockModelLoader.h
+    src/toolpath/core/simulation/StockSimulationTypes.h
+    src/toolpath/core/MachiningSetup.cpp
+    src/toolpath/core/MachiningSetup.h
+    src/toolpath/core/setup/MoldSetupWorkFrames.cpp
+    src/toolpath/core/setup/MoldSetupWorkFrames.h
+    src/toolpath/core/ToolpathDiagnostics.cpp
+    src/toolpath/core/ToolpathDiagnostics.h
+    src/toolpath/core/ToolpathExecution.h
+    src/toolpath/core/ToolpathParallel.h
+    src/toolpath/core/ToolpathOcctParallel.h
+    src/toolpath/core/ToolpathMoves.h
+    src/toolpath/core/ToolpathPrimitiveMapping.cpp
+    src/toolpath/core/ToolpathPrimitiveMapping.h
+    src/toolpath/core/ToolpathPrimitives.h
+    src/toolpath/core/ToolpathParamNormalizer.cpp
+    src/toolpath/core/ToolpathParamNormalizer.h
+    src/toolpath/core/ToolpathParams.h
+    src/toolpath/core/PocketToolBinding.cpp
+    src/toolpath/core/PocketToolBinding.h
+    src/toolpath/core/ToolpathProgram.cpp
+    src/toolpath/core/ToolpathProgram.h
+    src/toolpath/core/ToolpathToolContext.cpp
+    src/toolpath/core/ToolpathToolContext.h
+    src/toolpath/core/validation/ToolpathValidationTypes.cpp
+    src/toolpath/core/validation/ToolpathValidationTypes.h
+    src/toolpath/core/validation/ToolpathMoveValidator.cpp
+    src/toolpath/core/validation/ToolpathMoveValidator.h
+    src/toolpath/core/validation/ToolpathPrimitiveValidator.cpp
+    src/toolpath/core/validation/ToolpathPrimitiveValidator.h
+    src/toolpath/core/validation/ToolpathParameterValidator.cpp
+    src/toolpath/core/validation/ToolpathParameterValidator.h
+    src/toolpath/core/validation/ToolpathToolValidator.cpp
+    src/toolpath/core/validation/ToolpathToolValidator.h
+    "${OAP_CLIPPER2_SOURCE_DIR}/clipper.engine.cpp"
+    "${OAP_CLIPPER2_SOURCE_DIR}/clipper.offset.cpp")
+
+set(OAP_TOOLPATH_ALGORITHM_SOURCES
+    src/toolpath/algorithms/ToolpathAlgorithm.cpp
+    src/toolpath/algorithms/ToolpathAlgorithm.h
+    src/toolpath/algorithms/hole/BuiltinHoleToolpathAlgorithm.cpp
+    src/toolpath/algorithms/hole/BuiltinHoleToolpathAlgorithm.h
+    src/toolpath/algorithms/pocket/BuiltinPocketToolpathAlgorithm.cpp
+    src/toolpath/algorithms/pocket/BuiltinPocketToolpathAlgorithm.h
+    src/toolpath/algorithms/profile/BuiltinProfileToolpathAlgorithm.cpp
+    src/toolpath/algorithms/profile/BuiltinProfileToolpathAlgorithm.h
+
+
+
+
+
+
+
+)
+
+set(OAP_TOOLPATH_HOLE_SOURCES
+    src/toolpath/hole/HoleMachiningInput.h
+    src/toolpath/hole/DrillTipParameterBinding.h
+    src/toolpath/hole/HoleCoverage.cpp
+    src/toolpath/hole/HoleCoverage.h
+    src/toolpath/hole/HoleBatchExecution.cpp
+    src/toolpath/hole/HoleBatchExecution.h
+    src/toolpath/hole/HoleMachining.cpp
+    src/toolpath/hole/HoleMachining.h
+    src/toolpath/hole/HoleStageWallHighlightResolver.cpp
+    src/toolpath/hole/HoleStageWallHighlightResolver.h
+    src/toolpath/hole/HoleStockSimulator.cpp
+    src/toolpath/hole/HoleStockSimulator.h
+    src/toolpath/hole/HoleProgramAdapter.cpp
+    src/toolpath/hole/HoleProgramAdapter.h
+    src/toolpath/hole/HoleMoldEnvelopeEntryResolver.cpp
+    src/toolpath/hole/HoleMoldEnvelopeEntryResolver.h
+    src/toolpath/hole/HoleToolpathValidator.cpp
+    src/toolpath/hole/HoleToolpathValidator.h
+    src/toolpath/hole/detail/HoleRapidPlanner.cpp
+    src/toolpath/hole/detail/HoleRapidPlanner.h
+    src/toolpath/hole/detail/DrillDepthCompensation.cpp
+    src/toolpath/hole/detail/DrillDepthCompensation.h
+    src/toolpath/hole/detail/HolePhysicalGrouping.cpp
+    src/toolpath/hole/HolePhysicalGrouping.h
+    src/toolpath/hole/detail/HoleStrategyGenerators.h
+    src/toolpath/hole/detail/strategies/HoleStrategySupport.cpp
+    src/toolpath/hole/detail/strategies/HoleStrategySupport.h
+    src/toolpath/hole/detail/strategies/SmallDrillStrategy.cpp
+    src/toolpath/hole/detail/strategies/HelicalHoleStrategy.cpp
+    src/toolpath/hole/detail/strategies/LayeredSpiralHoleStrategy.cpp
+    src/toolpath/hole/detail/HoleVisitOptimizer.cpp
+    src/toolpath/hole/detail/HoleVisitOptimizer.h)
+
+set(OAP_TOOLPATH_POCKET_SOURCES
+    src/toolpath/pocket/simulation/fixedaxis/AnalyticFixedAxisLayeredBRepBuilder.cpp
+    src/toolpath/pocket/simulation/fixedaxis/AnalyticFixedAxisLayeredBRepBuilder.h
+    src/toolpath/pocket/simulation/fixedaxis/AnalyticPlanarBoolean.cpp
+    src/toolpath/pocket/simulation/fixedaxis/AnalyticPlanarBoolean.h
+    src/toolpath/pocket/simulation/fixedaxis/AnalyticPlanarSweep.cpp
+    src/toolpath/pocket/simulation/fixedaxis/AnalyticPlanarSweep.h
+    src/toolpath/pocket/simulation/fixedaxis/FixedAxisBRepPreflight.cpp
+    src/toolpath/pocket/simulation/fixedaxis/FixedAxisBRepPreflight.h
+    src/toolpath/pocket/simulation/fixedaxis/FixedAxisBRepStockSimulator.cpp
+    src/toolpath/pocket/simulation/fixedaxis/FixedAxisBRepStockSimulator.h
+    src/toolpath/pocket/simulation/fixedaxis/FixedAxisLayeredBRepBuilder.cpp
+    src/toolpath/pocket/simulation/fixedaxis/FixedAxisLayeredBRepBuilder.h
+    src/toolpath/pocket/geometry/OcctAreaAdapter.cpp
+    src/toolpath/pocket/geometry/OcctAreaAdapter.h
+    src/toolpath/pocket/planning/PocketClearing.cpp
+    src/toolpath/pocket/planning/PocketClearing.h
+    src/toolpath/pocket/planning/CutterCenterClearingPattern.cpp
+    src/toolpath/pocket/planning/CutterCenterClearingPattern.h
+    src/toolpath/pocket/simulation/PocketCamSimulationScene.cpp
+    src/toolpath/pocket/simulation/PocketCamSimulationScene.h
+    src/toolpath/pocket/geometry/PocketRegionBuilder.cpp
+    src/toolpath/pocket/geometry/PocketRegionBuilder.h
+    src/toolpath/pocket/planning/PocketLayerSlicer.cpp
+    src/toolpath/pocket/planning/PocketLayerSlicer.h
+    src/toolpath/pocket/program/PocketProgramAdapter.cpp
+    src/toolpath/pocket/program/PocketProgramAdapter.h
+    src/toolpath/pocket/validation/PocketSafetyValidator.cpp
+    src/toolpath/pocket/validation/PocketSafetyValidator.h
+    src/toolpath/pocket/simulation/DexelDisplayMesh.cpp
+    src/toolpath/pocket/simulation/DexelDisplayMesh.h
+    src/toolpath/pocket/simulation/DexelIntervalOps.cpp
+    src/toolpath/pocket/simulation/DexelIntervalOps.h
+    src/toolpath/pocket/simulation/MultiDexelStock.cpp
+    src/toolpath/pocket/simulation/MultiDexelStock.h
+    src/toolpath/pocket/simulation/StockTargetCache.cpp
+    src/toolpath/pocket/simulation/StockTargetCache.h
+    src/toolpath/pocket/simulation/PocketZMapComparison.cpp
+    src/toolpath/pocket/simulation/PocketZMapComparison.h
+    src/toolpath/pocket/program/PocketToolpathOperation.h
+    src/toolpath/pocket/validation/PocketToolpathValidator.cpp
+    src/toolpath/pocket/validation/PocketToolpathValidator.h
+    src/toolpath/pocket/program/PocketToolpathExport.cpp
+    src/toolpath/pocket/program/PocketToolpathExport.h
+    src/toolpath/pocket/validation/ToolpathSafetyValidator.h
+    src/toolpath/pocket/planning/detail/DepthLayerPlanner.cpp
+    src/toolpath/pocket/planning/detail/DepthLayerPlanner.h
+    src/toolpath/pocket/planning/detail/AdaptiveFreePathLinking.cpp
+    src/toolpath/pocket/planning/detail/AdaptiveFreePathLinking.h
+    src/toolpath/pocket/planning/detail/AdaptiveFreePathRaster.cpp
+    src/toolpath/pocket/planning/detail/AdaptiveFreePathRaster.h
+    src/toolpath/pocket/planning/detail/FreePathPattern.cpp
+    src/toolpath/pocket/planning/detail/OffsetPattern.cpp
+    src/toolpath/pocket/planning/detail/PocketClipperUtils.cpp
+    src/toolpath/pocket/planning/detail/PocketClipperUtils.h
+    src/toolpath/pocket/planning/detail/PocketCurveSemanticBuilder.cpp
+    src/toolpath/pocket/planning/detail/PocketCurveSemanticBuilder.h
+    src/toolpath/pocket/planning/detail/PocketEntryPlanner.cpp
+    src/toolpath/pocket/planning/detail/PocketEntryPlanner.h
+    src/toolpath/pocket/planning/detail/PocketGeometryUtils.cpp
+    src/toolpath/pocket/planning/detail/PocketGeometryUtils.h
+    src/toolpath/pocket/planning/detail/PocketMoveAssembler.cpp
+    src/toolpath/pocket/planning/detail/PocketMoveAssembler.h
+    src/toolpath/pocket/planning/detail/PocketPatterns.h
+    src/toolpath/pocket/planning/detail/PocketSafetyGeometry.cpp
+    src/toolpath/pocket/planning/detail/PocketSafetyGeometry.h
+    src/toolpath/pocket/planning/detail/SpiralPattern.cpp
+    src/toolpath/pocket/planning/detail/ZigZagPattern.cpp
+    src/toolpath/pocket/simulation/detail/MultiDexelComparison.cpp
+    src/toolpath/pocket/simulation/detail/MultiDexelConstruction.cpp
+    src/toolpath/pocket/simulation/detail/MultiDexelDisplay.cpp
+    src/toolpath/pocket/simulation/detail/MultiDexelImpl.h
+    src/toolpath/pocket/simulation/detail/DexelCellIntervals.h
+    src/toolpath/pocket/simulation/detail/MultiDexelOperations.cpp
+    src/toolpath/pocket/simulation/detail/MultiDexelOrientedSweep.cpp
+    src/toolpath/pocket/simulation/detail/MultiDexelOrientedSweep.h
+    src/toolpath/pocket/simulation/detail/MultiDexelPrimitives.cpp
+    src/toolpath/pocket/simulation/detail/MultiDexelPrimitives.h
+    src/toolpath/pocket/simulation/detail/MultiDexelQueries.cpp
+    src/toolpath/pocket/simulation/detail/MultiDexelRasterization.cpp
+    src/toolpath/pocket/simulation/detail/MultiDexelRasterization.h
+    src/toolpath/pocket/simulation/detail/MultiDexelTileUpdates.cpp
+    src/toolpath/pocket/simulation/detail/MultiDexelTileUpdates.h
+    src/toolpath/pocket/simulation/detail/PocketZMapCoreSupport.cpp
+    src/toolpath/pocket/simulation/detail/PocketZMapCoreSupport.h
+    src/toolpath/pocket/simulation/detail/PocketZMapDisplay.cpp
+    src/toolpath/pocket/simulation/detail/PocketZMapDisplayState.h
+    src/toolpath/pocket/simulation/detail/PocketZMapMultiDexelSupport.cpp
+    src/toolpath/pocket/simulation/detail/PocketZMapMultiDexelSupport.h
+    src/toolpath/pocket/simulation/fixedaxis/detail/AnalyticFixedAxisBooleans.cpp
+    src/toolpath/pocket/simulation/fixedaxis/detail/AnalyticFixedAxisBooleans.h
+    src/toolpath/pocket/simulation/fixedaxis/detail/AnalyticFixedAxisGeometry.cpp
+    src/toolpath/pocket/simulation/fixedaxis/detail/AnalyticFixedAxisGeometry.h
+    src/toolpath/pocket/simulation/fixedaxis/detail/AnalyticFixedAxisSweeps.cpp
+    src/toolpath/pocket/simulation/fixedaxis/detail/AnalyticFixedAxisSweeps.h
+    src/toolpath/pocket/simulation/fixedaxis/detail/AnalyticFixedAxisTypes.h)
+
+set(OAP_TOOLPATH_PROFILE_SOURCES
+    src/toolpath/profile/geometry/ProfileRegion.h
+    src/toolpath/profile/geometry/ProfileRegionBuilder.cpp
+    src/toolpath/profile/geometry/ProfileRegionBuilder.h
+    src/toolpath/profile/planning/ProfileContour.cpp
+    src/toolpath/profile/planning/ProfileContour.h
+    src/toolpath/profile/planning/ProfileDirectionPlanner.cpp
+    src/toolpath/profile/planning/ProfileDirectionPlanner.h
+    src/toolpath/profile/planning/detail/ProfileMotionPlanning.cpp
+    src/toolpath/profile/planning/detail/ProfileMotionPlanning.h
+    src/toolpath/profile/program/ProfileProgramAdapter.cpp
+    src/toolpath/profile/program/ProfileProgramAdapter.h
+    src/toolpath/profile/program/ProfileToolpathOperation.h
+    src/toolpath/profile/simulation/ProfileSimulationAdapter.cpp
+    src/toolpath/profile/simulation/ProfileSimulationAdapter.h
+    src/toolpath/profile/validation/ProfileSafetyValidator.cpp
+    src/toolpath/profile/validation/ProfileSafetyValidator.h)
+
+
+set(OAP_TOOLPATH_PROGRAM_SOURCES
+    src/toolpath/program/GCodePostProcessor.cpp
+    src/toolpath/program/GCodePostProcessor.h
+    src/toolpath/program/ToolpathProgramExport.cpp
+    src/toolpath/program/ToolpathProgramExport.h
+    src/toolpath/program/validation/GCodeReview.cpp
+    src/toolpath/program/validation/GCodeReview.h
+    src/toolpath/program/validation/ToolpathProgramValidator.cpp
+    src/toolpath/program/validation/ToolpathProgramValidator.h)
+
+set(OAP_TOOLPATH_WORKFLOW_SOURCES
+    src/toolpath/workflow/compatibility/LegacyProfileSimulationAdapter.cpp
+    src/toolpath/workflow/compatibility/LegacyProfileSimulationAdapter.h
+    src/toolpath/workflow/detail/ToolpathServiceSupport.h
+    src/toolpath/workflow/ToolpathProgramAdapters.h
+    src/toolpath/workflow/HoleBatchExecutor.cpp
+    src/toolpath/workflow/HoleBatchExecutor.h
+    src/toolpath/workflow/hole/HoleToolpathService.cpp
+    src/toolpath/workflow/hole/HoleToolpathService.h
+    src/toolpath/workflow/hole/HoleSimulationAdapter.cpp
+    src/toolpath/workflow/hole/HoleSimulationAdapter.h
+    src/toolpath/workflow/pocket/PocketToolpathService.cpp
+    src/toolpath/workflow/pocket/PocketToolpathService.h
+    src/toolpath/workflow/profile/ProfileToolpathService.cpp
+    src/toolpath/workflow/profile/ProfileToolpathService.h
+
+
+    src/toolpath/workflow/ToolpathAsyncExecutor.cpp
+    src/toolpath/workflow/ToolpathAsyncExecutor.h
+    src/toolpath/workflow/ToolpathWorkflow.cpp
+    src/toolpath/workflow/ToolpathWorkflow.h)
+
