@@ -8,16 +8,40 @@ endfunction()
 
 set(stage "@CMAKE_CURRENT_BINARY_DIR@/package-check/$<CONFIG>/stage")
 set(consumer "@CMAKE_CURRENT_BINARY_DIR@/package-check/$<CONFIG>/consumer")
+# A stale header from a previous broad install must not hide a missing API
+# dependency. Resolve the deletion target and constrain it to this build tree.
+file(REAL_PATH "@CMAKE_CURRENT_BINARY_DIR@" build_root)
+file(REAL_PATH "${stage}" stage_real)
+cmake_path(IS_PREFIX build_root "${stage_real}" NORMALIZE stage_in_build)
+if(NOT stage_in_build OR stage_real STREQUAL build_root)
+    message(FATAL_ERROR "Refusing to clean an install stage outside the build tree: ${stage_real}")
+endif()
+file(REMOVE_RECURSE "${stage}")
 run_checked("@CMAKE_COMMAND@" --install "@CMAKE_CURRENT_BINARY_DIR@"
     --config "$<CONFIG>" --prefix "${stage}" --component Development)
+set(sdk_include "${stage}/@CMAKE_INSTALL_INCLUDEDIR@/OpenAutoPath")
+set(expected_headers "@OAP_SDK_HEADERS@")
+list(TRANSFORM expected_headers REPLACE "^src/" "")
+file(GLOB_RECURSE installed_headers RELATIVE "${sdk_include}" "${sdk_include}/*.h")
+list(FILTER installed_headers EXCLUDE REGEX "^thirdparty/")
+list(SORT expected_headers)
+list(SORT installed_headers)
+if(NOT installed_headers STREQUAL expected_headers)
+    message(FATAL_ERROR "Installed headers differ from the public SDK manifest")
+endif()
 set(configure_args
     -S "@PROJECT_SOURCE_DIR@/cmake/fixtures/installed_consumer" -B "${consumer}"
     -G "@CMAKE_GENERATOR@"
     "-DCMAKE_BUILD_TYPE=$<CONFIG>" "-DCMAKE_CONFIGURATION_TYPES=$<CONFIG>"
     "-DCMAKE_CXX_COMPILER=@CMAKE_CXX_COMPILER@"
+    "-DOAP_SDK_INCLUDE_DIR=${sdk_include}"
     "-DOpenAutoPath_DIR=${stage}/@CMAKE_INSTALL_LIBDIR@/cmake/OpenAutoPath"
-    "-DQt6_DIR=@Qt6_DIR@" "-DOAP_OCCT_PROVIDER=@OAP_OCCT_PROVIDER@"
-    "-DOAP_OCCT_ROOT=@OAP_OCCT_ROOT@" "-DOpenCASCADE_DIR=@OpenCASCADE_DIR@")
+    "-DQt6_DIR=@Qt6_DIR@" "-DOAP_OCCT_PROVIDER=@OAP_OCCT_PROVIDER@")
+if("@OAP_OCCT_PROVIDER@" STREQUAL "WINDOWS_SDK")
+    list(APPEND configure_args "-DOAP_OCCT_ROOT=@OAP_OCCT_ROOT@")
+else()
+    list(APPEND configure_args "-DOpenCASCADE_DIR=@OpenCASCADE_DIR@")
+endif()
 if(NOT "@CMAKE_GENERATOR_PLATFORM@" STREQUAL "")
     list(APPEND configure_args -A "@CMAKE_GENERATOR_PLATFORM@")
 endif()
@@ -27,7 +51,7 @@ endif()
 run_checked("@CMAKE_COMMAND@" ${configure_args})
 run_checked("@CMAKE_COMMAND@" --build "${consumer}" --config "$<CONFIG>" --parallel 2)
 if(WIN32)
-    set(ENV{PATH} "${stage}/bin;@OAP_TEST_RUNTIME_PATH@;$ENV{PATH}")
+    set(ENV{PATH} "${stage}/@CMAKE_INSTALL_BINDIR@;@OAP_TEST_RUNTIME_PATH@;$ENV{PATH}")
 endif()
 run_checked("@CMAKE_CTEST_COMMAND@" --test-dir "${consumer}" -C "$<CONFIG>"
     --output-on-failure --no-tests=error)

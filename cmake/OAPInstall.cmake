@@ -2,6 +2,8 @@ include(CMakePackageConfigHelpers)
 option(OAP_INSTALL_DEVELOPMENT "Install core libraries, headers and CMake package" ON)
 
 if(OAP_INSTALL_DEVELOPMENT)
+    include("${CMAKE_CURRENT_LIST_DIR}/OAPSdkHeaders.cmake")
+    oap_validate_sdk_headers("${PROJECT_SOURCE_DIR}")
     set(oap_core_exports
         "oap_analysis|Analysis" "oap_recognition|Recognition"
         "oap_toolpath_core|ToolpathCore" "oap_toolpath_program|ToolpathProgram"
@@ -26,13 +28,13 @@ if(OAP_INSTALL_DEVELOPMENT)
         RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR} COMPONENT Development
         LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR} COMPONENT Development
         ARCHIVE DESTINATION ${CMAKE_INSTALL_LIBDIR} COMPONENT Development)
-    # Preserve relative includes, including same-module implementation headers
-    # referenced by the current public API. The repository API manifest still
-    # defines which headers are intended for cross-module use.
-    install(DIRECTORY
-        src/analysis src/recognition src/toolpath src/tooling src/manufacturing
-        DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/OpenAutoPath
-        COMPONENT Development FILES_MATCHING PATTERN "*.h")
+    foreach(header IN LISTS OAP_SDK_HEADERS)
+        string(REGEX REPLACE "^src/" "" relative_header "${header}")
+        get_filename_component(header_directory "${relative_header}" DIRECTORY)
+        install(FILES "${PROJECT_SOURCE_DIR}/${header}"
+            DESTINATION "${CMAKE_INSTALL_INCLUDEDIR}/OpenAutoPath/${header_directory}"
+            COMPONENT Development)
+    endforeach()
     install(DIRECTORY "${OAP_CLIPPER2_INCLUDE_DIR}/clipper2"
         DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/OpenAutoPath/thirdparty
         COMPONENT Development FILES_MATCHING PATTERN "*.h")

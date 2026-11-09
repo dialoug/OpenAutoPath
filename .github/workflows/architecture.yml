@@ -20,6 +20,8 @@ jobs:
       - uses: actions/checkout@v4
       - name: Check module boundaries
         run: cmake -DOAP_SOURCE_DIR="$GITHUB_WORKSPACE" -P cmake/CheckModuleBoundaries.cmake
+      - name: Check SDK header closure
+        run: cmake -DOAP_SOURCE_DIR="$GITHUB_WORKSPACE" -P cmake/CheckSdkHeaders.cmake
       - name: Check documentation links
         run: cmake -DOAP_SOURCE_DIR="$GITHUB_WORKSPACE" -P cmake/CheckDocumentationLinks.cmake
       - name: Check workflow boundaries

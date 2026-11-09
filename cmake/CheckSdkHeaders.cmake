@@ -1,0 +1,8 @@
+cmake_minimum_required(VERSION 3.22)
+if(NOT DEFINED OAP_SOURCE_DIR OR NOT IS_DIRECTORY "${OAP_SOURCE_DIR}/src")
+    message(FATAL_ERROR "OAP_SOURCE_DIR must point to the source root")
+endif()
+include("${CMAKE_CURRENT_LIST_DIR}/OAPSdkHeaders.cmake")
+oap_validate_sdk_headers("${OAP_SOURCE_DIR}")
+list(LENGTH OAP_SDK_HEADERS header_count)
+message(STATUS "SDK public header closure passed: ${header_count} headers")

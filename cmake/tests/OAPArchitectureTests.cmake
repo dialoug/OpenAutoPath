@@ -1,4 +1,9 @@
 # Static architecture and documentation checks.
+add_test(NAME sdk_header_closure COMMAND "${CMAKE_COMMAND}"
+    "-DOAP_SOURCE_DIR=${CMAKE_CURRENT_SOURCE_DIR}"
+    -P "${CMAKE_CURRENT_SOURCE_DIR}/cmake/CheckSdkHeaders.cmake")
+set_tests_properties(sdk_header_closure PROPERTIES
+    LABELS "fast;architecture;cmake" TIMEOUT 30)
 
 add_test(NAME cmake_external_source_groups
     COMMAND "${CMAKE_COMMAND}"

@@ -62,6 +62,13 @@ directory matching their responsibility and be registered in the matching
 manifest under `cmake/modules`. Headers used only inside one target belong in a
 `detail/` directory and must not be listed as public API.
 
+Development installation follows the core subset of this public API manifest.
+`cmake/OAPSdkHeaders.cmake` maintains an explicit exception list for support
+types embedded in public interfaces, without changing cross-target include
+permissions. The installed header set is checked exactly, and each header is
+compiled independently against the installed package. Unrelated implementation
+headers and desktop headers are excluded from the core SDK.
+
 Within toolpath workflows, private lifecycle helpers share parameter preparation
 while feature services retain domain-specific failure and cancellation policy.
 Profile planning separates cached geometry generation (`ProfileContour`) from

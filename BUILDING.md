@@ -184,12 +184,19 @@ also provide `OAP_OCCT_ROOT`, discoverable Qt and release-compatible
 do not embed the producer's dependency paths. Consumers must use compatible
 architecture, compiler ABI and runtime configuration.
 
-The `packaging` test installs development files into the build tree, configures
-an independent consumer, builds it and runs a geometry/hash smoke test. It checks
-installed headers, transitive links and dependency discovery. Build all core
-targets first. The exported API has no package version or ABI stability promise
-yet. OpenCAMLib is an implementation dependency; its raw headers are not part
-of the exported application API.
+Development installs use the core public-header manifest rather than copying
+entire source directories. `cmake/OAPSdkHeaders.cmake` explicitly lists any
+additional support headers required by public types. These support headers do
+not expand the permitted cross-module dependencies in application source code.
+The dependency closure is checked at configure time and in architecture CI.
+
+The `packaging` test clears its own staging directory inside the build tree,
+installs development files, and verifies that the installed first-party header
+set exactly matches the SDK manifest. An independent consumer compiles each
+installed header separately, then builds and runs a geometry/hash smoke test
+using OCCT, Qt and OpenCAMLib. Build all core targets first. The exported API
+has no package version or ABI stability promise yet. OpenCAMLib is an
+implementation dependency; its raw headers are not part of the exported API.
 
 ## Build layout and CI
 
