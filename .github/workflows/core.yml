@@ -20,7 +20,7 @@ jobs:
         include:
           - os: ubuntu-24.04
             preset: linux-core
-          - os: macos-14
+          - os: macos-15
             preset: macos-core
     runs-on: ${{ matrix.os }}
     timeout-minutes: 60
