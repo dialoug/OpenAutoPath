@@ -1,0 +1,63 @@
+name: Linux and macOS core
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: core-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-24.04
+            preset: linux-core
+          - os: macos-14
+            preset: macos-core
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 60
+    defaults:
+      run:
+        shell: micromamba-shell {0}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install compiler, Qt and OCCT
+        uses: mamba-org/setup-micromamba@v3
+        with:
+          environment-file: .github/ci/core-environment.yml
+          init-shell: none
+          cache-environment: true
+      - name: Configure
+        env:
+          OAP_PRESET: ${{ matrix.preset }}
+        run: >-
+          cmake --preset "$OAP_PRESET"
+          "-DCMAKE_PREFIX_PATH=$CONDA_PREFIX"
+          "-DFETCHCONTENT_BASE_DIR=$RUNNER_TEMP/oap-dependencies"
+      - name: Build core and tests
+        env:
+          OAP_PRESET: ${{ matrix.preset }}
+        run: cmake --build --preset "$OAP_PRESET"
+      - name: Run fast tests
+        env:
+          OAP_PRESET: ${{ matrix.preset }}
+        run: ctest --preset "$OAP_PRESET"
+      - name: Verify installed package
+        env:
+          OAP_PRESET: ${{ matrix.preset }}
+        run: ctest --preset "$OAP_PRESET-packaging"
+      - name: Upload test logs
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-logs-${{ matrix.preset }}
+          path: build/${{ matrix.preset }}/Testing/Temporary/
+          if-no-files-found: ignore

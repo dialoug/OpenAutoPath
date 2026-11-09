@@ -1,27 +1,13 @@
 # 根构建入口：声明项目选项并装配领域模块与桌面 GUI。
-cmake_minimum_required(VERSION 3.21)
+cmake_minimum_required(VERSION 3.22)
+include(cmake/platforms/OAPDefaults.cmake)
 project(OpenAutoPath LANGUAGES CXX)
 
 include(CTest)
-
-# Share one compiler-process budget across MSBuild projects and source files.
-# MultiToolTask avoids multiplying /m project workers by an unrestricted /MP.
-if(CMAKE_GENERATOR MATCHES "Visual Studio")
-    include(ProcessorCount)
-    ProcessorCount(OAP_DETECTED_BUILD_JOBS)
-    if(NOT OAP_DETECTED_BUILD_JOBS)
-        set(OAP_DETECTED_BUILD_JOBS 2)
-    endif()
-    set(OAP_BUILD_PARALLEL_JOBS "${OAP_DETECTED_BUILD_JOBS}" CACHE STRING
-        "Maximum concurrent MSVC compiler processes across projects")
-    if(NOT OAP_BUILD_PARALLEL_JOBS MATCHES "^[1-9][0-9]*$")
-        message(FATAL_ERROR "OAP_BUILD_PARALLEL_JOBS must be a positive integer")
-    endif()
-    list(APPEND CMAKE_VS_GLOBALS
-        "UseMultiToolTask=true"
-        "EnforceProcessCountAcrossBuilds=true"
-        "MultiProcMaxCount=${OAP_BUILD_PARALLEL_JOBS}")
-endif()
+include(GNUInstallDirs)
+option(OAP_BUILD_GUI "Build desktop application, presentation libraries and their tests" ${WIN32})
+option(OAP_DEPLOY_RUNTIME "Deploy desktop runtime DLLs after linking" ${WIN32})
+include(cmake/platforms/OAPPlatform.cmake)
 
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
@@ -62,7 +48,7 @@ oap_group_sources(oap_analysis)
 add_library(oap_recognition STATIC ${OAP_RECOGNITION_SOURCES})
 add_library(OAP::Recognition ALIAS oap_recognition)
 target_link_libraries(oap_recognition
-    PUBLIC ${OAP_INTERNAL_DEPS_oap_recognition})
+    PUBLIC ${OAP_INTERNAL_DEPS_oap_recognition} Threads::Threads)
 target_compile_definitions(oap_recognition PRIVATE _USE_MATH_DEFINES)
 oap_enable_utf8(oap_recognition)
 oap_enable_core_guideline_warnings(oap_recognition)
@@ -73,7 +59,7 @@ add_library(OAP::ToolpathCore ALIAS oap_toolpath_core)
 target_include_directories(oap_toolpath_core
     SYSTEM PRIVATE "${OAP_CLIPPER2_INCLUDE_DIR}")
 target_link_libraries(oap_toolpath_core
-    PUBLIC ${OAP_INTERNAL_DEPS_oap_toolpath_core})
+    PUBLIC ${OAP_INTERNAL_DEPS_oap_toolpath_core} Threads::Threads)
 
 add_library(oap_toolpath_program STATIC ${OAP_TOOLPATH_PROGRAM_SOURCES})
 add_library(OAP::ToolpathProgram ALIAS oap_toolpath_program)
@@ -88,7 +74,9 @@ target_link_libraries(oap_toolpath_hole
 add_library(oap_toolpath_pocket STATIC ${OAP_TOOLPATH_POCKET_SOURCES})
 add_library(OAP::PocketToolpath ALIAS oap_toolpath_pocket)
 target_include_directories(oap_toolpath_pocket
-    SYSTEM PUBLIC "${OAP_CLIPPER2_INCLUDE_DIR}")
+    SYSTEM PUBLIC
+        "$<BUILD_INTERFACE:${OAP_CLIPPER2_INCLUDE_DIR}>"
+        "$<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}/OpenAutoPath/thirdparty>")
 target_link_libraries(oap_toolpath_pocket
     PUBLIC ${OAP_INTERNAL_DEPS_oap_toolpath_pocket})
 
@@ -154,6 +142,7 @@ oap_enable_utf8(oap_manufacturing)
 oap_enable_core_guideline_warnings(oap_manufacturing)
 oap_group_sources(oap_manufacturing)
 
+if(OAP_BUILD_GUI)
 add_library(oap_app_view STATIC ${OAP_APP_VIEW_SOURCES})
 add_library(OAP::AppView ALIAS oap_app_view)
 target_link_libraries(oap_app_view
@@ -367,12 +356,15 @@ oap_configure_occt_viewer_target(OpenAutoPathApp PRIVATE)
 oap_enable_utf8(OpenAutoPathApp)
 oap_enable_core_guideline_warnings(OpenAutoPathApp)
 oap_group_sources(OpenAutoPathApp)
+endif()
 
 foreach(first_party_target IN LISTS OAP_FIRST_PARTY_TARGETS)
-    oap_configure_first_party_includes(${first_party_target})
+    if(TARGET ${first_party_target})
+        oap_configure_first_party_includes(${first_party_target})
+    endif()
 endforeach()
 
-if(WIN32)
+if(OAP_BUILD_GUI AND WIN32)
     # Windows 在进入 main() 前就会解析导入 DLL，根目录 EXE 无法自行把 bin/
     # 加入搜索路径。因此用一个无第三方依赖的小启动器作为用户入口，实际 UI
     # 与 Qt/OCCT 运行库继续整齐地留在 bin/。
@@ -389,14 +381,18 @@ if(WIN32)
     oap_enable_utf8(OpenAutoPath)
     oap_enable_core_guideline_warnings(OpenAutoPath)
     oap_group_sources(OpenAutoPath)
-else()
-    set_target_properties(OpenAutoPathApp PROPERTIES
-        OUTPUT_NAME OpenAutoPath
-        RUNTIME_OUTPUT_DIRECTORY "${OAP_OUTPUT_ROOT}")
 endif()
 
-include(cmake/OAPRuntime.cmake)
+include(cmake/OAPRuntimePaths.cmake)
+if(WIN32 AND OAP_BUILD_GUI AND OAP_DEPLOY_RUNTIME)
+    include(cmake/OAPRuntime.cmake)
+endif()
 
 if(BUILD_TESTING)
     include(cmake/OAPTests.cmake)
+endif()
+
+include(cmake/OAPInstall.cmake)
+if(BUILD_TESTING AND OAP_INSTALL_DEVELOPMENT)
+    include(cmake/tests/OAPInstallTests.cmake)
 endif()

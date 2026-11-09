@@ -1,0 +1,11 @@
+cmake_minimum_required(VERSION 3.22)
+project(OAPInstalledConsumer LANGUAGES CXX)
+find_package(OpenAutoPath CONFIG REQUIRED)
+add_executable(oap_installed_consumer main.cpp)
+target_link_libraries(oap_installed_consumer PRIVATE
+    OAP::Analysis OAP::PocketToolpath OAP::FinishingToolpath OAP::ToolLibrary)
+if(MSVC)
+    target_compile_options(oap_installed_consumer PRIVATE /utf-8)
+endif()
+enable_testing()
+add_test(NAME installed_consumer COMMAND oap_installed_consumer)

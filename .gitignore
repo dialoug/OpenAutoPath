@@ -82,8 +82,7 @@ Thumbs.db
 /*.nc
 /.reasonix
 
-# CMake 直接配置模式；Preset 仅视为 IDE 可能生成的本地配置。
-/CMakePresets.json
+# Shared CMakePresets.json is versioned; machine-specific settings are private.
 /CMakeUserPresets.json
 
 # 本地配置同步备份（由 Reasonix 自动生成）

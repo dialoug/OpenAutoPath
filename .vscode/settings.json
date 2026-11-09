@@ -1,22 +1,3 @@
 {
-    "cmake.useCMakePresets": "never",
-    "cmake.parallelJobs": 14,
-    "cmake.defaultVariants": {
-        "buildType": {
-            "default": "relwithdebinfo",
-            "description": "Build configuration",
-            "choices": {
-                "relwithdebinfo": {
-                    "short": "RelWithDebInfo",
-                    "long": "Optimized build with debug symbols",
-                    "buildType": "RelWithDebInfo"
-                },
-                "debug": {
-                    "short": "Debug",
-                    "long": "Unoptimized debugging build",
-                    "buildType": "Debug"
-                }
-            }
-        }
-    }
+    "cmake.useCMakePresets": "always"
 }

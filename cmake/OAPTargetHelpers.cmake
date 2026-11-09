@@ -2,11 +2,12 @@
 # Windows/OCCT 编译选项及 IDE 目录布局。
 
 function(oap_configure_occt_target_with_libraries target visibility)
-    target_include_directories(${target} ${visibility}
-        "${OAP_OCCT_INCLUDE_DIR}")
-    target_link_directories(${target} ${visibility} "${OAP_OCCT_LIBRARY_DIR}")
-    target_link_libraries(${target} ${visibility} ${ARGN})
-    target_compile_definitions(${target} ${visibility} WNT _CRT_SECURE_NO_WARNINGS)
+    foreach(toolkit IN LISTS ARGN)
+        target_link_libraries(${target} ${visibility} OCCT::${toolkit})
+    endforeach()
+    if(WIN32)
+        target_compile_definitions(${target} ${visibility} WNT _CRT_SECURE_NO_WARNINGS)
+    endif()
 endfunction()
 
 # Repository-relative first-party includes are available while compiling each
@@ -31,8 +32,7 @@ endfunction()
 
 function(oap_enable_utf8 target)
     if(MSVC)
-        # /MP 让同一目标内的多个翻译单元并行编译；配合 CMake Tools 的
-        # cmake.parallelJobs，可同时利用项目级和目标内并行。
+        # Visual Studio 的 MultiToolTask 用根配置中的共享进程预算约束并行度。
         # /FS 会串行写入目标 PDB；否则 Visual Studio 生成器在并行编译
         # 静态库时可能报 C1041 错误。
         target_compile_options(${target} PRIVATE /utf-8 /MP /FS)
@@ -63,8 +63,30 @@ endfunction()
 
 function(oap_group_sources target)
     get_target_property(target_sources ${target} SOURCES)
-    if(target_sources)
-        source_group(TREE "${CMAKE_CURRENT_SOURCE_DIR}" FILES ${target_sources})
+    if(NOT target_sources)
+        return()
+    endif()
+    set(project_sources)
+    set(external_sources)
+    foreach(source IN LISTS target_sources)
+        # Generated sources may be represented by generator expressions.
+        if(source MATCHES "^\\$<")
+            continue()
+        endif()
+        get_filename_component(source_absolute "${source}" ABSOLUTE
+            BASE_DIR "${CMAKE_CURRENT_SOURCE_DIR}")
+        file(RELATIVE_PATH source_relative "${CMAKE_CURRENT_SOURCE_DIR}" "${source_absolute}")
+        if(IS_ABSOLUTE "${source_relative}" OR source_relative MATCHES "^\\.\\.(/|$)")
+            list(APPEND external_sources "${source_absolute}")
+        else()
+            list(APPEND project_sources "${source_absolute}")
+        endif()
+    endforeach()
+    if(project_sources)
+        source_group(TREE "${CMAKE_CURRENT_SOURCE_DIR}" FILES ${project_sources})
+    endif()
+    if(external_sources)
+        source_group("External" FILES ${external_sources})
     endif()
 endfunction()
 

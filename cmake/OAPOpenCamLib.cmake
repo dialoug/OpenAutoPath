@@ -89,13 +89,13 @@ file(GENERATE OUTPUT "${oap_ocl_generated}/version_string.hpp" CONTENT
     "#pragma once\n#define VERSION_STRING \"${OAP_OPENCAMLIB_REVISION}\"\n")
 target_include_directories(oap_opencamlib PRIVATE "${oap_ocl_generated}")
 target_include_directories(oap_opencamlib SYSTEM PUBLIC
-    "${oap_ocl_source_root}/src"
-    "${oap_ocl_source_root}/src/geo"
-    "${oap_ocl_source_root}/src/cutters"
-    "${oap_ocl_source_root}/src/dropcutter"
-    "${oap_ocl_source_root}/src/algo"
-    "${oap_ocl_source_root}/src/common"
-    "${oap_ocl_boost_include}")
+    "$<BUILD_INTERFACE:${oap_ocl_source_root}/src>"
+    "$<BUILD_INTERFACE:${oap_ocl_source_root}/src/geo>"
+    "$<BUILD_INTERFACE:${oap_ocl_source_root}/src/cutters>"
+    "$<BUILD_INTERFACE:${oap_ocl_source_root}/src/dropcutter>"
+    "$<BUILD_INTERFACE:${oap_ocl_source_root}/src/algo>"
+    "$<BUILD_INTERFACE:${oap_ocl_source_root}/src/common>"
+    "$<BUILD_INTERFACE:${oap_ocl_boost_include}>")
 target_compile_definitions(oap_opencamlib PRIVATE BOOST_ALL_NO_LIB _USE_MATH_DEFINES)
 if(MSVC)
     target_compile_options(oap_opencamlib PRIVATE /utf-8 /openmp-)

@@ -1,0 +1,10 @@
+name: oap-core
+channels:
+  - conda-forge
+dependencies:
+  - cmake>=3.22
+  - ninja
+  - cxx-compiler
+  - git
+  - occt=7.9.3=novtk*
+  - qt6-main=6.11.1

@@ -1,0 +1,61 @@
+name: Windows build
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: windows-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: windows-2022
+    timeout-minutes: 60
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - preset: windows-vs2022
+          - preset: windows-core
+    defaults:
+      run:
+        shell: pwsh
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install Qt
+        uses: jurplel/install-qt-action@v4
+        with:
+          version: '6.11.1'
+          arch: win64_msvc2022_64
+          modules: qtshadertools
+          cache: true
+      - name: Cache OCCT SDK
+        uses: actions/cache@v4
+        with:
+          path: external
+          key: windows-occt-7.9.3-${{ hashFiles('tools/Install-WindowsOcct.ps1') }}
+      - name: Install OCCT SDK
+        run: ./tools/Install-WindowsOcct.ps1
+      - name: Configure
+        run: >-
+          cmake --preset ${{ matrix.preset }}
+          "-DOAP_QT_ROOT=$env:QT_ROOT_DIR"
+          "-DFETCHCONTENT_BASE_DIR=$env:RUNNER_TEMP/oap-dependencies"
+      - name: Build application and tests
+        run: cmake --build --preset ${{ matrix.preset }}
+      - name: Run fast tests
+        run: ctest --preset ${{ matrix.preset }}
+      - name: Verify installed package
+        run: ctest --preset ${{ matrix.preset }}-packaging
+      - name: Upload test logs
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-logs-${{ matrix.preset }}
+          path: build/${{ matrix.preset }}/Testing/Temporary/
+          if-no-files-found: ignore

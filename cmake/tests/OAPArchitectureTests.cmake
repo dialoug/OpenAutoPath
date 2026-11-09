@@ -1,5 +1,13 @@
 # Static architecture and documentation checks.
 
+add_test(NAME cmake_external_source_groups
+    COMMAND "${CMAKE_COMMAND}"
+        -S "${CMAKE_CURRENT_SOURCE_DIR}/cmake/fixtures/source_groups"
+        -B "${CMAKE_CURRENT_BINARY_DIR}/tests/source_groups"
+        "-DOAP_SOURCE_DIR=${CMAKE_CURRENT_SOURCE_DIR}")
+set_tests_properties(cmake_external_source_groups PROPERTIES
+    LABELS "fast;architecture;cmake" TIMEOUT 30)
+
 add_test(NAME module_boundaries
     COMMAND "${CMAKE_COMMAND}"
         "-DOAP_SOURCE_DIR=${CMAKE_CURRENT_SOURCE_DIR}"

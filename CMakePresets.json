@@ -1,0 +1,284 @@
+{
+  "version": 3,
+  "cmakeMinimumRequired": {
+    "major": 3,
+    "minor": 22,
+    "patch": 0
+  },
+  "configurePresets": [
+    {
+      "name": "base",
+      "hidden": true,
+      "binaryDir": "${sourceDir}/build/${presetName}",
+      "installDir": "${sourceDir}/out/install/${presetName}",
+      "cacheVariables": {
+        "BUILD_TESTING": true,
+        "OAP_ENABLE_STRICT_WARNINGS": true
+      }
+    },
+    {
+      "name": "windows-base",
+      "hidden": true,
+      "inherits": "base",
+      "architecture": "x64",
+      "condition": {
+        "type": "equals",
+        "lhs": "${hostSystemName}",
+        "rhs": "Windows"
+      },
+      "cacheVariables": {
+        "OAP_OCCT_PROVIDER": "WINDOWS_SDK",
+        "OAP_BUILD_PARALLEL_JOBS": "4",
+        "CMAKE_CONFIGURATION_TYPES": "RelWithDebInfo;Release;MinSizeRel"
+      }
+    },
+    {
+      "name": "windows-vs2022",
+      "inherits": "windows-base",
+      "generator": "Visual Studio 17 2022",
+      "cacheVariables": {
+        "OAP_BUILD_GUI": true,
+        "OAP_DEPLOY_RUNTIME": true
+      }
+    },
+    {
+      "name": "windows-vs2026",
+      "inherits": "windows-vs2022",
+      "generator": "Visual Studio 18 2026"
+    },
+    {
+      "name": "windows-core",
+      "inherits": "windows-vs2022",
+      "cacheVariables": {
+        "OAP_BUILD_GUI": false,
+        "OAP_DEPLOY_RUNTIME": false
+      }
+    },
+    {
+      "name": "windows-core-vs2026",
+      "inherits": "windows-core",
+      "generator": "Visual Studio 18 2026"
+    },
+    {
+      "name": "unix-core-base",
+      "hidden": true,
+      "inherits": "base",
+      "generator": "Ninja",
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "RelWithDebInfo",
+        "CMAKE_EXPORT_COMPILE_COMMANDS": true,
+        "OAP_OCCT_PROVIDER": "PACKAGE",
+        "OAP_BUILD_GUI": false,
+        "OAP_DEPLOY_RUNTIME": false
+      }
+    },
+    {
+      "name": "linux-core",
+      "inherits": "unix-core-base",
+      "condition": {
+        "type": "equals",
+        "lhs": "${hostSystemName}",
+        "rhs": "Linux"
+      }
+    },
+    {
+      "name": "macos-core",
+      "inherits": "unix-core-base",
+      "condition": {
+        "type": "equals",
+        "lhs": "${hostSystemName}",
+        "rhs": "Darwin"
+      }
+    }
+  ],
+  "buildPresets": [
+    {
+      "name": "windows-vs2022",
+      "configurePreset": "windows-vs2022",
+      "configuration": "RelWithDebInfo",
+      "jobs": 4
+    },
+    {
+      "name": "windows-vs2026",
+      "configurePreset": "windows-vs2026",
+      "configuration": "RelWithDebInfo",
+      "jobs": 4
+    },
+    {
+      "name": "windows-core",
+      "configurePreset": "windows-core",
+      "configuration": "Release",
+      "jobs": 4
+    },
+    {
+      "name": "windows-core-vs2026",
+      "configurePreset": "windows-core-vs2026",
+      "configuration": "Release",
+      "jobs": 4
+    },
+    {
+      "name": "linux-core",
+      "configurePreset": "linux-core",
+      "configuration": "RelWithDebInfo",
+      "jobs": 4
+    },
+    {
+      "name": "macos-core",
+      "configurePreset": "macos-core",
+      "configuration": "RelWithDebInfo",
+      "jobs": 4
+    }
+  ],
+  "testPresets": [
+    {
+      "name": "windows-vs2022",
+      "configurePreset": "windows-vs2022",
+      "configuration": "RelWithDebInfo",
+      "output": {
+        "outputOnFailure": true
+      },
+      "filter": {
+        "include": {
+          "label": "fast"
+        }
+      },
+      "execution": {
+        "noTestsAction": "error"
+      }
+    },
+    {
+      "name": "windows-vs2026",
+      "configurePreset": "windows-vs2026",
+      "configuration": "RelWithDebInfo",
+      "output": {
+        "outputOnFailure": true
+      },
+      "filter": {
+        "include": {
+          "label": "fast"
+        }
+      },
+      "execution": {
+        "noTestsAction": "error"
+      }
+    },
+    {
+      "name": "windows-core",
+      "configurePreset": "windows-core",
+      "configuration": "Release",
+      "output": {
+        "outputOnFailure": true
+      },
+      "filter": {
+        "include": {
+          "label": "fast"
+        }
+      },
+      "execution": {
+        "noTestsAction": "error"
+      }
+    },
+    {
+      "name": "windows-core-vs2026",
+      "configurePreset": "windows-core-vs2026",
+      "configuration": "Release",
+      "output": {
+        "outputOnFailure": true
+      },
+      "filter": {
+        "include": {
+          "label": "fast"
+        }
+      },
+      "execution": {
+        "noTestsAction": "error"
+      }
+    },
+    {
+      "name": "linux-core",
+      "configurePreset": "linux-core",
+      "configuration": "RelWithDebInfo",
+      "output": {
+        "outputOnFailure": true
+      },
+      "filter": {
+        "include": {
+          "label": "fast"
+        }
+      },
+      "execution": {
+        "noTestsAction": "error"
+      }
+    },
+    {
+      "name": "macos-core",
+      "configurePreset": "macos-core",
+      "configuration": "RelWithDebInfo",
+      "output": {
+        "outputOnFailure": true
+      },
+      "filter": {
+        "include": {
+          "label": "fast"
+        }
+      },
+      "execution": {
+        "noTestsAction": "error"
+      }
+    },
+    {
+      "name": "windows-vs2022-packaging",
+      "inherits": "windows-vs2022",
+      "filter": {
+        "include": {
+          "label": "packaging"
+        }
+      }
+    },
+    {
+      "name": "windows-vs2026-packaging",
+      "inherits": "windows-vs2026",
+      "filter": {
+        "include": {
+          "label": "packaging"
+        }
+      }
+    },
+    {
+      "name": "windows-core-packaging",
+      "inherits": "windows-core",
+      "filter": {
+        "include": {
+          "label": "packaging"
+        }
+      }
+    },
+    {
+      "name": "windows-core-vs2026-packaging",
+      "inherits": "windows-core-vs2026",
+      "filter": {
+        "include": {
+          "label": "packaging"
+        }
+      }
+    },
+    {
+      "name": "linux-core-packaging",
+      "inherits": "linux-core",
+      "filter": {
+        "include": {
+          "label": "packaging"
+        }
+      }
+    },
+    {
+      "name": "macos-core-packaging",
+      "inherits": "macos-core",
+      "filter": {
+        "include": {
+          "label": "packaging"
+        }
+      }
+    }
+  ]
+}

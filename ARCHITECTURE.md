@@ -543,7 +543,7 @@ From the repository root:
 
 ```powershell
 cmake -S . -B build
-cmake --build build --config Release --target OpenAutoPathApp --parallel
+cmake --build build --config Release --parallel
 ctest --test-dir build -C Release --output-on-failure
 ```
 
@@ -551,3 +551,6 @@ The fast test suite covers module boundaries plus representative analysis,
 recognition, toolpath, manufacturing, IPW, presentation and task-lifecycle
 behavior. Large ignored STEP files and archived experiment counts are not part
 of the deterministic test contract.
+
+See [BUILDING.md](BUILDING.md) for dependency setup, supported configurations,
+platform presets, core-only builds, installation and cross-platform CI.

@@ -1,0 +1,33 @@
+cmake_minimum_required(VERSION 3.22)
+function(run_checked)
+    execute_process(COMMAND ${ARGV} RESULT_VARIABLE result)
+    if(NOT result EQUAL 0)
+        message(FATAL_ERROR "Installed package check failed (${result}): ${ARGV}")
+    endif()
+endfunction()
+
+set(stage "@CMAKE_CURRENT_BINARY_DIR@/package-check/$<CONFIG>/stage")
+set(consumer "@CMAKE_CURRENT_BINARY_DIR@/package-check/$<CONFIG>/consumer")
+run_checked("@CMAKE_COMMAND@" --install "@CMAKE_CURRENT_BINARY_DIR@"
+    --config "$<CONFIG>" --prefix "${stage}" --component Development)
+set(configure_args
+    -S "@PROJECT_SOURCE_DIR@/cmake/fixtures/installed_consumer" -B "${consumer}"
+    -G "@CMAKE_GENERATOR@"
+    "-DCMAKE_BUILD_TYPE=$<CONFIG>" "-DCMAKE_CONFIGURATION_TYPES=$<CONFIG>"
+    "-DCMAKE_CXX_COMPILER=@CMAKE_CXX_COMPILER@"
+    "-DOpenAutoPath_DIR=${stage}/@CMAKE_INSTALL_LIBDIR@/cmake/OpenAutoPath"
+    "-DQt6_DIR=@Qt6_DIR@" "-DOAP_OCCT_PROVIDER=@OAP_OCCT_PROVIDER@"
+    "-DOAP_OCCT_ROOT=@OAP_OCCT_ROOT@" "-DOpenCASCADE_DIR=@OpenCASCADE_DIR@")
+if(NOT "@CMAKE_GENERATOR_PLATFORM@" STREQUAL "")
+    list(APPEND configure_args -A "@CMAKE_GENERATOR_PLATFORM@")
+endif()
+if(NOT "@CMAKE_GENERATOR_TOOLSET@" STREQUAL "")
+    list(APPEND configure_args -T "@CMAKE_GENERATOR_TOOLSET@")
+endif()
+run_checked("@CMAKE_COMMAND@" ${configure_args})
+run_checked("@CMAKE_COMMAND@" --build "${consumer}" --config "$<CONFIG>" --parallel 2)
+if(WIN32)
+    set(ENV{PATH} "${stage}/bin;@OAP_TEST_RUNTIME_PATH@;$ENV{PATH}")
+endif()
+run_checked("@CMAKE_CTEST_COMMAND@" --test-dir "${consumer}" -C "$<CONFIG>"
+    --output-on-failure --no-tests=error)

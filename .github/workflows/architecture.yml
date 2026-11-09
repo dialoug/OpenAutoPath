@@ -22,3 +22,7 @@ jobs:
         run: cmake -DOAP_SOURCE_DIR="$GITHUB_WORKSPACE" -P cmake/CheckModuleBoundaries.cmake
       - name: Check documentation links
         run: cmake -DOAP_SOURCE_DIR="$GITHUB_WORKSPACE" -P cmake/CheckDocumentationLinks.cmake
+      - name: Check workflow boundaries
+        run: cmake -DOAP_SOURCE_DIR="$GITHUB_WORKSPACE" -P cmake/CheckWorkflowBoundaries.cmake
+      - name: Check external source grouping
+        run: cmake -S cmake/fixtures/source_groups -B build/source-groups -DOAP_SOURCE_DIR="$GITHUB_WORKSPACE"

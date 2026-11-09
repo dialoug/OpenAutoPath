@@ -4,7 +4,7 @@
 # 当前仓库的标准 Windows 开发目录布局。所有路径仍是缓存变量，可用 -D 覆盖。
 
 set(oap_qt_root_default "$ENV{OAP_QT_ROOT}")
-if(NOT oap_qt_root_default)
+if(NOT oap_qt_root_default AND WIN32)
     set(oap_qt_root_default "C:/Qt/6.11.1/msvc2022_64")
 endif()
 set(OAP_QT_ROOT "${oap_qt_root_default}" CACHE PATH
@@ -12,74 +12,54 @@ set(OAP_QT_ROOT "${oap_qt_root_default}" CACHE PATH
 if(OAP_QT_ROOT)
     list(PREPEND CMAKE_PREFIX_PATH "${OAP_QT_ROOT}")
 endif()
-find_package(Qt6 6.11 REQUIRED COMPONENTS
-    Widgets Gui Core OpenGL OpenGLWidgets ShaderTools GuiPrivate)
+set(oap_qt_components Core)
+if(OAP_BUILD_GUI)
+    list(APPEND oap_qt_components Widgets Gui OpenGL OpenGLWidgets ShaderTools GuiPrivate)
+endif()
+find_package(Qt6 6.11 REQUIRED COMPONENTS ${oap_qt_components})
+find_package(Threads REQUIRED)
 
 # Native Vulkan compute/indirect draw interop needs headers only. Device entry
 # points come from Qt's Vulkan instance, so no separate loader library is linked.
-find_path(OAP_VULKAN_HEADERS_DIR vulkan/vulkan.h HINTS "$ENV{VULKAN_SDK}/Include")
-if(NOT OAP_VULKAN_HEADERS_DIR)
-    include(FetchContent)
-    cmake_policy(PUSH)
-    if(POLICY CMP0135)
-        cmake_policy(SET CMP0135 NEW)
+if(OAP_BUILD_GUI)
+    find_path(OAP_VULKAN_HEADERS_DIR vulkan/vulkan.h HINTS "$ENV{VULKAN_SDK}/Include")
+    if(NOT OAP_VULKAN_HEADERS_DIR)
+        include(FetchContent)
+        cmake_policy(PUSH)
+        if(POLICY CMP0135)
+            cmake_policy(SET CMP0135 NEW)
+        endif()
+        FetchContent_Declare(oap_vulkan_headers
+            URL https://codeload.github.com/KhronosGroup/Vulkan-Headers/zip/refs/tags/v1.3.290
+            URL_HASH SHA256=918a8bb31b8312fd649fd1d1826443da870f33f3187c16c4528aa94927409bab
+            # Only populate headers; do not add the dependency's install/test targets.
+            SOURCE_SUBDIR include)
+        FetchContent_MakeAvailable(oap_vulkan_headers)
+        cmake_policy(POP)
+        set(OAP_VULKAN_HEADERS_DIR "${oap_vulkan_headers_SOURCE_DIR}/include")
     endif()
-    FetchContent_Declare(oap_vulkan_headers
-        URL https://codeload.github.com/KhronosGroup/Vulkan-Headers/zip/refs/tags/v1.3.290
-        URL_HASH SHA256=918a8bb31b8312fd649fd1d1826443da870f33f3187c16c4528aa94927409bab
-        # Only populate headers; do not add the dependency's install/test targets.
-        SOURCE_SUBDIR include)
-    FetchContent_MakeAvailable(oap_vulkan_headers)
-    cmake_policy(POP)
-    set(OAP_VULKAN_HEADERS_DIR "${oap_vulkan_headers_SOURCE_DIR}/include")
 endif()
 
-set(oap_occt_root_default "$ENV{OAP_OCCT_ROOT}")
-if(NOT oap_occt_root_default)
-    set(oap_occt_root_default
-        "${PROJECT_SOURCE_DIR}/external/opencascade-7.9.3-vc14-64")
-endif()
-set(OAP_OCCT_ROOT "${oap_occt_root_default}"
-    CACHE PATH "OpenCASCADE 7.9.3 binary SDK root")
-if(NOT OAP_OCCT_ROOT)
-    message(FATAL_ERROR
-        "OAP_OCCT_ROOT is required. Set the environment variable or pass "
-        "-DOAP_OCCT_ROOT=<OpenCASCADE SDK root>.")
-endif()
-set(OAP_OCCT_INCLUDE_DIR "${OAP_OCCT_ROOT}/inc")
-set(OAP_OCCT_LIBRARY_DIR "${OAP_OCCT_ROOT}/win64/vc14/lib")
-set(OAP_OCCT_RUNTIME_DIR "${OAP_OCCT_ROOT}/win64/vc14/bin")
-
-foreach(required_path
-        OAP_OCCT_INCLUDE_DIR
-        OAP_OCCT_LIBRARY_DIR
-        OAP_OCCT_RUNTIME_DIR)
-    if(NOT EXISTS "${${required_path}}")
-        message(FATAL_ERROR
-            "${required_path} does not exist: ${${required_path}}. "
-            "Set OAP_OCCT_ROOT to a valid OpenCASCADE SDK.")
+include("${CMAKE_CURRENT_LIST_DIR}/dependencies/OAPOCCT.cmake")
+if(OAP_OCCT_PROVIDER STREQUAL "WINDOWS_SDK")
+    set(oap_occt_root_default "$ENV{OAP_OCCT_ROOT}")
+    if(NOT oap_occt_root_default)
+        set(oap_occt_root_default "${PROJECT_SOURCE_DIR}/external/opencascade-7.9.3-vc14-64")
     endif()
-endforeach()
-
-# 导入、XCAF 持久化和几何分析所需的核心工具包。核心库只能传播这组
-# 依赖，避免无界面命令行工具因为静态库链接而携带 OpenGL/查看器组件。
-set(OAP_OCCT_CORE_LIBRARIES
-    TKDESTEP TKXSBase TKDE TKDECascade
-    TKXCAF TKLCAF TKCAF TKCDF
-    TKBinXCAF TKBin TKBinL TKStd TKStdL
-    TKService
-    TKMesh TKShHealing TKTopAlgo TKGeomAlgo
-    TKBO TKBool TKFillet TKOffset TKPrim
-    TKBRep TKGeomBase TKG3d TKG2d TKMath TKernel)
-
-# 仅桌面查看器需要的渲染工具包。
-set(OAP_OCCT_VIEWER_LIBRARIES
-    TKV3d TKOpenGl)
+    set(OAP_OCCT_ROOT "${oap_occt_root_default}" CACHE PATH "OCCT Windows SDK root")
+    oap_load_occt_windows_sdk("${OAP_OCCT_ROOT}")
+else()
+    oap_load_occt_package()
+endif()
 
 # Clipper2 is independent from AnalysisSitus. An explicit root may point to an
 # official checkout, CPP/Clipper2Lib, or the former flat include/source layout.
 # With no root, FetchContent obtains the exact audited 2.0.1 commit.
 set(oap_clipper2_root_default "$ENV{OAP_CLIPPER2_ROOT}")
+if(NOT oap_clipper2_root_default AND
+   EXISTS "${PROJECT_SOURCE_DIR}/external/Clipper2/CPP/Clipper2Lib/include/clipper2/clipper.h")
+    set(oap_clipper2_root_default "${PROJECT_SOURCE_DIR}/external/Clipper2")
+endif()
 if(NOT oap_clipper2_root_default AND
    EXISTS "${PROJECT_SOURCE_DIR}/external/AnalysisSitus-master/src/asiAlgo/clipper")
     set(oap_clipper2_root_default
@@ -130,16 +110,8 @@ foreach(required_clipper_file
     endif()
 endforeach()
 
-set(oap_thirdparty_root_default "$ENV{OAP_THIRDPARTY_ROOT}")
-if(NOT oap_thirdparty_root_default)
-    set(oap_thirdparty_root_default
-        "${PROJECT_SOURCE_DIR}/external/3rdparty-vc14-64")
-endif()
-set(OAP_THIRDPARTY_ROOT "${oap_thirdparty_root_default}"
-    CACHE PATH "OCCT third-party runtime root")
-if(NOT OAP_THIRDPARTY_ROOT)
-    message(FATAL_ERROR
-        "OAP_THIRDPARTY_ROOT is required for the OCCT runtime dependencies.")
+if(WIN32)
+    include("${CMAKE_CURRENT_LIST_DIR}/platforms/OAPWindowsDependencies.cmake")
 endif()
 
 unset(oap_qt_root_default)
