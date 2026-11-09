@@ -98,7 +98,7 @@ const std::string& MultiDexelStock::Impl::contentFingerprint() const
 {
     std::call_once(fingerprint->once, [this] {
         Fingerprint128 hash;
-        hash.add(0x6d756c7469646578ull);
+        hash.add(std::uint64_t{0x6d756c7469646578ull});
         hash.add(origin.X());
         hash.add(origin.Y());
         hash.add(origin.Z());

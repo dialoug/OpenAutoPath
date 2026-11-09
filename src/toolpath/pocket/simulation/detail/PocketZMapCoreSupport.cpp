@@ -98,7 +98,7 @@ std::string displaySourceFingerprint(
     const TargetField& target)
 {
     ContentFingerprint hash;
-    hash.add(0x7a6d617064697370ull);
+    hash.add(std::uint64_t{0x7a6d617064697370ull});
     hash.add(data.origin.X());
     hash.add(data.origin.Y());
     hash.add(data.origin.Z());

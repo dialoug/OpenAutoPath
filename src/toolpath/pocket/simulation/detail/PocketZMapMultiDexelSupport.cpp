@@ -434,7 +434,7 @@ std::string multiDexelDisplaySourceFingerprint(
     const DexelDisplayGrid& target)
 {
     ContentFingerprint hash;
-    hash.add(0x6d756c7469646973ull);
+    hash.add(std::uint64_t{0x6d756c7469646973ull});
     hash.add(data.initial->contentFingerprint());
     hash.add(data.final->contentFingerprint());
     hash.add(static_cast<std::uint64_t>(
