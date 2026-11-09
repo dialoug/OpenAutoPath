@@ -1,4 +1,5 @@
 #include "toolpath/core/ToolpathParamNormalizer.h"
+#include "toolpath/core/ToolpathParallel.h"
 #include "toolpath/pocket/planning/CutterCenterClearingPattern.h"
 #include "toolpath/pocket/planning/PocketClearing.h"
 #include "toolpath/pocket/validation/PocketSafetyValidator.h"
@@ -169,6 +170,9 @@ bool sameFreePathRuns(
 
 bool parallelOffsetRingsPreserveDeterministicOutput()
 {
+    const auto expectedParallelism = std::min<std::size_t>(
+        4u, oap::toolpath::toolpathHardwareParallelism());
+    const bool hasParallelWorkers = expectedParallelism > 1u;
     const oap::toolpath::PocketRegion region = rectangularPocket();
     oap::toolpath::ToolpathParams params = offsetRampParams();
     params.depth.stepDown = region.depth;
@@ -201,15 +205,15 @@ bool parallelOffsetRingsPreserveDeterministicOutput()
     if (!expect(serial.ok && parallel.ok,
                 "serial and parallel offset generation should succeed") ||
         !expect(!serial.usedParallelPatternProcessing &&
-                    parallel.usedParallelPatternProcessing,
+                    parallel.usedParallelPatternProcessing == hasParallelWorkers,
                 "only the leased offset run should report ring parallelism") ||
-        !expect(parallel.patternPeakParallelism == 4u &&
-                    parallel.patternParallelBatchCount > 0u &&
-                    parallel.patternParallelTaskCount > 0u,
-                "offset generation should use the granted worker budget") ||
+        !expect(parallel.patternPeakParallelism == expectedParallelism &&
+                    (parallel.patternParallelBatchCount > 0u) == hasParallelWorkers &&
+                    (parallel.patternParallelTaskCount > 0u) == hasParallelWorkers,
+                "offset generation should honor hardware and granted worker limits") ||
         !expect(serial.travelChoiceParallelBatchCount == 0u &&
-                    parallel.travelChoiceParallelBatchCount > 0u &&
-                    parallel.travelChoicePeakParallelism == 4u,
+                    (parallel.travelChoiceParallelBatchCount > 0u) == hasParallelWorkers &&
+                    parallel.travelChoicePeakParallelism == expectedParallelism,
                 "adjacent loop links should use the shared worker budget") ||
         !expect(acquired.load(std::memory_order_relaxed) ==
                     released.load(std::memory_order_relaxed),
@@ -264,6 +268,8 @@ bool parallelOffsetRingsPreserveDeterministicOutput()
 
 bool parallelZigZagScanLinesPreserveDeterministicOutput()
 {
+    const auto expectedParallelism = std::min<std::size_t>(
+        4u, oap::toolpath::toolpathHardwareParallelism());
     const oap::toolpath::PocketRegion region = rectangularPocket();
     oap::toolpath::ToolpathParams params = offsetRampParams();
     params.depth.stepDown = region.depth;
@@ -289,9 +295,9 @@ bool parallelZigZagScanLinesPreserveDeterministicOutput()
             region, params, &parallelControl);
 
     if (!expect(serial.ok && parallel.ok &&
-                    parallel.usedParallelPatternProcessing &&
-                    parallel.patternPeakParallelism == 4u,
-                "zigzag scan lines should use the granted worker budget") ||
+                    parallel.usedParallelPatternProcessing == (expectedParallelism > 1u) &&
+                    parallel.patternPeakParallelism == expectedParallelism,
+                "zigzag scan lines should honor hardware and granted worker limits") ||
         !expect(serial.loops.size() == parallel.loops.size() &&
                     serial.moves.size() == parallel.moves.size() &&
                     serial.primitives.size() == parallel.primitives.size(),

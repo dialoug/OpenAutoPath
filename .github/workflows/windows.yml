@@ -27,6 +27,8 @@ jobs:
         shell: pwsh
     steps:
       - uses: actions/checkout@v4
+      - name: Verify SDK downloader
+        run: ./tools/tests/Test-WindowsOcctDownload.ps1
       - name: Install Qt
         uses: jurplel/install-qt-action@v4
         with:

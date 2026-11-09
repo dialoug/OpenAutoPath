@@ -68,6 +68,14 @@ oap_add_test_with_runtime(
     pocket_layer_linking
     oap_test_pocket_layer_linking)
 
+foreach(worker_limit 1 2)
+    oap_add_test_with_runtime(pocket_layer_linking_budget_${worker_limit}
+        oap_test_pocket_layer_linking)
+    set_tests_properties(pocket_layer_linking_budget_${worker_limit} PROPERTIES
+        ENVIRONMENT "OAP_CAM_MAX_THREADS=${worker_limit}"
+        LABELS "fast;toolpath;pocket;high-risk" TIMEOUT 60)
+endforeach()
+
 oap_add_test_with_runtime(
     profile_contour
     oap_test_profile_contour)

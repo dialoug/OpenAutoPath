@@ -6,6 +6,31 @@ param(
 $ErrorActionPreference = 'Stop'
 $Destination = [IO.Path]::GetFullPath($Destination)
 New-Item -ItemType Directory -Path $Destination -Force | Out-Null
+
+function Get-VerifiedArchive {
+    param([string]$Uri, [string]$Archive, [string]$Sha256)
+    $partial = $Archive + '.download'
+    for ($attempt = 1; $attempt -le 3; $attempt++) {
+        try {
+            Invoke-WebRequest -Uri $Uri -OutFile $partial -UseBasicParsing
+            if ((Get-FileHash -LiteralPath $partial -Algorithm SHA256).Hash -ne $Sha256) {
+                throw "SHA256 mismatch for $Archive"
+            }
+            Move-Item -LiteralPath $partial -Destination $Archive
+            return
+        } catch {
+            if (Test-Path -LiteralPath $partial) {
+                Remove-Item -LiteralPath $partial
+            }
+            if ($attempt -eq 3) {
+                throw "Unable to download verified archive after 3 attempts: $Uri. $($_.Exception.Message)"
+            }
+            Write-Warning "Download attempt $attempt failed; retrying $Uri"
+            Start-Sleep -Seconds (2 * $attempt)
+        }
+    }
+}
+
 $packages = @(
     @{
         Name = 'opencascade-7.9.3-vc14-64'
@@ -31,7 +56,7 @@ foreach ($package in $packages) {
     $archive = Join-Path $Destination ($package.Name + '.zip')
     $url = 'https://github.com/Open-Cascade-SAS/OCCT/releases/download/V7_9_3/' + $package.Name + '.zip'
     if (-not (Test-Path -LiteralPath $archive)) {
-        Invoke-WebRequest -Uri $url -OutFile $archive
+        Get-VerifiedArchive -Uri $url -Archive $archive -Sha256 $package.Sha256
     }
     if ((Get-FileHash -LiteralPath $archive -Algorithm SHA256).Hash -ne $package.Sha256) {
         throw "SHA256 mismatch for $archive"
