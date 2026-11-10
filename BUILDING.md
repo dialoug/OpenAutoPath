@@ -324,8 +324,8 @@ Windows Runtime 还安装 Qt、OCCT 及附带运行库的声明。打包脚本�
 加 `-OfflineSources` 则只允许使用已缓存且哈希匹配的归档。普通 CMake 配置、构建和
 安装不会触发这些下载；发布 CI 按清单缓存归档。源码归档会增加 ZIP 体积。
 
-预编译 SDK 与上游源码的完整对应关系尚未全部复现，尤其是供应商补丁和逐库构建配置，
-详见 [依赖源码说明](licenses/DEPENDENCY_SOURCES.md)。文件检查通过不等于这项核实完成。
+桌面 CI 从固定源码构建 FreeImage、FFmpeg 和 OCCT，并保留构建记录；Qt 及其余预编译
+依赖的核对范围见 [依赖源码说明](licenses/DEPENDENCY_SOURCES.md)。文件校验不是外部签名认证。
 已发布的 ZIP 不会因源码新增许可文件而自动更新。
 
 The Windows packager validates deployed libraries against `licenses/windows-runtime.json`,
@@ -334,8 +334,21 @@ source archives. `-SourceCache` selects a reusable cache; `-OfflineSources` disa
 Ordinary CMake configure/build/install remains offline with respect to these source archives.
 Vendor binary/source correspondence limitations are documented in `licenses/DEPENDENCY_SOURCES.md`.
 
-**FreeImage 源码构建：** Windows 桌面 CI 会先校验并构建固定的 FreeImage 3.18.0 源码，
-应用随仓库保存的 OpenEXR 兼容补丁，并完成 PNG 读写回归验证。CMake 的
-`OAP_FREEIMAGE_ROOT` 可选择该独立 SDK；默认本地配置仍使用 OCCT 第三方 SDK 中的
-FreeImage。构建方法见 [依赖源码说明](licenses/DEPENDENCY_SOURCES.md)。
-自建 DLL 的构建记录、配套脚本和补丁一并进入发布包；缺失或不匹配的记录会阻止打包。
+**Windows 依赖源码构建：** 桌面 CI 依次构建 FreeImage 3.18.0、FFmpeg 3.3.4 和 OCCT 7.9.3。
+FreeImage 应用仓库中的 OpenEXR 兼容补丁，FFmpeg 与 OCCT 不修改上游源码。
+FreeImage 验证 PNG 读写，FFmpeg 验证解码与像素转换，应用随后运行现有 CTest。
+源码 SDK 有独立缓存；首次构建耗时较长，Windows 作业超时上限为 120 分钟。
+
+CMake 的 `OAP_FREEIMAGE_ROOT`、`OAP_FFMPEG_ROOT`、`OAP_OCCT_ROOT` 选择对应 SDK，
+默认本地配置仍可使用供应商 SDK。源码构建的 OCCT 使用 NATIVE 分配器，不部署 jemalloc；
+切换已有构建目录时应移走运行目录中旧的 jemalloc.dll，或使用新的构建目录。
+完整命令见 [依赖源码说明](licenses/DEPENDENCY_SOURCES.md)。
+
+自建 DLL 的构建记录、配套脚本、补丁和 FFmpeg 配置文件进入发布包。`v*` 版本打包
+要求三个组件的源码构建记录均匹配，缺失 DLL、记录不匹配或混入旧 jemalloc 会阻止打包。
+`preview-*` 仍允许清单中已核实的供应商二进制，便于本地验证；桌面 CI 默认使用源码构建。
+
+The desktop workflow builds pinned FreeImage, FFmpeg and OCCT sources and caches the SDKs.
+Select them with `OAP_FREEIMAGE_ROOT`, `OAP_FFMPEG_ROOT` and `OAP_OCCT_ROOT`.
+Versioned (`v*`) packages require matching source-build records for all three components;
+preview packages can also use the reviewed vendor SDK. Source-built OCCT uses the native allocator.

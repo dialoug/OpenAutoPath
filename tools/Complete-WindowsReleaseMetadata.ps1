@@ -6,7 +6,8 @@ param(
     [Parameter(Mandatory)][string]$BuildDir,
     [string]$SourceCache,
     [switch]$Offline,
-    [switch]$VerifyOnly
+    [switch]$VerifyOnly,
+    [switch]$RequireSourceBuilds
 )
 
 $ErrorActionPreference = 'Stop'
@@ -53,9 +54,24 @@ foreach ($file in Get-ChildItem -LiteralPath (Join-Path $stagePath 'bin') -Recur
     $entry = $known[$relative]
     $hash = (Get-FileHash -LiteralPath $file.FullName -Algorithm SHA256).Hash.ToLowerInvariant()
     if ($entry.File.PSObject.Properties['sha256'] -and $hash -ne $entry.File.sha256) {
-        if ($entry.Component.id -ne 'freeimage') {
+        if ($entry.Component.id -in @('ffmpeg', 'occt')) {
+            $id = $entry.Component.id
+            $recordPath = Join-Path $licensePath "build-evidence/$id-build-record.json"
+            if (-not (Test-Path -LiteralPath $recordPath)) { throw "Changed $id runtime has no source build record" }
+            $record = Get-Content -LiteralPath $recordPath -Raw -Encoding UTF8 | ConvertFrom-Json
+            $source = $manifest.sources | Where-Object component -eq $id
+            $recipe = @{ ffmpeg = 'tools/Build-WindowsFFmpeg.ps1'; occt = 'tools/Build-WindowsOCCT.ps1' }[$id]
+            $output = @($record.outputs | Where-Object file -eq $file.Name)
+            if ($record.schemaVersion -ne 1 -or $record.component -ne $id -or
+                $record.version -ne $entry.Component.version -or $record.sourceSha256 -ne $source.sha256 -or
+                $record.recipe -ne $recipe -or $record.recipeSha256 -ne (Get-FileHash (Join-Path $sourceRoot $recipe)).Hash -or
+                $output.Count -ne 1 -or $output[0].sha256 -ne $hash -or @($record.patches).Count -ne 0) {
+                throw "$id source build record does not match the runtime/source/recipe"
+            }
+            if (@($sourceBuildRecords | Where-Object component -eq $id).Count -eq 0) { $sourceBuildRecords += $record }
+        } elseif ($entry.Component.id -ne 'freeimage') {
             throw "Runtime changed since license review: $relative. Review the new SDK before updating its hash."
-        }
+        } else {
         # A source build is accepted only with the pinned recipe, source archive,
         # compatibility patch and a record matching the actual deployed DLL.
         $recordPath = Join-Path $licensePath 'build-evidence/FreeImage-build-record.json'
@@ -72,6 +88,7 @@ foreach ($file in Get-ChildItem -LiteralPath (Join-Path $stagePath 'bin') -Recur
             throw 'FreeImage source build record does not match the runtime/source/recipe/patch'
         }
         $sourceBuildRecords += $record
+        }
     }
     # DXC is obtained from the Windows SDK, not Qt. Signed SDK and GitHub
     # distributions can have different hashes for the same product version.
@@ -92,6 +109,31 @@ foreach ($file in Get-ChildItem -LiteralPath (Join-Path $stagePath 'bin') -Recur
 # Optional Qt plugins may be absent; the indispensable runtime files are checked
 # by Package-WindowsRelease.ps1. Never allow an empty inventory to pass.
 if ($inventory.Count -eq 0) { throw 'No runtime binaries found' }
+if ($RequireSourceBuilds) {
+    foreach ($id in @('freeimage', 'ffmpeg', 'occt')) {
+        if (@($sourceBuildRecords | Where-Object component -eq $id).Count -ne 1) {
+            throw "Source-built release requires a verified $id build record"
+        }
+        $component = $manifest.components | Where-Object id -eq $id
+        foreach ($requiredFile in $component.files) {
+            if (@($inventory | Where-Object file -eq $requiredFile.path).Count -ne 1) {
+                throw "Source-built release is missing runtime: $($requiredFile.path)"
+            }
+        }
+    }
+}
+$occtRecord = $sourceBuildRecords | Where-Object component -eq 'occt'
+if ($occtRecord) {
+    foreach ($dependency in $occtRecord.dependencyBinaries) {
+        $deployed = @($inventory | Where-Object { [IO.Path]::GetFileName($_.file) -eq $dependency.file })
+        if ($deployed.Count -ne 1 -or $deployed[0].sha256 -ne $dependency.sha256) {
+            throw "OCCT source build dependency mismatch: $($dependency.file)"
+        }
+    }
+    if ($occtRecord.memoryManager -eq 'NATIVE' -and @($inventory | Where-Object component -eq 'jemalloc').Count) {
+        throw 'Native-allocator OCCT package contains a stale jemalloc.dll; use a clean runtime directory'
+    }
+}
 $oclNotice = Get-Content -LiteralPath (Join-Path $licensePath 'OpenCAMLib-NOTICE.txt') -Raw
 $ocl = $manifest.components | Where-Object id -eq 'opencamlib'
 if (-not $oclNotice.Contains($ocl.version)) { throw 'OpenCAMLib source revision does not match the license manifest' }
@@ -151,7 +193,9 @@ Copy-Item -LiteralPath $manifestPath -Destination $licensePath
 Copy-Item -LiteralPath $manifestPath -Destination $sourcesPath
 $support = Join-Path $sourcesPath 'OpenAutoPath-build-support'
 foreach ($relative in @('LICENSE', 'licenses/windows-runtime.json', 'tools/Build-WindowsFreeImage.ps1',
-        'tools/tests/Test-FreeImageRuntime.ps1', 'tools/dependencies/freeimage-openexr-modern-cxx.patch')) {
+        'tools/tests/Test-FreeImageRuntime.ps1', 'tools/dependencies/freeimage-openexr-modern-cxx.patch',
+        'tools/Build-WindowsFFmpeg.ps1', 'tools/tests/Test-FFmpegRuntime.ps1', 'tools/Build-WindowsOCCT.ps1',
+        'tools/Install-WindowsOcct.ps1')) {
     $destination = Join-Path $support $relative
     New-Item -ItemType Directory -Force -Path (Split-Path $destination -Parent) | Out-Null
     Copy-Item -LiteralPath (Join-Path $sourceRoot $relative) -Destination $destination

@@ -41,10 +41,10 @@ Runtime 与 Development 安装组件均携带本项目 MIT、本文、AnalysisSi
 
 ## Windows SDK 附带的运行时
 
-部署列表还涉及 FreeType 2.13.3、FreeImage 3.18.0、oneTBB 2021.13.0、jemalloc、
+部署列表还涉及 FreeType 2.13.3、FreeImage 3.18.0、oneTBB 2021.13.0、
 FFmpeg 3.3.4、OpenVR 1.14.15、DirectX Shader Compiler 和 Microsoft Visual C++
 运行库。这些文件不是 OpenAutoPath 自有代码。Qt Network 及平台、图像、TLS 等插件
-也纳入了运行库清单。
+也纳入了运行库清单。原供应商 OCCT 配置还需要 jemalloc；桌面 CI 的源码构建配置不需要它。
 
 - FreeType 可选择 FreeType License（FTL）；需按其要求保留声明和鸣谢。
 - FreeImage 使用 FreeImage Public License；内嵌 LibRaw 使用可选的 CDDL，JPEG、PNG、
@@ -52,8 +52,10 @@ FFmpeg 3.3.4、OpenVR 1.14.15、DirectX Shader Compiler 和 Microsoft Visual C++
   桌面 CI 从固定源码归档构建 FreeImage，包含本项目的 OpenEXR 兼容补丁；构建脚本、
   补丁和匹配 DLL 的构建记录随包提供。
 - oneTBB 使用 Apache-2.0；jemalloc 以其 SDK 内的 BSD 声明为准。
-- 当前本地 FFmpeg SDK 的 `ffprobe -L` 报告 LGPL-2.1-or-later，构建参数未启用 GPL
-  或 nonfree；替换 SDK 后需要重新核对，不能把此结论套用到所有 FFmpeg 构建。
+- FFmpeg 桌面 CI 从固定的 3.3.4 源码构建，未启用 GPL 或 nonfree，采用 LGPL-2.1-or-later
+  路径；替换 SDK 或构建选项后需要重新核对，不能把此结论套用到所有 FFmpeg 构建。
+- OCCT 桌面 CI 从 7.9.3 源码构建，使用上游 NATIVE 内存分配器，链接源码构建的
+  FreeImage、FFmpeg，以及清单中的 FreeType、oneTBB、OpenVR。
 - Microsoft 运行库遵循微软再分发条款，不适用本项目 MIT。
 - OpenVR 使用 BSD-3-Clause；DirectX Shader Compiler 同时涉及 LLVM/NCSA、MIT 和
   Microsoft 条款，副本见 `licenses/runtime/DirectXShaderCompiler`。
@@ -72,5 +74,6 @@ Qt 官方 SPDX 清单及构建配置也随包保存；许可集合含可选组�
 FreeType 的固定版本源码归档和构建说明，详见
 [依赖源码说明](licenses/DEPENDENCY_SOURCES.md)（安装后本文同目录也有该文件）。
 已验证 48 个原供应商 DLL 与官方发布归档一致；这不等于已验证每个 DLL 的完整对应源码。
-FreeImage 已有本项目源码构建路径，FFmpeg 及其他供应商构建的剩余核实事项见依赖源码说明。
+FreeImage、FFmpeg、OCCT 的桌面 CI 已配置本项目源码构建路径；带 `v` 版本号的打包
+要求这三个组件具备匹配的源码、脚本和 DLL 构建记录。Qt 及其他预编译依赖的核对边界见依赖源码说明。
 已发布的 ZIP 不会自动更新，第三方组件也不会改为 MIT。

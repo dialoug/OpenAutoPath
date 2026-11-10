@@ -1,15 +1,31 @@
 set(OAP_FREEIMAGE_ROOT "${OAP_THIRDPARTY_ROOT}/freeimage-3.18.0-x64" CACHE PATH
     "FreeImage runtime SDK; may point to an SDK built by Build-WindowsFreeImage.ps1")
+set(OAP_FFMPEG_ROOT "${OAP_THIRDPARTY_ROOT}/ffmpeg-3.3.4-64" CACHE PATH
+    "FFmpeg runtime SDK; may point to an SDK built by Build-WindowsFFmpeg.ps1")
 set(OAP_THIRDPARTY_DLLS
     "${OAP_THIRDPARTY_ROOT}/freetype-2.13.3-x64/bin/freetype.dll"
     "${OAP_FREEIMAGE_ROOT}/bin/FreeImage.dll"
     "${OAP_THIRDPARTY_ROOT}/tbb-2021.13.0-x64/bin/tbb12.dll"
-    "${OAP_THIRDPARTY_ROOT}/jemalloc-vc14-64/bin/jemalloc.dll"
     "${OAP_THIRDPARTY_ROOT}/openvr-1.14.15-64/bin/win64/openvr_api.dll"
-    "${OAP_THIRDPARTY_ROOT}/ffmpeg-3.3.4-64/bin/avcodec-57.dll"
-    "${OAP_THIRDPARTY_ROOT}/ffmpeg-3.3.4-64/bin/avformat-57.dll"
-    "${OAP_THIRDPARTY_ROOT}/ffmpeg-3.3.4-64/bin/avutil-55.dll"
-    "${OAP_THIRDPARTY_ROOT}/ffmpeg-3.3.4-64/bin/swscale-4.dll")
+    "${OAP_FFMPEG_ROOT}/bin/avcodec-57.dll"
+    "${OAP_FFMPEG_ROOT}/bin/avformat-57.dll"
+    "${OAP_FFMPEG_ROOT}/bin/avutil-55.dll"
+    "${OAP_FFMPEG_ROOT}/bin/swscale-4.dll")
+
+# Our source-built OCCT selects upstream's native allocator; the vendor SDK
+# still requires jemalloc. Only a matching source-build record selects this path.
+set(oap_occt_native_allocator FALSE)
+if(EXISTS "${OAP_OCCT_ROOT}/build-record.json")
+    file(READ "${OAP_OCCT_ROOT}/build-record.json" oap_occt_build_record)
+    string(JSON oap_occt_record_component GET "${oap_occt_build_record}" component)
+    string(JSON oap_occt_record_allocator GET "${oap_occt_build_record}" memoryManager)
+    if(oap_occt_record_component STREQUAL "occt" AND oap_occt_record_allocator STREQUAL "NATIVE")
+        set(oap_occt_native_allocator TRUE)
+    endif()
+endif()
+if(NOT oap_occt_native_allocator)
+    list(APPEND OAP_THIRDPARTY_DLLS "${OAP_THIRDPARTY_ROOT}/jemalloc-vc14-64/bin/jemalloc.dll")
+endif()
 
 # FreeImage 使用 Visual C++ OpenMP 运行库。优先使用显式路径，其次只在当前
 # CMake 选择的 VS 实例或开发者命令行公布的 Redist 根下查找。

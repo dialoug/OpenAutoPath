@@ -1,6 +1,6 @@
 # Exercise release guards with an isolated fixture. No release or network access.
 [CmdletBinding()]
-param([Parameter(Mandatory)][string]$BuildDir, [string]$FreeImageRoot)
+param([Parameter(Mandatory)][string]$BuildDir, [string]$FreeImageRoot, [string]$FFmpegRoot, [string]$OCCTRoot)
 $ErrorActionPreference = 'Stop'
 Set-StrictMode -Version Latest
 $root = Split-Path (Split-Path $PSScriptRoot -Parent) -Parent
@@ -27,6 +27,8 @@ function Assert-Rejected([scriptblock]$Action, [string]$Expected) {
     }
     Write-Host "PASS: $Expected"
 }
+
+Assert-Rejected { & $collector -Stage $fixture -BuildDir $buildPath -VerifyOnly -RequireSourceBuilds } 'Source-built release requires'
 
 $unknown = Join-Path $fixture 'bin/unreviewed.dll'
 [IO.File]::WriteAllText($unknown, 'unknown dependency')
@@ -66,5 +68,60 @@ if ($FreeImageRoot) {
     $recordText | Set-Content $recordFile -Encoding UTF8
     Move-Item $recordFile ($recordFile + '.fixture')
     Assert-Rejected { & $collector -Stage $fixture -BuildDir $buildPath -VerifyOnly } 'Changed FreeImage runtime has no source build record'
+    Move-Item ($recordFile + '.fixture') $recordFile
     Write-Host 'FreeImage source build record guard tests passed.'
+}
+foreach ($sdk in @(@{ id = 'ffmpeg'; root = $FFmpegRoot; bin = 'bin' },
+        @{ id = 'occt'; root = $OCCTRoot; bin = 'win64/vc14/bin' })) {
+    if (-not $sdk.root) { continue }
+    $id = $sdk.id
+    $evidence = Join-Path $notices 'build-evidence'
+    New-Item -ItemType Directory -Force -Path $evidence | Out-Null
+    $recordFile = Join-Path $evidence "$id-build-record.json"
+    Copy-Item (Join-Path $sdk.root 'build-record.json') $recordFile
+    $recordText = Get-Content $recordFile -Raw -Encoding UTF8
+    $record = $recordText | ConvertFrom-Json
+    foreach ($binary in $record.outputs) {
+        Copy-Item (Join-Path $sdk.root "$($sdk.bin)/$($binary.file)") (Join-Path $fixture "bin/$($binary.file)")
+    }
+    if ($id -eq 'occt') {
+        # The application has already deployed exactly the dependencies used by OCCT.
+        foreach ($dependency in $record.dependencyBinaries) {
+            if (-not (Test-Path (Join-Path $fixture "bin/$($dependency.file)"))) {
+                Copy-Item (Join-Path $buildPath "RelWithDebInfo/bin/$($dependency.file)") (Join-Path $fixture "bin/$($dependency.file)")
+            }
+        }
+    }
+    & $collector -Stage $fixture -BuildDir $buildPath -VerifyOnly
+    foreach ($field in @('sourceSha256', 'recipeSha256')) {
+        $record = $recordText | ConvertFrom-Json
+        $record.$field = 'invalid'
+        $record | ConvertTo-Json -Depth 8 | Set-Content $recordFile -Encoding UTF8
+        Assert-Rejected { & $collector -Stage $fixture -BuildDir $buildPath -VerifyOnly } "$id source build record does not match"
+    }
+    $record = $recordText | ConvertFrom-Json
+    $record.outputs[0].sha256 = 'invalid'
+    $record | ConvertTo-Json -Depth 8 | Set-Content $recordFile -Encoding UTF8
+    Assert-Rejected { & $collector -Stage $fixture -BuildDir $buildPath -VerifyOnly } "$id source build record does not match"
+    $recordText | Set-Content $recordFile -Encoding UTF8
+    Move-Item $recordFile ($recordFile + '.fixture')
+    Assert-Rejected { & $collector -Stage $fixture -BuildDir $buildPath -VerifyOnly } "Changed $id runtime has no source build record"
+    Move-Item ($recordFile + '.fixture') $recordFile
+    if ($id -eq 'occt') {
+        $record = $recordText | ConvertFrom-Json
+        $record.dependencyBinaries[0].sha256 = 'invalid'
+        $record | ConvertTo-Json -Depth 8 | Set-Content $recordFile -Encoding UTF8
+        Assert-Rejected { & $collector -Stage $fixture -BuildDir $buildPath -VerifyOnly } 'OCCT source build dependency mismatch'
+        $recordText | Set-Content $recordFile -Encoding UTF8
+        $jemalloc = Join-Path $fixture 'bin/jemalloc.dll'
+        Copy-Item (Join-Path $root 'external/3rdparty-vc14-64/jemalloc-vc14-64/bin/jemalloc.dll') $jemalloc
+        Assert-Rejected { & $collector -Stage $fixture -BuildDir $buildPath -VerifyOnly } 'stale jemalloc.dll'
+        Move-Item $jemalloc ($jemalloc + '.fixture')
+        & $collector -Stage $fixture -BuildDir $buildPath -VerifyOnly -RequireSourceBuilds
+        $missing = Join-Path $fixture 'bin/avformat-57.dll'
+        Move-Item $missing ($missing + '.fixture')
+        Assert-Rejected { & $collector -Stage $fixture -BuildDir $buildPath -VerifyOnly -RequireSourceBuilds } 'Source-built release is missing runtime'
+        Move-Item ($missing + '.fixture') $missing
+    }
+    Write-Host "$id source build record guard tests passed."
 }

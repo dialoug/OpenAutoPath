@@ -67,7 +67,7 @@ if (-not (Test-Path -LiteralPath (Join-Path $stage 'bin/vc_redist.x64.exe'))) {
     throw 'The x64 Visual C++ runtime installer is missing'
 }
 # Verify deployed libraries and include their notices, SDK evidence and sources.
-& (Join-Path $PSScriptRoot 'Complete-WindowsReleaseMetadata.ps1') -Stage $stage -BuildDir $buildPath -SourceCache $SourceCache -Offline:$OfflineSources
+& (Join-Path $PSScriptRoot 'Complete-WindowsReleaseMetadata.ps1') -Stage $stage -BuildDir $buildPath -SourceCache $SourceCache -Offline:$OfflineSources -RequireSourceBuilds:($Version.StartsWith('v'))
 Copy-Item -LiteralPath (Join-Path $sourceRoot 'BUILDING.md') -Destination $stage
 @{
     version = $Version

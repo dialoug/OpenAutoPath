@@ -21,7 +21,7 @@ concurrency:
 jobs:
   build:
     runs-on: windows-2022
-    timeout-minutes: 60
+    timeout-minutes: 120
     strategy:
       fail-fast: false
       matrix:
@@ -52,8 +52,26 @@ jobs:
           key: windows-occt-7.9.3-${{ hashFiles('tools/Install-WindowsOcct.ps1') }}
       - name: Install OCCT SDK
         run: ./tools/Install-WindowsOcct.ps1
-      - name: Build FreeImage from reviewed source
+      - name: Cache source-built runtime SDKs
+        id: source-sdks
         if: matrix.preset == 'windows-vs2022'
+        uses: actions/cache@v4
+        with:
+          path: |
+            build/dependencies/freeimage/bin
+            build/dependencies/freeimage/lib
+            build/dependencies/freeimage/include
+            build/dependencies/freeimage/build-record.json
+            build/dependencies/ffmpeg/bin
+            build/dependencies/ffmpeg/lib
+            build/dependencies/ffmpeg/include
+            build/dependencies/ffmpeg/config.h
+            build/dependencies/ffmpeg/config.mak
+            build/dependencies/ffmpeg/build-record.json
+            build/dependencies/occt/install
+          key: windows-source-sdks-v1-${{ hashFiles('licenses/windows-runtime.json', 'tools/Build-Windows*.ps1', 'tools/Install-WindowsOcct.ps1', 'tools/tests/Test-*Runtime.ps1', 'tools/dependencies/*') }}
+      - name: Build FreeImage from reviewed source
+        if: matrix.preset == 'windows-vs2022' && steps.source-sdks.outputs.cache-hit != 'true'
         run: |
           $manifest = Get-Content licenses/windows-runtime.json -Raw | ConvertFrom-Json
           $source = $manifest.sources | Where-Object component -eq 'freeimage'
@@ -65,6 +83,33 @@ jobs:
           }
           ./tools/Build-WindowsFreeImage.ps1 -SourceArchive $archive `
             -OutputDir build/dependencies/freeimage -Toolset v143 -Parallel 4
+      - name: Build FFmpeg and OCCT from reviewed sources
+        if: matrix.preset == 'windows-vs2022' && steps.source-sdks.outputs.cache-hit != 'true'
+        run: |
+          $manifest = Get-Content licenses/windows-runtime.json -Raw | ConvertFrom-Json
+          $cache = 'external/release-sources'
+          foreach ($id in @('ffmpeg', 'occt')) {
+            $source = $manifest.sources | Where-Object component -eq $id
+            $archive = Join-Path $cache $source.file
+            if (-not (Test-Path -LiteralPath $archive)) {
+              Invoke-WebRequest -Uri $source.url -OutFile $archive
+            }
+          }
+          $make = Join-Path $cache 'make-4.4.1-2-x86_64.pkg.tar.zst'
+          if (-not (Test-Path -LiteralPath $make)) {
+            Invoke-WebRequest -Uri 'https://repo.msys2.org/msys/x86_64/make-4.4.1-2-x86_64.pkg.tar.zst' -OutFile $make
+          }
+          ./tools/Build-WindowsFFmpeg.ps1 -SourceArchive "$cache/ffmpeg-3.3.4.tar.xz" `
+            -MakePackage $make -OutputDir build/dependencies/ffmpeg -Parallel 4
+          ./tools/Build-WindowsOCCT.ps1 -SourceArchive "$cache/OCCT-V7_9_3.tar.gz" `
+            -ThirdPartyRoot external/3rdparty-vc14-64 -FreeImageRoot build/dependencies/freeimage `
+            -FFmpegRoot build/dependencies/ffmpeg `
+            -OutputDir build/dependencies/occt -Parallel 4
+      - name: Test source-built runtime libraries
+        if: matrix.preset == 'windows-vs2022'
+        run: |
+          ./tools/tests/Test-FreeImageRuntime.ps1 -Dll build/dependencies/freeimage/bin/FreeImage.dll -OutputDir build/dependency-tests/freeimage
+          ./tools/tests/Test-FFmpegRuntime.ps1 -BinDir build/dependencies/ffmpeg/bin -OutputDir build/dependency-tests/ffmpeg
       - name: Configure
         env:
           BUILD_PRESET: ${{ matrix.preset }}
@@ -73,10 +118,15 @@ jobs:
             "-DFETCHCONTENT_BASE_DIR=$env:RUNNER_TEMP/oap-dependencies")
           if ($env:BUILD_PRESET -eq 'windows-vs2022') {
             $options += "-DOAP_FREEIMAGE_ROOT=$env:GITHUB_WORKSPACE/build/dependencies/freeimage"
+            $options += "-DOAP_FFMPEG_ROOT=$env:GITHUB_WORKSPACE/build/dependencies/ffmpeg"
+            $options += "-DOAP_OCCT_ROOT=$env:GITHUB_WORKSPACE/build/dependencies/occt/install"
           }
           cmake --preset $env:BUILD_PRESET @options
       - name: Build application and tests
         run: cmake --build --preset ${{ matrix.preset }}
+      - name: Verify desktop DLL loading
+        if: matrix.preset == 'windows-vs2022'
+        run: ./tools/tests/Test-WindowsRuntimeLoad.ps1 -BinDir build/windows-vs2022/RelWithDebInfo/bin
       - name: Run fast tests
         run: ctest --preset ${{ matrix.preset }}
       - name: Verify installed package
@@ -86,6 +136,7 @@ jobs:
         run: >-
           ./tools/tests/Test-WindowsReleaseMetadata.ps1 -BuildDir build/${{ matrix.preset }}
           -FreeImageRoot build/dependencies/freeimage
+          -FFmpegRoot build/dependencies/ffmpeg -OCCTRoot build/dependencies/occt/install
       - name: Cache dependency source archives
         if: matrix.preset == 'windows-vs2022' && inputs.package_version != ''
         uses: actions/cache@v4
@@ -115,5 +166,11 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: test-logs-${{ matrix.preset }}
-          path: build/${{ matrix.preset }}/Testing/Temporary/
+          path: |
+            build/${{ matrix.preset }}/Testing/Temporary/
+            build/dependencies/**/build.log
+            build/dependencies/**/configure.log
+            build/dependencies/**/install.log
+            build/dependencies/**/config.log
+            build/dependencies/**/build-record.json
           if-no-files-found: ignore

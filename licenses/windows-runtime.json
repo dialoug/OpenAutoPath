@@ -277,6 +277,13 @@
         "sha256": "2a4f5e187992427674869e89477882d1ace4d67695d4b27173830d93f8cf11be",
         "assetId": 325110450,
         "verification": "Runtime file SHA256 matched the official release archive entry on 2026-11-11; this verifies binary distribution origin, not complete corresponding source."
+      },
+      "sourceBuild": {
+        "recipe": "tools/Build-WindowsOCCT.ps1",
+        "record": "share/licenses/OpenAutoPath/build-evidence/occt-build-record.json",
+        "patches": [],
+        "status": "Desktop CI builds the pinned upstream source; tagged packages require matching source-build records.",
+        "memoryManager": "NATIVE (does not require jemalloc)"
       }
     },
     {
@@ -431,6 +438,17 @@
         "avformat": "--enable-shared --disable-static --prefix=/d/build_ffmpeg/ffmpeg-3.3.4-64 --toolchain=msvc --arch=amd64 --disable-asm --disable-yasm --disable-swresample",
         "avutil": "--enable-shared --disable-static --prefix=/d/build_ffmpeg/ffmpeg-3.3.4-64 --toolchain=msvc --arch=amd64 --disable-asm --disable-yasm --disable-swresample",
         "swscale": "--enable-shared --disable-static --prefix=/d/build_ffmpeg/ffmpeg-3.3.4-64 --toolchain=msvc --arch=amd64 --disable-asm --disable-yasm --disable-swresample"
+      },
+      "sourceBuild": {
+        "recipe": "tools/Build-WindowsFFmpeg.ps1",
+        "record": "share/licenses/OpenAutoPath/build-evidence/ffmpeg-build-record.json",
+        "patches": [],
+        "status": "Desktop CI builds the pinned upstream source; tagged packages require matching source-build records.",
+        "buildTool": {
+          "file": "make-4.4.1-2-x86_64.pkg.tar.zst",
+          "url": "https://repo.msys2.org/msys/x86_64/make-4.4.1-2-x86_64.pkg.tar.zst",
+          "sha256": "2408af61717dae87b00c855b132769a125c708907fc94a46bb16dae076113e5c"
+        }
       }
     },
     {
