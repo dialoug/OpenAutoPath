@@ -4,12 +4,18 @@ on:
   push:
   pull_request:
   workflow_dispatch:
+  workflow_call:
+    inputs:
+      package_version:
+        description: Nonempty only when the caller requests a desktop ZIP
+        type: string
+        default: ''
 
 permissions:
   contents: read
 
 concurrency:
-  group: windows-${{ github.ref }}
+  group: windows-${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
 
 jobs:
@@ -57,6 +63,24 @@ jobs:
         run: ctest --preset ${{ matrix.preset }}
       - name: Verify installed package
         run: ctest --preset ${{ matrix.preset }}-packaging
+      - name: Package desktop runtime
+        if: matrix.preset == 'windows-vs2022' && inputs.package_version != ''
+        env:
+          PACKAGE_VERSION: ${{ inputs.package_version }}
+        run: >-
+          ./tools/Package-WindowsRelease.ps1
+          -BuildDir build/windows-vs2022
+          -Version $env:PACKAGE_VERSION
+          -OutputDir artifacts/release
+      - name: Upload desktop package
+        if: matrix.preset == 'windows-vs2022' && inputs.package_version != ''
+        uses: actions/upload-artifact@v4
+        with:
+          name: windows-desktop-package
+          path: |
+            artifacts/release/*.zip
+            artifacts/release/SHA256SUMS.txt
+          if-no-files-found: error
       - name: Upload test logs
         if: always()
         uses: actions/upload-artifact@v4

@@ -4,12 +4,13 @@ on:
   push:
   pull_request:
   workflow_dispatch:
+  workflow_call:
 
 permissions:
   contents: read
 
 concurrency:
-  group: architecture-${{ github.ref }}
+  group: architecture-${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
 
 jobs:

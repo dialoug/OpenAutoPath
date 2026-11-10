@@ -1,0 +1,95 @@
+name: Release
+
+# 推送 v 开头的标签时验证并发布；手动运行只生成可下载的测试包。
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+# 同一引用的发布任务排队执行，避免发布过程中被后续运行取消。
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  # 校验标签格式；分支上的手动构建使用 preview-提交短哈希命名。
+  version:
+    runs-on: ubuntu-latest
+    outputs:
+      value: ${{ steps.version.outputs.value }}
+    steps:
+      - name: Validate version or name manual package
+        id: version
+        shell: bash
+        env:
+          REF_TYPE: ${{ github.ref_type }}
+          REF_NAME: ${{ github.ref_name }}
+        run: |
+          if [[ "$REF_TYPE" == tag ]]; then
+            if [[ ! "$REF_NAME" =~ ^v[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z]+([.-][0-9A-Za-z]+)*)?$ ]]; then
+              echo 'Expected vMAJOR.MINOR.PATCH or vMAJOR.MINOR.PATCH-prerelease' >&2
+              exit 1
+            fi
+            echo "value=$REF_NAME" >> "$GITHUB_OUTPUT"
+          else
+            echo "value=preview-${GITHUB_SHA:0:12}" >> "$GITHUB_OUTPUT"
+          fi
+
+  # 复用同一提交的完整 CI；任一检查失败都会阻止发布。
+  architecture:
+    needs: version
+    uses: ./.github/workflows/architecture.yml
+
+  core:
+    needs: version
+    uses: ./.github/workflows/core.yml
+
+  windows:
+    needs: version
+    uses: ./.github/workflows/windows.yml
+    with:
+      package_version: ${{ needs.version.outputs.value }}
+
+  # 仅标签推送允许发布；即使手动选择标签运行，也不会执行本任务。
+  publish:
+    needs: [version, architecture, core, windows]
+    if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v')
+    runs-on: ubuntu-latest
+    permissions:
+      # 写权限仅授予发布任务，用于创建 Release 和上传附件。
+      contents: write
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: windows-desktop-package
+          path: release-assets
+      - name: Verify assets and publish release
+        shell: bash
+        working-directory: release-assets
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          RELEASE_TAG: ${{ needs.version.outputs.value }}
+        run: |
+          sha256sum --check SHA256SUMS.txt
+          # Resume a failed draft upload, but never overwrite a published release.
+          # 可以恢复上传失败的草稿，但不能覆盖已发布版本。
+          if draft=$(gh release view "$RELEASE_TAG" --json isDraft --jq .isDraft); then
+            if [[ "$draft" != true ]]; then
+              echo 'This version is already published; use a new version tag.' >&2
+              exit 1
+            fi
+          else
+            options=()
+            if [[ "$RELEASE_TAG" == *-* ]]; then
+              options+=(--prerelease)
+            fi
+            gh release create "$RELEASE_TAG" --verify-tag --draft \
+              --title "OpenAutoPath $RELEASE_TAG" --generate-notes "${options[@]}"
+          fi
+          gh release upload "$RELEASE_TAG" ./*.zip SHA256SUMS.txt --clobber
+          gh release edit "$RELEASE_TAG" --draft=false

@@ -211,3 +211,92 @@ use their core presets with a conda-forge environment. All build selected
 targets, run fast tests and verify the installed package. Fetched sources live
 outside the checkout in CI, exercising external-source grouping. Architecture
 CI separately checks source boundaries and documentation.
+
+## Windows release delivery / Windows 自动打包与发布
+
+`.github/workflows/release.yml` reuses all three CI workflows for the same
+commit. Only after architecture checks, Windows desktop/core tests and SDK
+checks, and Linux/macOS core tests and SDK checks pass can it publish a release.
+The Windows desktop package uses the tested RelWithDebInfo binaries, without
+PDBs or development libraries. It includes the launcher, application, deployed
+DLLs, Qt plugins, runtime installer, existing third-party notices and build ID.
+Linux/macOS currently validate the core only; this workflow does not publish
+desktop packages for those platforms.
+
+**中文说明：** `.github/workflows/release.yml` 会针对同一个提交复用三套 CI。
+只有架构检查、Windows 桌面版与核心版测试、Linux/macOS 核心版测试，以及各平台的
+SDK 安装验证全部通过，才会发布。当前发布产物仅为 Windows x64 桌面 ZIP，使用经过
+测试的 RelWithDebInfo 二进制，不包含 PDB 调试符号或开发库；包内包含启动器、应用、
+运行库、Qt 插件、运行库安装程序、现有第三方声明和构建标识。
+Linux/macOS 目前只验证核心模块，不生成桌面发布包。
+
+First push the workflow changes to GitHub. Run **Release** manually in Actions
+to build a preview ZIP and `SHA256SUMS.txt` under the
+`windows-desktop-package` artifact without creating a GitHub Release. Manual
+runs never publish, including runs selected on an existing tag.
+
+**先试打包：** 将这些工作流文件提交并推送到 GitHub 后，在仓库的
+**Actions → Release → Run workflow** 中手动运行。完成后，在该次运行页面的
+**Artifacts（构建产物）** 中下载 `windows-desktop-package`，其中包含 ZIP 和
+`SHA256SUMS.txt`。手动运行不会创建或发布 GitHub Release，即使选择的是已有标签。
+分支上的手动运行使用 `preview-提交短哈希` 命名；标签上的手动运行沿用标签名称。
+
+To publish a version, tag the intended commit and push that tag:
+
+**正式发布：** 先确认当前提交就是要发布的版本，再创建并推送版本标签。
+下面的 `v0.1.0` 是示例，实际使用时替换为本次版本号：
+
+```powershell
+git tag -a v0.1.0 -m "OpenAutoPath v0.1.0"
+git push origin v0.1.0
+```
+
+Tags must be `vMAJOR.MINOR.PATCH` with an optional prerelease suffix such as
+`v0.1.0-rc.1`. Suffix versions become GitHub prereleases. The workflow uses
+the built-in `GITHUB_TOKEN`; only the publishing job has `contents: write`.
+It verifies the downloaded ZIP's checksum, creates a draft, uploads the assets,
+then publishes. A failed upload can resume on rerun;
+an already published version is not overwritten. Publish fixes under a new tag.
+Repository or organization policy must allow the publishing job's token scope.
+
+**版本与权限：** 标签格式为 `v主版本.次版本.修订版本`，例如 `v0.1.0`；
+也可以使用 `v0.1.0-rc.1` 等后缀，带后缀的版本会标记为预发布版。
+流程使用 GitHub 内置的 `GITHUB_TOKEN`，无需另填个人访问令牌；只有发布任务申请
+`contents: write` 写权限，仓库或组织策略须允许该权限。
+
+**失败与重试：** 发布任务先校验下载的 ZIP，再创建 Release 草稿、上传 ZIP 和校验文件，
+最后公开该 Release（可见范围遵循仓库权限）。上传中断后可以重新运行流程，继续处理草稿；
+已经发布的版本不会被覆盖，后续修复应使用新标签。SHA-256 用于检查文件完整性，
+构建标识保存在包内的 `build-info.json` 中。
+
+The ZIP is unsigned. Extract it completely, install `bin/vc_redist.x64.exe` if
+needed, and launch the root `OpenAutoPath.exe`. File-presence checks validate
+the runtime layout; they are not a clean-machine interactive GUI test.
+
+**下载后运行：** 完整解压 ZIP，保留 `bin` 和 `share` 的相对位置，运行根目录的
+`OpenAutoPath.exe`。如果系统尚未安装 Visual C++ 运行库，先运行
+`bin/vc_redist.x64.exe`。当前产物没有代码签名；打包阶段检查必要文件是否齐全，
+不等同于已经在未安装开发环境的干净 Windows 系统上完成交互式 GUI 测试。
+
+To package an existing tested local desktop build into a fresh output folder:
+
+**本地打包：** 先构建并测试对应桌面版本，再指定构建目录和新的输出目录运行：
+
+```powershell
+./tools/Package-WindowsRelease.ps1 -BuildDir build/windows-vs2026 `
+  -Version v0.1.0-rc.1 -OutputDir artifacts/release-local
+```
+
+The packager runs `cmake --install --component Runtime` into a unique stage,
+checks required runtime files and writes the ZIP, SHA-256 and build metadata.
+The recorded commit identifies the source checkout; build and test that checkout
+before packaging. Release CI always builds a fresh checkout of the selected ref.
+
+**参数说明：** `-BuildDir` 指向已有的 CMake 构建目录，`-Version` 是产物版本名称，
+`-OutputDir` 是 ZIP 和校验文件的输出目录；`-Configuration` 默认为
+`RelWithDebInfo`，也可指定已构建的 `Release` 或 `MinSizeRel`。
+脚本不会重新编译，而是通过 `cmake --install --component Runtime` 将运行文件安装到
+新的临时目录，检查必要文件后压缩并计算 SHA-256。输出目录若已有同名 ZIP 或
+`SHA256SUMS.txt`，脚本会拒绝覆盖，应改用新的输出目录。
+记录的提交号来自当前源码目录，因此本地打包前应保证二进制与该提交对应；
+云端发布流程会从所选提交重新检出并构建。
