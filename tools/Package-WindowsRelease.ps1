@@ -10,7 +10,9 @@ param(
     [string]$Version,
     [ValidateSet('RelWithDebInfo', 'Release', 'MinSizeRel')]
     [string]$Configuration = 'RelWithDebInfo',
-    [string]$OutputDir = 'artifacts/release'
+    [string]$OutputDir = 'artifacts/release',
+    [string]$SourceCache,
+    [switch]$OfflineSources
 )
 
 $ErrorActionPreference = 'Stop'
@@ -48,6 +50,9 @@ $required = @(
     'bin/Qt6OpenGL.dll', 'bin/Qt6OpenGLWidgets.dll',
     'bin/platforms/qwindows.dll', 'bin/TKernel.dll', 'bin/TKV3d.dll',
     'bin/vcomp140.dll',
+    'share/licenses/OpenAutoPath/LICENSE',
+    'share/licenses/OpenAutoPath/THIRD_PARTY_NOTICES.md',
+    'share/licenses/OpenAutoPath/AnalysisSitus-BSD-3-Clause.txt',
     'share/licenses/OpenAutoPath/OpenCAMLib-COPYING.txt',
     'share/licenses/OpenAutoPath/OpenCAMLib-NOTICE.txt',
     'share/licenses/OpenAutoPath/Boost-LICENSE_1_0.txt',
@@ -61,6 +66,8 @@ foreach ($relative in $required) {
 if (-not (Test-Path -LiteralPath (Join-Path $stage 'bin/vc_redist.x64.exe'))) {
     throw 'The x64 Visual C++ runtime installer is missing'
 }
+# Verify deployed libraries and include their notices, SDK evidence and sources.
+& (Join-Path $PSScriptRoot 'Complete-WindowsReleaseMetadata.ps1') -Stage $stage -BuildDir $buildPath -SourceCache $SourceCache -Offline:$OfflineSources
 Copy-Item -LiteralPath (Join-Path $sourceRoot 'BUILDING.md') -Destination $stage
 @{
     version = $Version
@@ -78,7 +85,9 @@ OpenAutoPath for Windows x64
 保留 bin 和 share 目录及其相对位置，不要只复制启动程序。
 如果系统尚未安装 Visual C++ 运行库，请先运行 bin/vc_redist.x64.exe。
 版本、源码提交号和构建配置记录在 build-info.json 中。本软件包未进行代码签名。
-本次构建安装的第三方声明位于 share/licenses/OpenAutoPath。
+项目自有代码采用 MIT；第三方组件保留原许可。
+许可与声明位于 share/licenses/OpenAutoPath，分发范围见 THIRD_PARTY_NOTICES.md。
+依赖源码归档位于 share/sources/OpenAutoPath，构建说明见 DEPENDENCY_SOURCES.md。
 构建与发布流程的中英文说明见同目录的 BUILDING.md。
 
 English instructions
@@ -87,13 +96,26 @@ Extract the entire archive before starting OpenAutoPath.exe at the package root.
 Keep the bin and share directories beside it. If the Visual C++ runtime is not
 installed, run bin/vc_redist.x64.exe and then start OpenAutoPath.exe.
 Build identity is recorded in build-info.json. This package is not code-signed.
-The notices installed by this build are in share/licenses/OpenAutoPath.
+Project-owned code is MIT-licensed; third-party components retain their licenses.
+See share/licenses/OpenAutoPath/LICENSE and THIRD_PARTY_NOTICES.md for scope.
+Dependency sources and build notes are under share/sources/OpenAutoPath.
 '@ | Set-Content -LiteralPath (Join-Path $stage 'README.txt') -Encoding UTF8
 
 # ZIP 保留版本命名的顶层目录；校验文件可用于核对下载后的文件完整性。
+Add-Type -AssemblyName System.IO.Compression
 Add-Type -AssemblyName System.IO.Compression.FileSystem
-[IO.Compression.ZipFile]::CreateFromDirectory(
-    $stage, $archivePath, [IO.Compression.CompressionLevel]::Optimal, $true)
+# Use ZIP-standard forward slashes even under Windows PowerShell/.NET Framework.
+$archive = [IO.Compression.ZipFile]::Open($archivePath, [IO.Compression.ZipArchiveMode]::Create)
+try {
+    foreach ($file in Get-ChildItem -LiteralPath $stage -Recurse -File | Sort-Object FullName) {
+        $relative = $file.FullName.Substring($stage.Length + 1).Replace('\', '/')
+        [IO.Compression.ZipFileExtensions]::CreateEntryFromFile(
+            $archive, $file.FullName, "$packageName/$relative",
+            [IO.Compression.CompressionLevel]::Optimal) | Out-Null
+    }
+} finally {
+    $archive.Dispose()
+}
 $hash = (Get-FileHash -LiteralPath $archivePath -Algorithm SHA256).Hash.ToLowerInvariant()
 "$hash  $packageName.zip" | Set-Content -LiteralPath $checksumPath -Encoding ascii
 Write-Host "Created $archivePath"

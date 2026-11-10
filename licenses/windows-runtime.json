@@ -1,0 +1,399 @@
+{
+  "schemaVersion": 1,
+  "scope": "Windows x64 runtime shipped by the pinned Qt/OCCT SDK configuration. Unknown or changed libraries require review.",
+  "components": [
+    {
+      "id": "qtbase",
+      "version": "6.11.1",
+      "license": "LGPL-3.0-only; bundled components retain their own terms",
+      "notice": "runtime/Qt-6.11.1-NOTICES.txt",
+      "files": [
+        {
+          "path": "bin/generic/qtuiotouchplugin.dll",
+          "sha256": "0a517e732bd6a12889e0708d6c464db1c07cfad9bb80831815d85505378d54ba"
+        },
+        {
+          "path": "bin/imageformats/qgif.dll",
+          "sha256": "1ac71f48e08ee0aa405d55041f8340d56ed827fb94260bceda46ac0a50dfb7a5"
+        },
+        {
+          "path": "bin/imageformats/qico.dll",
+          "sha256": "0eb08bc9d8f6c1ab05f3a837629eb10e41eb6aa72240d23e291056b801894794"
+        },
+        {
+          "path": "bin/imageformats/qjpeg.dll",
+          "sha256": "bc3815c58443a01f43417ecac74bbf182c245d433ea82af0b3dc669c2cb064ab"
+        },
+        {
+          "path": "bin/networkinformation/qnetworklistmanager.dll",
+          "sha256": "8de339b75f82efac6381ca01e3dd3482c500a9115c49b53fbccafe0d933eef64"
+        },
+        {
+          "path": "bin/platforms/qwindows.dll",
+          "sha256": "dd126e2a47f7f3d4a855981e9d4012076058b1440f6900b9a07aa950e4e4f20a"
+        },
+        {
+          "path": "bin/Qt6Core.dll",
+          "sha256": "fae4778a42e93adc82b831c879c886a05147e9cc26760808d21116be5547259b"
+        },
+        {
+          "path": "bin/Qt6Gui.dll",
+          "sha256": "8fceee959a670372aaa5763287c2ef7924cd9ecdbe2c29cf4b6c12a63079c503"
+        },
+        {
+          "path": "bin/Qt6Network.dll",
+          "sha256": "0232076731e386b6cc353bdf743d5fb17e95a3493c2d02afac984db87ed47b96"
+        },
+        {
+          "path": "bin/Qt6OpenGL.dll",
+          "sha256": "487f5dc733294df5553008195e5f659be2cd45d034bd30755705589d8892149b"
+        },
+        {
+          "path": "bin/Qt6OpenGLWidgets.dll",
+          "sha256": "1b116f24e60b03a2fef39b04210f0a2e8d163452b786a008e52f11bb4164f769"
+        },
+        {
+          "path": "bin/Qt6Widgets.dll",
+          "sha256": "4d603bff620ae0830d15c25a787f9f10ed3f972d998f1f17c9c4f83937280399"
+        },
+        {
+          "path": "bin/styles/qmodernwindowsstyle.dll",
+          "sha256": "093e3ac68dfdac52a2667a2f7ba00b336392f9d6bde08430494ef54dbd120541"
+        },
+        {
+          "path": "bin/tls/qcertonlybackend.dll",
+          "sha256": "c1fa08ef8f0ea33370ad8e1239d9147262b08d002edab4bc4e9812827381dbba"
+        },
+        {
+          "path": "bin/tls/qschannelbackend.dll",
+          "sha256": "b263e588f2a93955a3e42b2c0d893d203cbe5a0ac42d1af5840ddd3b9a16b183"
+        }
+      ]
+    },
+    {
+      "id": "occt",
+      "version": "7.9.3",
+      "license": "LGPL-2.1-only WITH OCCT-exception-1.0",
+      "notice": "runtime/OCCT/OCCT_LGPL_EXCEPTION.txt",
+      "files": [
+        {
+          "path": "bin/TKBin.dll",
+          "sha256": "fbd90e8c72e19f3492ebae002116b2b10294d47c925779906d14993c49b1e21e"
+        },
+        {
+          "path": "bin/TKBinL.dll",
+          "sha256": "3397619dca1ac81753cbe3027fcbad32053e235c268edfe503e5a9157db0cd18"
+        },
+        {
+          "path": "bin/TKBinTObj.dll",
+          "sha256": "2cdc769b6bf57fcc605a4df5849caf7a529006f542db9098183f7c741789b613"
+        },
+        {
+          "path": "bin/TKBinXCAF.dll",
+          "sha256": "a62625eb5f249c111de0a2a134daba8bcc53ea2ea7da70ced63790173412e74d"
+        },
+        {
+          "path": "bin/TKBO.dll",
+          "sha256": "e5bce511ae88c854b3133533bea8b9b357bd2d3e3b78c2c1171e68e26e4297c1"
+        },
+        {
+          "path": "bin/TKBool.dll",
+          "sha256": "669e4f57d0b058d32322c87a99d61e25b3585cacf05bbf3a0cbfad8165072cf5"
+        },
+        {
+          "path": "bin/TKBRep.dll",
+          "sha256": "9d195f5e4ed65a6562b84d27dc58fa7d2f519f6f44d58cac194fed6832107706"
+        },
+        {
+          "path": "bin/TKCAF.dll",
+          "sha256": "73cce7d44692103a710efd333ddb22194808f10b72dcf7eeb03d60f11c050fab"
+        },
+        {
+          "path": "bin/TKCDF.dll",
+          "sha256": "824d5e270b25e9c12ba409efc1c0e14a0deaaf4435a89358ee2b9bcafd5a5b12"
+        },
+        {
+          "path": "bin/TKDE.dll",
+          "sha256": "e5f27d07f34076541723436217a48d93bc05bacd28bd66db66f100bba5c89a40"
+        },
+        {
+          "path": "bin/TKDECascade.dll",
+          "sha256": "d7d7afa12822fceb6c5f4cfbafeade6d84b67ae3975fc069a4bfc321767d264d"
+        },
+        {
+          "path": "bin/TKDESTEP.dll",
+          "sha256": "0d8ccf8f50aecdfa247f38d8bd160d482e66fa159d803767bce8f17a0dba388a"
+        },
+        {
+          "path": "bin/TKernel.dll",
+          "sha256": "174f59e869425dfee5f3549ce878142c007730bff3f7aff152ee3cc4cacf3429"
+        },
+        {
+          "path": "bin/TKFillet.dll",
+          "sha256": "05ceb5fed13eed7d9fcd86f165fb817482f5261654abb90542e0dcffa06e2f5d"
+        },
+        {
+          "path": "bin/TKG2d.dll",
+          "sha256": "52edd56256d768b4e8b8671272d816322a5de3a232c41dcbb2b0c9caacc4e654"
+        },
+        {
+          "path": "bin/TKG3d.dll",
+          "sha256": "04b622035e7506f2692794875ebe243a06ed5b873f4c220f01c2c1044d0e93e5"
+        },
+        {
+          "path": "bin/TKGeomAlgo.dll",
+          "sha256": "282c384e426e5cb8150b4fd8fa3360734f0a8ae812b584f40c5b226ac22f6782"
+        },
+        {
+          "path": "bin/TKGeomBase.dll",
+          "sha256": "c5d86c4faf26dceda57cbf6e58bd2c08afdf81f0d2a11fdbb67b58145141976b"
+        },
+        {
+          "path": "bin/TKHLR.dll",
+          "sha256": "0a653f081cbdf2ff1e79d81276ec22d32389c10656424c8e8a78b5a23704a073"
+        },
+        {
+          "path": "bin/TKLCAF.dll",
+          "sha256": "beda774906d2971f01b25d8751b9a324e161459744db08511c9eddd0d7dc2a5a"
+        },
+        {
+          "path": "bin/TKMath.dll",
+          "sha256": "6672a4e3caec369f2881261c10977dbdc3d5c6f52d27545dca514a79a866a128"
+        },
+        {
+          "path": "bin/TKMesh.dll",
+          "sha256": "9b43cc049895abc8dc4c909519be074e5fd7d635f02d763392d91d87ba187404"
+        },
+        {
+          "path": "bin/TKOffset.dll",
+          "sha256": "3a9766dcdb68802e5d43fbffa4987bebc0151961c77ee34e4034d9d5e7a8d151"
+        },
+        {
+          "path": "bin/TKOpenGl.dll",
+          "sha256": "c243a205cbb325743b5d7883b13bf395ce396caf321cb3820907d246e12328fc"
+        },
+        {
+          "path": "bin/TKPrim.dll",
+          "sha256": "2faf096655662052a6efe36a1ea31c1380d6fb7c9eacefa30c8b751c4dc8b818"
+        },
+        {
+          "path": "bin/TKService.dll",
+          "sha256": "61727250170b6c30c49f9b3e2660f2371e58c901ad00a18a456efaa3c515ab75"
+        },
+        {
+          "path": "bin/TKShHealing.dll",
+          "sha256": "f8633beb7e7ed363b8f885d2d600caa59c603984514f7af9aaa87f1e306014b5"
+        },
+        {
+          "path": "bin/TKStd.dll",
+          "sha256": "95137a8b17610ec7d148575667b2ccfd4ab395f532cfaa96c4e0e5835b695c92"
+        },
+        {
+          "path": "bin/TKStdL.dll",
+          "sha256": "b6b53d3f6fef919f189b91e3751f79ab1d21ce08aa14ffbca937b347fc0f2a2b"
+        },
+        {
+          "path": "bin/TKTObj.dll",
+          "sha256": "c3ac2a2aff6fb56655541cae0b55bf47f2ee596795d2db5f081d2513c29acb5a"
+        },
+        {
+          "path": "bin/TKTopAlgo.dll",
+          "sha256": "8c88bed0194a1436ac0c86710e8bd0c6eac77f107bfbb728066dc020dbcc7ca6"
+        },
+        {
+          "path": "bin/TKV3d.dll",
+          "sha256": "405acb936ddc8c68fb62cb75226b5da5501869ff7bf488fdede115d3e99de0a7"
+        },
+        {
+          "path": "bin/TKVCAF.dll",
+          "sha256": "fe53f48d56dd65242b3b372b2575228140447b7df2489e888c7d3faa481785c6"
+        },
+        {
+          "path": "bin/TKXCAF.dll",
+          "sha256": "a9db6463747ad0a513dc4b2b9554e0075659651d356ca3930dffc92d62b17731"
+        },
+        {
+          "path": "bin/TKXml.dll",
+          "sha256": "d85d70092c43f0e5ffb232ddf4d97e2b027db788bdbed1c1559ae95df672b94c"
+        },
+        {
+          "path": "bin/TKXmlL.dll",
+          "sha256": "dba9a4350fd52d501fb574b806526f15f12d18c616bdef172f1090b0f9f4e2c2"
+        },
+        {
+          "path": "bin/TKXmlTObj.dll",
+          "sha256": "c5b90104a4ebae4b28eed773162c9bd45fde6b8a15cec607b91b94a690e7804f"
+        },
+        {
+          "path": "bin/TKXmlXCAF.dll",
+          "sha256": "518fa615e7440230aa7ab7053f3670c799de30c29e4ce3a26babacfeab2eee5e"
+        },
+        {
+          "path": "bin/TKXSBase.dll",
+          "sha256": "081f4c5b4818776e7f312c56d667d57e3f4a935ae64743b958d4b917a48eb475"
+        }
+      ]
+    },
+    {
+      "id": "opencamlib",
+      "version": "1a450b7c3d3b669224a2a5d09aab7f319794574c",
+      "license": "LGPL-2.1-or-later",
+      "notice": "OpenCAMLib-NOTICE.txt",
+      "files": [
+        {
+          "path": "bin/oap_opencamlib.dll"
+        }
+      ]
+    },
+    {
+      "id": "freetype",
+      "version": "2.13.3",
+      "license": "FTL; see bundled notices",
+      "notice": "runtime/FreeType/docs/FTL.TXT",
+      "files": [
+        {
+          "path": "bin/freetype.dll",
+          "sha256": "637621e4ae51b496b8a86f9b053050d5af2ba999ea0680bbfe3d5df91f976c75"
+        }
+      ]
+    },
+    {
+      "id": "freeimage",
+      "version": "3.18.0",
+      "license": "FreeImage Public License 1.0; embedded LibRaw uses CDDL-1.0; other codecs retain their licenses",
+      "notice": "runtime/FreeImage/license-fi.txt",
+      "files": [
+        {
+          "path": "bin/FreeImage.dll",
+          "sha256": "4594bd0538f7f6b05148b00996ff36ddfedef8d66910e931503dcfebf8efe1db"
+        }
+      ]
+    },
+    {
+      "id": "onetbb",
+      "version": "2021.13.0",
+      "license": "Apache-2.0",
+      "notice": "runtime/oneTBB-LICENSE.txt",
+      "files": [
+        {
+          "path": "bin/tbb12.dll",
+          "sha256": "887888a0c2ffe7f64718d4eea2a10ce41c68dec1a954db3a62646adeee66c0ad"
+        }
+      ]
+    },
+    {
+      "id": "jemalloc",
+      "version": "OCCT 7.9.3 Windows SDK build",
+      "license": "BSD-2-Clause",
+      "notice": "runtime/jemalloc-COPYRIGHT.txt",
+      "files": [
+        {
+          "path": "bin/jemalloc.dll",
+          "sha256": "ea0cfcf6a12bb3863961074547c958fd978aa3f800244cc4fe2847b127c4df5e"
+        }
+      ]
+    },
+    {
+      "id": "openvr",
+      "version": "1.14.15",
+      "license": "BSD-3-Clause",
+      "notice": "runtime/OpenVR-LICENSE.txt",
+      "files": [
+        {
+          "path": "bin/openvr_api.dll",
+          "sha256": "71db78e77e577db6d0666c25437695d42ceafb9c7f8da94fbe765525b8e2f5f2"
+        }
+      ]
+    },
+    {
+      "id": "ffmpeg",
+      "version": "3.3.4",
+      "license": "LGPL-2.1-or-later",
+      "notice": "runtime/FFmpeg/COPYING.LGPLv2.1",
+      "files": [
+        {
+          "path": "bin/avcodec-57.dll",
+          "sha256": "4d7a6a2cff37c782ce1a3c74fa83ebbebcc43dfc774e3f497a406c84c1458c7e"
+        },
+        {
+          "path": "bin/avformat-57.dll",
+          "sha256": "297d3207dd0e6325dab7a080472a4fd2f743cfc53861615b4dc96b91227cd3af"
+        },
+        {
+          "path": "bin/avutil-55.dll",
+          "sha256": "be7c03ff47618916d16af446e2f7c00e48f2ff8934c6ace4c0d0e3d804732e8e"
+        },
+        {
+          "path": "bin/swscale-4.dll",
+          "sha256": "67bcffb3ccdaebf2bbd3149542d92dd9430abfdff1d7b79b3a529af712926412"
+        }
+      ]
+    },
+    {
+      "id": "dxc",
+      "version": "1.9.2602.17 (21d28f727)",
+      "license": "NCSA/MIT and Microsoft DirectX Shader Compiler terms",
+      "notice": "runtime/DirectXShaderCompiler/LICENSE-MS.txt",
+      "files": [
+        {
+          "path": "bin/dxcompiler.dll"
+        },
+        {
+          "path": "bin/dxil.dll"
+        }
+      ]
+    },
+    {
+      "id": "msvc",
+      "version": "Microsoft Visual C++ redistributable selected by windeployqt / MSVC",
+      "license": "Microsoft redistributable terms",
+      "notice": "runtime/Microsoft-RUNTIME.txt",
+      "files": [
+        {
+          "path": "bin/vcomp140.dll"
+        },
+        {
+          "path": "bin/vc_redist.x64.exe"
+        }
+      ]
+    }
+  ],
+  "sources": [
+    {
+      "component": "qtbase",
+      "file": "qtbase-6.11.1.tar.xz",
+      "url": "https://download.qt.io/archive/qt/6.11/6.11.1/submodules/qtbase-everywhere-src-6.11.1.tar.xz",
+      "sha256": "d9594a31228aa23ad6b531719a29b45f0f3989fe6c136d45767ea179f233c1ac"
+    },
+    {
+      "component": "occt",
+      "file": "OCCT-V7_9_3.tar.gz",
+      "url": "https://codeload.github.com/Open-Cascade-SAS/OCCT/tar.gz/refs/tags/V7_9_3",
+      "sha256": "5ecf094ec6b12d5413dfb851d8c3590c354058aee556e32e408bdfbf8c357d57"
+    },
+    {
+      "component": "opencamlib",
+      "file": "opencamlib-1a450b7.tar.gz",
+      "url": "https://codeload.github.com/aewallin/opencamlib/tar.gz/1a450b7c3d3b669224a2a5d09aab7f319794574c",
+      "sha256": "a582f8bbff191b87df4ab42bf6c4d0ee560887a3b7db6a5d5059f7eeb6993e07"
+    },
+    {
+      "component": "freeimage",
+      "file": "FreeImage3180-mirror.zip",
+      "url": "https://distfiles.macports.org/freeimage/FreeImage3180.zip",
+      "sha256": "f41379682f9ada94ea7b34fe86bf9ee00935a3147be41b6569c9605a53e438fd"
+    },
+    {
+      "component": "ffmpeg",
+      "file": "ffmpeg-3.3.4.tar.xz",
+      "url": "https://ffmpeg.org/releases/ffmpeg-3.3.4.tar.xz",
+      "sha256": "98b97e1b908dfeb6aeb6d407e5a5eacdfc253a40c2d195f5867ed2d1d46ea957"
+    },
+    {
+      "component": "freetype",
+      "file": "freetype-2.13.3.tar.xz",
+      "url": "https://download.savannah.gnu.org/releases/freetype/freetype-2.13.3.tar.xz",
+      "sha256": "0550350666d427c74daeb85d5ac7bb353acba5f76956395995311a9c6f063289"
+    }
+  ]
+}

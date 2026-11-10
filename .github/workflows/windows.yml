@@ -63,6 +63,15 @@ jobs:
         run: ctest --preset ${{ matrix.preset }}
       - name: Verify installed package
         run: ctest --preset ${{ matrix.preset }}-packaging
+      - name: Verify release metadata guards
+        if: matrix.preset == 'windows-vs2022'
+        run: ./tools/tests/Test-WindowsReleaseMetadata.ps1 -BuildDir build/${{ matrix.preset }}
+      - name: Cache dependency source archives
+        if: matrix.preset == 'windows-vs2022' && inputs.package_version != ''
+        uses: actions/cache@v4
+        with:
+          path: build/${{ matrix.preset }}/release-source-cache
+          key: windows-release-sources-${{ hashFiles('licenses/windows-runtime.json') }}
       - name: Package desktop runtime
         if: matrix.preset == 'windows-vs2022' && inputs.package_version != ''
         env:

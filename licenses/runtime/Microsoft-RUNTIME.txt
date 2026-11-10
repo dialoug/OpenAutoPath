@@ -1,0 +1,17 @@
+Microsoft runtime components
+============================
+
+vcomp140.dll and vc_redist.x64.exe are Microsoft software, not MIT-licensed
+OpenAutoPath code. The installer contains Microsoft's own license terms.
+Redistribution is governed by the applicable Microsoft Visual Studio license
+and redistributable list. A build machine's Visual Studio license must authorize
+redistribution; this notice does not grant additional Microsoft rights.
+
+Visual C++ runtime redistribution documentation:
+https://learn.microsoft.com/en-us/cpp/windows/redistributing-visual-cpp-files
+
+Visual Studio 2022 redistributable list (Windows CI uses VS 2022):
+https://learn.microsoft.com/en-us/visualstudio/releases/2022/redistribution
+
+The package inventory records the hashes and file versions actually shipped.
+DirectX Shader Compiler has separate terms in DirectXShaderCompiler/.

@@ -21,3 +21,6 @@ CMakeLists.txt text eol=lf
 *.rar  binary
 *.step binary
 *.stp  binary
+
+# Preserve third-party notice bytes, including upstream encodings and line ends.
+licenses/runtime/** -text -whitespace

@@ -300,3 +300,36 @@ before packaging. Release CI always builds a fresh checkout of the selected ref.
 `SHA256SUMS.txt`，脚本会拒绝覆盖，应改用新的输出目录。
 记录的提交号来自当前源码目录，因此本地打包前应保证二进制与该提交对应；
 云端发布流程会从所选提交重新检出并构建。
+
+## License and redistribution / 许可与再分发
+
+Project-owned code and documentation are MIT-licensed; see [LICENSE](LICENSE).
+Third-party components and adapted code retain their original terms; see
+[THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md).
+Both Runtime and Development installations include these documents and the
+AnalysisSitus BSD notice under `share/licenses/OpenAutoPath`, alongside the
+existing OpenCAMLib, Boost and Clipper2 notices. Reconfigure an existing build
+directory before installing to pick up the updated installation rules.
+
+项目自有代码和文档采用 MIT。第三方依赖和移植代码保留原许可，不能将整个安装包
+都视为 MIT。Runtime 与 Development 安装均会携带上述许可文件；旧构建目录应先
+重新运行 CMake 配置，再安装或打包。打包脚本会检查这些文件是否存在。
+Windows Runtime 还安装 Qt、OCCT 及附带运行库的声明。打包脚本逐个核对实际 DLL，
+输出组件、版本、SHA-256 和许可路径清单，并保留 Qt SDK 的 SPDX 和构建配置。
+未知 DLL、已审核 SDK 二进制变化或许可文件缺失会阻止打包；更换 SDK 时需重新审核
+`licenses/windows-runtime.json`，不能仅更新哈希以跳过检查。
+
+打包还会下载并校验六份依赖源码归档，存入 ZIP 的 `share/sources/OpenAutoPath`。
+默认下载缓存位于构建目录的 `release-source-cache`；可用 `-SourceCache 路径` 复用缓存，
+加 `-OfflineSources` 则只允许使用已缓存且哈希匹配的归档。普通 CMake 配置、构建和
+安装不会触发这些下载；发布 CI 按清单缓存归档。源码归档会增加 ZIP 体积。
+
+预编译 SDK 与上游源码的完整对应关系尚未全部复现，尤其是供应商补丁和逐库构建配置，
+详见 [依赖源码说明](licenses/DEPENDENCY_SOURCES.md)。文件检查通过不等于这项核实完成。
+已发布的 ZIP 不会因源码新增许可文件而自动更新。
+
+The Windows packager validates deployed libraries against `licenses/windows-runtime.json`,
+includes upstream notices and Qt build evidence, and bundles six hash-verified dependency
+source archives. `-SourceCache` selects a reusable cache; `-OfflineSources` disables downloads.
+Ordinary CMake configure/build/install remains offline with respect to these source archives.
+Vendor binary/source correspondence limitations are documented in `licenses/DEPENDENCY_SOURCES.md`.

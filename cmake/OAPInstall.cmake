@@ -64,6 +64,11 @@ if(OAP_BUILD_GUI)
 endif()
 
 foreach(component Runtime Development)
+    install(FILES "${PROJECT_SOURCE_DIR}/LICENSE"
+        "${PROJECT_SOURCE_DIR}/THIRD_PARTY_NOTICES.md"
+        "${PROJECT_SOURCE_DIR}/licenses/AnalysisSitus-BSD-3-Clause.txt"
+        DESTINATION ${CMAKE_INSTALL_DATADIR}/licenses/OpenAutoPath
+        COMPONENT ${component})
     install(FILES "${OAP_OPENCAMLIB_LICENSE_FILE}"
         DESTINATION ${CMAKE_INSTALL_DATADIR}/licenses/OpenAutoPath
         RENAME OpenCAMLib-COPYING.txt COMPONENT ${component})
@@ -78,4 +83,13 @@ foreach(component Runtime Development)
             RENAME Clipper2-LICENSE.txt COMPONENT ${component})
     endif()
 endforeach()
+if(WIN32 AND OAP_BUILD_GUI)
+    install(DIRECTORY "${PROJECT_SOURCE_DIR}/licenses/runtime/"
+        DESTINATION ${CMAKE_INSTALL_DATADIR}/licenses/OpenAutoPath/runtime
+        COMPONENT Runtime)
+    install(FILES "${PROJECT_SOURCE_DIR}/licenses/windows-runtime.json"
+        "${PROJECT_SOURCE_DIR}/licenses/DEPENDENCY_SOURCES.md"
+        DESTINATION ${CMAKE_INSTALL_DATADIR}/licenses/OpenAutoPath
+        COMPONENT Runtime)
+endif()
 install(FILES BUILDING.md DESTINATION ${CMAKE_INSTALL_DATADIR}/doc/OpenAutoPath)
