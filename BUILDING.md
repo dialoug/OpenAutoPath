@@ -333,3 +333,9 @@ includes upstream notices and Qt build evidence, and bundles six hash-verified d
 source archives. `-SourceCache` selects a reusable cache; `-OfflineSources` disables downloads.
 Ordinary CMake configure/build/install remains offline with respect to these source archives.
 Vendor binary/source correspondence limitations are documented in `licenses/DEPENDENCY_SOURCES.md`.
+
+**FreeImage 源码构建：** Windows 桌面 CI 会先校验并构建固定的 FreeImage 3.18.0 源码，
+应用随仓库保存的 OpenEXR 兼容补丁，并完成 PNG 读写回归验证。CMake 的
+`OAP_FREEIMAGE_ROOT` 可选择该独立 SDK；默认本地配置仍使用 OCCT 第三方 SDK 中的
+FreeImage。构建方法见 [依赖源码说明](licenses/DEPENDENCY_SOURCES.md)。
+自建 DLL 的构建记录、配套脚本和补丁一并进入发布包；缺失或不匹配的记录会阻止打包。

@@ -84,6 +84,11 @@ foreach(component Runtime Development)
     endif()
 endforeach()
 if(WIN32 AND OAP_BUILD_GUI)
+    if(EXISTS "${OAP_FREEIMAGE_ROOT}/build-record.json")
+        install(FILES "${OAP_FREEIMAGE_ROOT}/build-record.json"
+            DESTINATION ${CMAKE_INSTALL_DATADIR}/licenses/OpenAutoPath/build-evidence
+            RENAME FreeImage-build-record.json COMPONENT Runtime)
+    endif()
     install(DIRECTORY "${PROJECT_SOURCE_DIR}/licenses/runtime/"
         DESTINATION ${CMAKE_INSTALL_DATADIR}/licenses/OpenAutoPath/runtime
         COMPONENT Runtime)

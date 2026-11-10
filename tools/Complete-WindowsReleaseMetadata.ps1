@@ -42,6 +42,7 @@ foreach ($component in $manifest.components) {
     }
 }
 $inventory = @()
+$sourceBuildRecords = @()
 foreach ($file in Get-ChildItem -LiteralPath (Join-Path $stagePath 'bin') -Recurse -File) {
     if ($file.Extension -notin @('.dll', '.exe')) { continue }
     $relative = $file.FullName.Substring($stagePath.Length + 1).Replace('\', '/')
@@ -52,7 +53,25 @@ foreach ($file in Get-ChildItem -LiteralPath (Join-Path $stagePath 'bin') -Recur
     $entry = $known[$relative]
     $hash = (Get-FileHash -LiteralPath $file.FullName -Algorithm SHA256).Hash.ToLowerInvariant()
     if ($entry.File.PSObject.Properties['sha256'] -and $hash -ne $entry.File.sha256) {
-        throw "Runtime changed since license review: $relative. Review the new SDK before updating its hash."
+        if ($entry.Component.id -ne 'freeimage') {
+            throw "Runtime changed since license review: $relative. Review the new SDK before updating its hash."
+        }
+        # A source build is accepted only with the pinned recipe, source archive,
+        # compatibility patch and a record matching the actual deployed DLL.
+        $recordPath = Join-Path $licensePath 'build-evidence/FreeImage-build-record.json'
+        if (-not (Test-Path -LiteralPath $recordPath)) { throw 'Changed FreeImage runtime has no source build record' }
+        $record = Get-Content -LiteralPath $recordPath -Raw -Encoding UTF8 | ConvertFrom-Json
+        $fiSource = $manifest.sources | Where-Object component -eq 'freeimage'
+        if ($record.schemaVersion -ne 1 -or $record.component -ne 'freeimage' -or
+            $record.version -ne '3.18.0' -or $record.sourceSha256 -ne $fiSource.sha256 -or
+            $record.dllSha256 -ne $hash -or
+            $record.recipe -ne 'tools/Build-WindowsFreeImage.ps1' -or
+            $record.patch -ne 'tools/dependencies/freeimage-openexr-modern-cxx.patch' -or
+            $record.recipeSha256 -ne (Get-FileHash (Join-Path $sourceRoot $record.recipe)).Hash -or
+            $record.patchSha256 -ne (Get-FileHash (Join-Path $sourceRoot $record.patch)).Hash) {
+            throw 'FreeImage source build record does not match the runtime/source/recipe/patch'
+        }
+        $sourceBuildRecords += $record
     }
     # DXC is obtained from the Windows SDK, not Qt. Signed SDK and GitHub
     # distributions can have different hashes for the same product version.
@@ -130,11 +149,19 @@ foreach ($source in $manifest.sources) {
 Copy-Item -LiteralPath (Join-Path $sourceRoot 'licenses/DEPENDENCY_SOURCES.md') -Destination $sourcesPath
 Copy-Item -LiteralPath $manifestPath -Destination $licensePath
 Copy-Item -LiteralPath $manifestPath -Destination $sourcesPath
+$support = Join-Path $sourcesPath 'OpenAutoPath-build-support'
+foreach ($relative in @('LICENSE', 'licenses/windows-runtime.json', 'tools/Build-WindowsFreeImage.ps1',
+        'tools/tests/Test-FreeImageRuntime.ps1', 'tools/dependencies/freeimage-openexr-modern-cxx.patch')) {
+    $destination = Join-Path $support $relative
+    New-Item -ItemType Directory -Force -Path (Split-Path $destination -Parent) | Out-Null
+    Copy-Item -LiteralPath (Join-Path $sourceRoot $relative) -Destination $destination
+}
 $result = [ordered]@{
     schemaVersion = 1
     scope = 'Deployed third-party DLLs and Microsoft redistributable; excludes project executables'
     binaries = @($inventory | Sort-Object { $_.file })
     sources = @($manifest.sources)
+    sourceBuilds = @($sourceBuildRecords)
     sourceDirectory = 'share/sources/OpenAutoPath'
 }
 $result | ConvertTo-Json -Depth 10 | Set-Content -LiteralPath (Join-Path $licensePath 'runtime-inventory.json') -Encoding UTF8

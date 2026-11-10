@@ -49,6 +49,8 @@ FFmpeg 3.3.4、OpenVR 1.14.15、DirectX Shader Compiler 和 Microsoft Visual C++
 - FreeType 可选择 FreeType License（FTL）；需按其要求保留声明和鸣谢。
 - FreeImage 使用 FreeImage Public License；内嵌 LibRaw 使用可选的 CDDL，JPEG、PNG、
   TIFF、OpenEXR、OpenJPEG、WebP、JXR、zlib 等组件保留各自声明，见 `licenses/runtime/FreeImage`。
+  桌面 CI 从固定源码归档构建 FreeImage，包含本项目的 OpenEXR 兼容补丁；构建脚本、
+  补丁和匹配 DLL 的构建记录随包提供。
 - oneTBB 使用 Apache-2.0；jemalloc 以其 SDK 内的 BSD 声明为准。
 - 当前本地 FFmpeg SDK 的 `ffprobe -L` 报告 LGPL-2.1-or-later，构建参数未启用 GPL
   或 nonfree；替换 SDK 后需要重新核对，不能把此结论套用到所有 FFmpeg 构建。
@@ -69,6 +71,6 @@ Qt 官方 SPDX 清单及构建配置也随包保存；许可集合含可选组�
 包内 `share/sources/OpenAutoPath` 提供 Qt、OCCT、OpenCAMLib、FreeImage、FFmpeg、
 FreeType 的固定版本源码归档和构建说明，详见
 [依赖源码说明](licenses/DEPENDENCY_SOURCES.md)（安装后本文同目录也有该文件）。
-这仍不等于已验证每个预编译 DLL 的完整对应源码：官方 OCCT 第三方 SDK 未提供完整的
-逐库构建脚本和补丁记录，该项核实尚未完成。具体边界见依赖源码说明。
+已验证 48 个原供应商 DLL 与官方发布归档一致；这不等于已验证每个 DLL 的完整对应源码。
+FreeImage 已有本项目源码构建路径，FFmpeg 及其他供应商构建的剩余核实事项见依赖源码说明。
 已发布的 ZIP 不会自动更新，第三方组件也不会改为 MIT。

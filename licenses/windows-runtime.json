@@ -78,161 +78,206 @@
       "files": [
         {
           "path": "bin/TKBin.dll",
-          "sha256": "fbd90e8c72e19f3492ebae002116b2b10294d47c925779906d14993c49b1e21e"
+          "sha256": "fbd90e8c72e19f3492ebae002116b2b10294d47c925779906d14993c49b1e21e",
+          "vendorArchiveEntry": "opencascade-7.9.3-vc14-64/win64/vc14/bin/TKBin.dll"
         },
         {
           "path": "bin/TKBinL.dll",
-          "sha256": "3397619dca1ac81753cbe3027fcbad32053e235c268edfe503e5a9157db0cd18"
+          "sha256": "3397619dca1ac81753cbe3027fcbad32053e235c268edfe503e5a9157db0cd18",
+          "vendorArchiveEntry": "opencascade-7.9.3-vc14-64/win64/vc14/bin/TKBinL.dll"
         },
         {
           "path": "bin/TKBinTObj.dll",
-          "sha256": "2cdc769b6bf57fcc605a4df5849caf7a529006f542db9098183f7c741789b613"
+          "sha256": "2cdc769b6bf57fcc605a4df5849caf7a529006f542db9098183f7c741789b613",
+          "vendorArchiveEntry": "opencascade-7.9.3-vc14-64/win64/vc14/bin/TKBinTObj.dll"
         },
         {
           "path": "bin/TKBinXCAF.dll",
-          "sha256": "a62625eb5f249c111de0a2a134daba8bcc53ea2ea7da70ced63790173412e74d"
+          "sha256": "a62625eb5f249c111de0a2a134daba8bcc53ea2ea7da70ced63790173412e74d",
+          "vendorArchiveEntry": "opencascade-7.9.3-vc14-64/win64/vc14/bin/TKBinXCAF.dll"
         },
         {
           "path": "bin/TKBO.dll",
-          "sha256": "e5bce511ae88c854b3133533bea8b9b357bd2d3e3b78c2c1171e68e26e4297c1"
+          "sha256": "e5bce511ae88c854b3133533bea8b9b357bd2d3e3b78c2c1171e68e26e4297c1",
+          "vendorArchiveEntry": "opencascade-7.9.3-vc14-64/win64/vc14/bin/TKBO.dll"
         },
         {
           "path": "bin/TKBool.dll",
-          "sha256": "669e4f57d0b058d32322c87a99d61e25b3585cacf05bbf3a0cbfad8165072cf5"
+          "sha256": "669e4f57d0b058d32322c87a99d61e25b3585cacf05bbf3a0cbfad8165072cf5",
+          "vendorArchiveEntry": "opencascade-7.9.3-vc14-64/win64/vc14/bin/TKBool.dll"
         },
         {
           "path": "bin/TKBRep.dll",
-          "sha256": "9d195f5e4ed65a6562b84d27dc58fa7d2f519f6f44d58cac194fed6832107706"
+          "sha256": "9d195f5e4ed65a6562b84d27dc58fa7d2f519f6f44d58cac194fed6832107706",
+          "vendorArchiveEntry": "opencascade-7.9.3-vc14-64/win64/vc14/bin/TKBRep.dll"
         },
         {
           "path": "bin/TKCAF.dll",
-          "sha256": "73cce7d44692103a710efd333ddb22194808f10b72dcf7eeb03d60f11c050fab"
+          "sha256": "73cce7d44692103a710efd333ddb22194808f10b72dcf7eeb03d60f11c050fab",
+          "vendorArchiveEntry": "opencascade-7.9.3-vc14-64/win64/vc14/bin/TKCAF.dll"
         },
         {
           "path": "bin/TKCDF.dll",
-          "sha256": "824d5e270b25e9c12ba409efc1c0e14a0deaaf4435a89358ee2b9bcafd5a5b12"
+          "sha256": "824d5e270b25e9c12ba409efc1c0e14a0deaaf4435a89358ee2b9bcafd5a5b12",
+          "vendorArchiveEntry": "opencascade-7.9.3-vc14-64/win64/vc14/bin/TKCDF.dll"
         },
         {
           "path": "bin/TKDE.dll",
-          "sha256": "e5f27d07f34076541723436217a48d93bc05bacd28bd66db66f100bba5c89a40"
+          "sha256": "e5f27d07f34076541723436217a48d93bc05bacd28bd66db66f100bba5c89a40",
+          "vendorArchiveEntry": "opencascade-7.9.3-vc14-64/win64/vc14/bin/TKDE.dll"
         },
         {
           "path": "bin/TKDECascade.dll",
-          "sha256": "d7d7afa12822fceb6c5f4cfbafeade6d84b67ae3975fc069a4bfc321767d264d"
+          "sha256": "d7d7afa12822fceb6c5f4cfbafeade6d84b67ae3975fc069a4bfc321767d264d",
+          "vendorArchiveEntry": "opencascade-7.9.3-vc14-64/win64/vc14/bin/TKDECascade.dll"
         },
         {
           "path": "bin/TKDESTEP.dll",
-          "sha256": "0d8ccf8f50aecdfa247f38d8bd160d482e66fa159d803767bce8f17a0dba388a"
+          "sha256": "0d8ccf8f50aecdfa247f38d8bd160d482e66fa159d803767bce8f17a0dba388a",
+          "vendorArchiveEntry": "opencascade-7.9.3-vc14-64/win64/vc14/bin/TKDESTEP.dll"
         },
         {
           "path": "bin/TKernel.dll",
-          "sha256": "174f59e869425dfee5f3549ce878142c007730bff3f7aff152ee3cc4cacf3429"
+          "sha256": "174f59e869425dfee5f3549ce878142c007730bff3f7aff152ee3cc4cacf3429",
+          "vendorArchiveEntry": "opencascade-7.9.3-vc14-64/win64/vc14/bin/TKernel.dll"
         },
         {
           "path": "bin/TKFillet.dll",
-          "sha256": "05ceb5fed13eed7d9fcd86f165fb817482f5261654abb90542e0dcffa06e2f5d"
+          "sha256": "05ceb5fed13eed7d9fcd86f165fb817482f5261654abb90542e0dcffa06e2f5d",
+          "vendorArchiveEntry": "opencascade-7.9.3-vc14-64/win64/vc14/bin/TKFillet.dll"
         },
         {
           "path": "bin/TKG2d.dll",
-          "sha256": "52edd56256d768b4e8b8671272d816322a5de3a232c41dcbb2b0c9caacc4e654"
+          "sha256": "52edd56256d768b4e8b8671272d816322a5de3a232c41dcbb2b0c9caacc4e654",
+          "vendorArchiveEntry": "opencascade-7.9.3-vc14-64/win64/vc14/bin/TKG2d.dll"
         },
         {
           "path": "bin/TKG3d.dll",
-          "sha256": "04b622035e7506f2692794875ebe243a06ed5b873f4c220f01c2c1044d0e93e5"
+          "sha256": "04b622035e7506f2692794875ebe243a06ed5b873f4c220f01c2c1044d0e93e5",
+          "vendorArchiveEntry": "opencascade-7.9.3-vc14-64/win64/vc14/bin/TKG3d.dll"
         },
         {
           "path": "bin/TKGeomAlgo.dll",
-          "sha256": "282c384e426e5cb8150b4fd8fa3360734f0a8ae812b584f40c5b226ac22f6782"
+          "sha256": "282c384e426e5cb8150b4fd8fa3360734f0a8ae812b584f40c5b226ac22f6782",
+          "vendorArchiveEntry": "opencascade-7.9.3-vc14-64/win64/vc14/bin/TKGeomAlgo.dll"
         },
         {
           "path": "bin/TKGeomBase.dll",
-          "sha256": "c5d86c4faf26dceda57cbf6e58bd2c08afdf81f0d2a11fdbb67b58145141976b"
+          "sha256": "c5d86c4faf26dceda57cbf6e58bd2c08afdf81f0d2a11fdbb67b58145141976b",
+          "vendorArchiveEntry": "opencascade-7.9.3-vc14-64/win64/vc14/bin/TKGeomBase.dll"
         },
         {
           "path": "bin/TKHLR.dll",
-          "sha256": "0a653f081cbdf2ff1e79d81276ec22d32389c10656424c8e8a78b5a23704a073"
+          "sha256": "0a653f081cbdf2ff1e79d81276ec22d32389c10656424c8e8a78b5a23704a073",
+          "vendorArchiveEntry": "opencascade-7.9.3-vc14-64/win64/vc14/bin/TKHLR.dll"
         },
         {
           "path": "bin/TKLCAF.dll",
-          "sha256": "beda774906d2971f01b25d8751b9a324e161459744db08511c9eddd0d7dc2a5a"
+          "sha256": "beda774906d2971f01b25d8751b9a324e161459744db08511c9eddd0d7dc2a5a",
+          "vendorArchiveEntry": "opencascade-7.9.3-vc14-64/win64/vc14/bin/TKLCAF.dll"
         },
         {
           "path": "bin/TKMath.dll",
-          "sha256": "6672a4e3caec369f2881261c10977dbdc3d5c6f52d27545dca514a79a866a128"
+          "sha256": "6672a4e3caec369f2881261c10977dbdc3d5c6f52d27545dca514a79a866a128",
+          "vendorArchiveEntry": "opencascade-7.9.3-vc14-64/win64/vc14/bin/TKMath.dll"
         },
         {
           "path": "bin/TKMesh.dll",
-          "sha256": "9b43cc049895abc8dc4c909519be074e5fd7d635f02d763392d91d87ba187404"
+          "sha256": "9b43cc049895abc8dc4c909519be074e5fd7d635f02d763392d91d87ba187404",
+          "vendorArchiveEntry": "opencascade-7.9.3-vc14-64/win64/vc14/bin/TKMesh.dll"
         },
         {
           "path": "bin/TKOffset.dll",
-          "sha256": "3a9766dcdb68802e5d43fbffa4987bebc0151961c77ee34e4034d9d5e7a8d151"
+          "sha256": "3a9766dcdb68802e5d43fbffa4987bebc0151961c77ee34e4034d9d5e7a8d151",
+          "vendorArchiveEntry": "opencascade-7.9.3-vc14-64/win64/vc14/bin/TKOffset.dll"
         },
         {
           "path": "bin/TKOpenGl.dll",
-          "sha256": "c243a205cbb325743b5d7883b13bf395ce396caf321cb3820907d246e12328fc"
+          "sha256": "c243a205cbb325743b5d7883b13bf395ce396caf321cb3820907d246e12328fc",
+          "vendorArchiveEntry": "opencascade-7.9.3-vc14-64/win64/vc14/bin/TKOpenGl.dll"
         },
         {
           "path": "bin/TKPrim.dll",
-          "sha256": "2faf096655662052a6efe36a1ea31c1380d6fb7c9eacefa30c8b751c4dc8b818"
+          "sha256": "2faf096655662052a6efe36a1ea31c1380d6fb7c9eacefa30c8b751c4dc8b818",
+          "vendorArchiveEntry": "opencascade-7.9.3-vc14-64/win64/vc14/bin/TKPrim.dll"
         },
         {
           "path": "bin/TKService.dll",
-          "sha256": "61727250170b6c30c49f9b3e2660f2371e58c901ad00a18a456efaa3c515ab75"
+          "sha256": "61727250170b6c30c49f9b3e2660f2371e58c901ad00a18a456efaa3c515ab75",
+          "vendorArchiveEntry": "opencascade-7.9.3-vc14-64/win64/vc14/bin/TKService.dll"
         },
         {
           "path": "bin/TKShHealing.dll",
-          "sha256": "f8633beb7e7ed363b8f885d2d600caa59c603984514f7af9aaa87f1e306014b5"
+          "sha256": "f8633beb7e7ed363b8f885d2d600caa59c603984514f7af9aaa87f1e306014b5",
+          "vendorArchiveEntry": "opencascade-7.9.3-vc14-64/win64/vc14/bin/TKShHealing.dll"
         },
         {
           "path": "bin/TKStd.dll",
-          "sha256": "95137a8b17610ec7d148575667b2ccfd4ab395f532cfaa96c4e0e5835b695c92"
+          "sha256": "95137a8b17610ec7d148575667b2ccfd4ab395f532cfaa96c4e0e5835b695c92",
+          "vendorArchiveEntry": "opencascade-7.9.3-vc14-64/win64/vc14/bin/TKStd.dll"
         },
         {
           "path": "bin/TKStdL.dll",
-          "sha256": "b6b53d3f6fef919f189b91e3751f79ab1d21ce08aa14ffbca937b347fc0f2a2b"
+          "sha256": "b6b53d3f6fef919f189b91e3751f79ab1d21ce08aa14ffbca937b347fc0f2a2b",
+          "vendorArchiveEntry": "opencascade-7.9.3-vc14-64/win64/vc14/bin/TKStdL.dll"
         },
         {
           "path": "bin/TKTObj.dll",
-          "sha256": "c3ac2a2aff6fb56655541cae0b55bf47f2ee596795d2db5f081d2513c29acb5a"
+          "sha256": "c3ac2a2aff6fb56655541cae0b55bf47f2ee596795d2db5f081d2513c29acb5a",
+          "vendorArchiveEntry": "opencascade-7.9.3-vc14-64/win64/vc14/bin/TKTObj.dll"
         },
         {
           "path": "bin/TKTopAlgo.dll",
-          "sha256": "8c88bed0194a1436ac0c86710e8bd0c6eac77f107bfbb728066dc020dbcc7ca6"
+          "sha256": "8c88bed0194a1436ac0c86710e8bd0c6eac77f107bfbb728066dc020dbcc7ca6",
+          "vendorArchiveEntry": "opencascade-7.9.3-vc14-64/win64/vc14/bin/TKTopAlgo.dll"
         },
         {
           "path": "bin/TKV3d.dll",
-          "sha256": "405acb936ddc8c68fb62cb75226b5da5501869ff7bf488fdede115d3e99de0a7"
+          "sha256": "405acb936ddc8c68fb62cb75226b5da5501869ff7bf488fdede115d3e99de0a7",
+          "vendorArchiveEntry": "opencascade-7.9.3-vc14-64/win64/vc14/bin/TKV3d.dll"
         },
         {
           "path": "bin/TKVCAF.dll",
-          "sha256": "fe53f48d56dd65242b3b372b2575228140447b7df2489e888c7d3faa481785c6"
+          "sha256": "fe53f48d56dd65242b3b372b2575228140447b7df2489e888c7d3faa481785c6",
+          "vendorArchiveEntry": "opencascade-7.9.3-vc14-64/win64/vc14/bin/TKVCAF.dll"
         },
         {
           "path": "bin/TKXCAF.dll",
-          "sha256": "a9db6463747ad0a513dc4b2b9554e0075659651d356ca3930dffc92d62b17731"
+          "sha256": "a9db6463747ad0a513dc4b2b9554e0075659651d356ca3930dffc92d62b17731",
+          "vendorArchiveEntry": "opencascade-7.9.3-vc14-64/win64/vc14/bin/TKXCAF.dll"
         },
         {
           "path": "bin/TKXml.dll",
-          "sha256": "d85d70092c43f0e5ffb232ddf4d97e2b027db788bdbed1c1559ae95df672b94c"
+          "sha256": "d85d70092c43f0e5ffb232ddf4d97e2b027db788bdbed1c1559ae95df672b94c",
+          "vendorArchiveEntry": "opencascade-7.9.3-vc14-64/win64/vc14/bin/TKXml.dll"
         },
         {
           "path": "bin/TKXmlL.dll",
-          "sha256": "dba9a4350fd52d501fb574b806526f15f12d18c616bdef172f1090b0f9f4e2c2"
+          "sha256": "dba9a4350fd52d501fb574b806526f15f12d18c616bdef172f1090b0f9f4e2c2",
+          "vendorArchiveEntry": "opencascade-7.9.3-vc14-64/win64/vc14/bin/TKXmlL.dll"
         },
         {
           "path": "bin/TKXmlTObj.dll",
-          "sha256": "c5b90104a4ebae4b28eed773162c9bd45fde6b8a15cec607b91b94a690e7804f"
+          "sha256": "c5b90104a4ebae4b28eed773162c9bd45fde6b8a15cec607b91b94a690e7804f",
+          "vendorArchiveEntry": "opencascade-7.9.3-vc14-64/win64/vc14/bin/TKXmlTObj.dll"
         },
         {
           "path": "bin/TKXmlXCAF.dll",
-          "sha256": "518fa615e7440230aa7ab7053f3670c799de30c29e4ce3a26babacfeab2eee5e"
+          "sha256": "518fa615e7440230aa7ab7053f3670c799de30c29e4ce3a26babacfeab2eee5e",
+          "vendorArchiveEntry": "opencascade-7.9.3-vc14-64/win64/vc14/bin/TKXmlXCAF.dll"
         },
         {
           "path": "bin/TKXSBase.dll",
-          "sha256": "081f4c5b4818776e7f312c56d667d57e3f4a935ae64743b958d4b917a48eb475"
+          "sha256": "081f4c5b4818776e7f312c56d667d57e3f4a935ae64743b958d4b917a48eb475",
+          "vendorArchiveEntry": "opencascade-7.9.3-vc14-64/win64/vc14/bin/TKXSBase.dll"
         }
-      ]
+      ],
+      "vendorBinaryOrigin": {
+        "url": "https://github.com/Open-Cascade-SAS/OCCT/releases/download/V7_9_3/opencascade-7.9.3-vc14-64.zip",
+        "sha256": "2a4f5e187992427674869e89477882d1ace4d67695d4b27173830d93f8cf11be",
+        "assetId": 325110450,
+        "verification": "Runtime file SHA256 matched the official release archive entry on 2026-11-11; this verifies binary distribution origin, not complete corresponding source."
+      }
     },
     {
       "id": "opencamlib",
@@ -253,9 +298,16 @@
       "files": [
         {
           "path": "bin/freetype.dll",
-          "sha256": "637621e4ae51b496b8a86f9b053050d5af2ba999ea0680bbfe3d5df91f976c75"
+          "sha256": "637621e4ae51b496b8a86f9b053050d5af2ba999ea0680bbfe3d5df91f976c75",
+          "vendorArchiveEntry": "3rdparty-vc14-64/freetype-2.13.3-x64/bin/freetype.dll"
         }
-      ]
+      ],
+      "vendorBinaryOrigin": {
+        "url": "https://github.com/Open-Cascade-SAS/OCCT/releases/download/V7_9_3/3rdparty-vc14-64.zip",
+        "sha256": "f25be51af6160a2db74d19a4adc0c08728517822167b01459f8e775927a2a2f6",
+        "assetId": 325110670,
+        "verification": "Runtime file SHA256 matched the official release archive entry on 2026-11-11; this verifies binary distribution origin, not complete corresponding source."
+      }
     },
     {
       "id": "freeimage",
@@ -265,9 +317,22 @@
       "files": [
         {
           "path": "bin/FreeImage.dll",
-          "sha256": "4594bd0538f7f6b05148b00996ff36ddfedef8d66910e931503dcfebf8efe1db"
+          "sha256": "4594bd0538f7f6b05148b00996ff36ddfedef8d66910e931503dcfebf8efe1db",
+          "vendorArchiveEntry": "3rdparty-vc14-64/freeimage-3.18.0-x64/bin/FreeImage.dll"
         }
-      ]
+      ],
+      "vendorBinaryOrigin": {
+        "url": "https://github.com/Open-Cascade-SAS/OCCT/releases/download/V7_9_3/3rdparty-vc14-64.zip",
+        "sha256": "f25be51af6160a2db74d19a4adc0c08728517822167b01459f8e775927a2a2f6",
+        "assetId": 325110670,
+        "verification": "Runtime file SHA256 matched the official release archive entry on 2026-11-11; this verifies binary distribution origin, not complete corresponding source."
+      },
+      "sourceBuild": {
+        "recipe": "tools/Build-WindowsFreeImage.ps1",
+        "patch": "tools/dependencies/freeimage-openexr-modern-cxx.patch",
+        "record": "share/licenses/OpenAutoPath/build-evidence/FreeImage-build-record.json",
+        "status": "CI desktop builds from the pinned source archive; vendor binary remains an explicit local SDK option."
+      }
     },
     {
       "id": "onetbb",
@@ -277,9 +342,16 @@
       "files": [
         {
           "path": "bin/tbb12.dll",
-          "sha256": "887888a0c2ffe7f64718d4eea2a10ce41c68dec1a954db3a62646adeee66c0ad"
+          "sha256": "887888a0c2ffe7f64718d4eea2a10ce41c68dec1a954db3a62646adeee66c0ad",
+          "vendorArchiveEntry": "3rdparty-vc14-64/tbb-2021.13.0-x64/bin/tbb12.dll"
         }
-      ]
+      ],
+      "vendorBinaryOrigin": {
+        "url": "https://github.com/Open-Cascade-SAS/OCCT/releases/download/V7_9_3/3rdparty-vc14-64.zip",
+        "sha256": "f25be51af6160a2db74d19a4adc0c08728517822167b01459f8e775927a2a2f6",
+        "assetId": 325110670,
+        "verification": "Runtime file SHA256 matched the official release archive entry on 2026-11-11; this verifies binary distribution origin, not complete corresponding source."
+      }
     },
     {
       "id": "jemalloc",
@@ -289,9 +361,16 @@
       "files": [
         {
           "path": "bin/jemalloc.dll",
-          "sha256": "ea0cfcf6a12bb3863961074547c958fd978aa3f800244cc4fe2847b127c4df5e"
+          "sha256": "ea0cfcf6a12bb3863961074547c958fd978aa3f800244cc4fe2847b127c4df5e",
+          "vendorArchiveEntry": "3rdparty-vc14-64/jemalloc-vc14-64/bin/jemalloc.dll"
         }
-      ]
+      ],
+      "vendorBinaryOrigin": {
+        "url": "https://github.com/Open-Cascade-SAS/OCCT/releases/download/V7_9_3/3rdparty-vc14-64.zip",
+        "sha256": "f25be51af6160a2db74d19a4adc0c08728517822167b01459f8e775927a2a2f6",
+        "assetId": 325110670,
+        "verification": "Runtime file SHA256 matched the official release archive entry on 2026-11-11; this verifies binary distribution origin, not complete corresponding source."
+      }
     },
     {
       "id": "openvr",
@@ -301,9 +380,16 @@
       "files": [
         {
           "path": "bin/openvr_api.dll",
-          "sha256": "71db78e77e577db6d0666c25437695d42ceafb9c7f8da94fbe765525b8e2f5f2"
+          "sha256": "71db78e77e577db6d0666c25437695d42ceafb9c7f8da94fbe765525b8e2f5f2",
+          "vendorArchiveEntry": "3rdparty-vc14-64/openvr-1.14.15-64/bin/win64/openvr_api.dll"
         }
-      ]
+      ],
+      "vendorBinaryOrigin": {
+        "url": "https://github.com/Open-Cascade-SAS/OCCT/releases/download/V7_9_3/3rdparty-vc14-64.zip",
+        "sha256": "f25be51af6160a2db74d19a4adc0c08728517822167b01459f8e775927a2a2f6",
+        "assetId": 325110670,
+        "verification": "Runtime file SHA256 matched the official release archive entry on 2026-11-11; this verifies binary distribution origin, not complete corresponding source."
+      }
     },
     {
       "id": "ffmpeg",
@@ -313,21 +399,39 @@
       "files": [
         {
           "path": "bin/avcodec-57.dll",
-          "sha256": "4d7a6a2cff37c782ce1a3c74fa83ebbebcc43dfc774e3f497a406c84c1458c7e"
+          "sha256": "4d7a6a2cff37c782ce1a3c74fa83ebbebcc43dfc774e3f497a406c84c1458c7e",
+          "vendorArchiveEntry": "3rdparty-vc14-64/ffmpeg-3.3.4-64/bin/avcodec-57.dll"
         },
         {
           "path": "bin/avformat-57.dll",
-          "sha256": "297d3207dd0e6325dab7a080472a4fd2f743cfc53861615b4dc96b91227cd3af"
+          "sha256": "297d3207dd0e6325dab7a080472a4fd2f743cfc53861615b4dc96b91227cd3af",
+          "vendorArchiveEntry": "3rdparty-vc14-64/ffmpeg-3.3.4-64/bin/avformat-57.dll"
         },
         {
           "path": "bin/avutil-55.dll",
-          "sha256": "be7c03ff47618916d16af446e2f7c00e48f2ff8934c6ace4c0d0e3d804732e8e"
+          "sha256": "be7c03ff47618916d16af446e2f7c00e48f2ff8934c6ace4c0d0e3d804732e8e",
+          "vendorArchiveEntry": "3rdparty-vc14-64/ffmpeg-3.3.4-64/bin/avutil-55.dll"
         },
         {
           "path": "bin/swscale-4.dll",
-          "sha256": "67bcffb3ccdaebf2bbd3149542d92dd9430abfdff1d7b79b3a529af712926412"
+          "sha256": "67bcffb3ccdaebf2bbd3149542d92dd9430abfdff1d7b79b3a529af712926412",
+          "vendorArchiveEntry": "3rdparty-vc14-64/ffmpeg-3.3.4-64/bin/swscale-4.dll"
         }
-      ]
+      ],
+      "vendorBinaryOrigin": {
+        "url": "https://github.com/Open-Cascade-SAS/OCCT/releases/download/V7_9_3/3rdparty-vc14-64.zip",
+        "sha256": "f25be51af6160a2db74d19a4adc0c08728517822167b01459f8e775927a2a2f6",
+        "assetId": 325110670,
+        "verification": "Runtime file SHA256 matched the official release archive entry on 2026-11-11; this verifies binary distribution origin, not complete corresponding source."
+      },
+      "runtimeBuildEvidence": {
+        "version": "3.3.4",
+        "license": "LGPL version 2.1 or later",
+        "avcodec": "--enable-shared --disable-static --prefix=/d/build_ffmpeg/ffmpeg-3.3.4-64 --toolchain=msvc --arch=amd64 --disable-asm --disable-yasm --disable-swresample",
+        "avformat": "--enable-shared --disable-static --prefix=/d/build_ffmpeg/ffmpeg-3.3.4-64 --toolchain=msvc --arch=amd64 --disable-asm --disable-yasm --disable-swresample",
+        "avutil": "--enable-shared --disable-static --prefix=/d/build_ffmpeg/ffmpeg-3.3.4-64 --toolchain=msvc --arch=amd64 --disable-asm --disable-yasm --disable-swresample",
+        "swscale": "--enable-shared --disable-static --prefix=/d/build_ffmpeg/ffmpeg-3.3.4-64 --toolchain=msvc --arch=amd64 --disable-asm --disable-yasm --disable-swresample"
+      }
     },
     {
       "id": "dxc",

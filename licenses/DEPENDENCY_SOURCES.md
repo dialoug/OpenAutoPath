@@ -10,7 +10,7 @@ Windows 发布 ZIP 的 `share/sources/OpenAutoPath` 随包提供下列上游源�
 | Qt | qtbase 6.11.1 官方源码包 | 随包保留 SDK 的 SPDX 清单及 `config_qtbase.opt`、`config_qtbase.summary`；清单记录源码提交 `59c81a3c2247b821b9b84b4eb8d939b77e07e276` 和编译器信息 |
 | OCCT | `V7_9_3` 标签源码 | Windows 二进制来自 Open-Cascade-SAS 官方发布的 `opencascade-7.9.3-vc14-64.zip`；获取与校验见 `tools/Install-WindowsOcct.ps1` |
 | OpenCAMLib | `1a450b7c3d3b669224a2a5d09aab7f319794574c` | 项目 `cmake/OAPOpenCamLib.cmake` 提供构建封装，生成共享库，关闭内部 OpenMP；上游 C++ 源码未修改 |
-| FreeImage | 3.18.0 源码，含内部编解码库 | 原发行链接见下文；源码归档通过 MacPorts 镜像取得，并固定 SHA-256；保留上游 VS 工程与构建文件 |
+| FreeImage | 3.18.0 源码，含内部编解码库 | 桌面 CI 使用本项目构建脚本从固定归档构建，并应用一个 OpenEXR 标准库兼容补丁；随包保留构建记录及可重用脚本 |
 | FFmpeg | 3.3.4 官方源码包 | 当前 OCCT SDK 构建参数见下文；未启用 GPL 或 nonfree |
 | FreeType | 2.13.3 官方源码包 | 包含 FTL 及内部组件声明；Qt 内置的另一版本随 qtbase 源码提供 |
 
@@ -23,12 +23,43 @@ OpenAutoPath 不使用阻止用户替换 DLL 的签名校验或安装锁。
 
 源码仓库的 `BUILDING.md`、CMake 配置及 `tools/Install-WindowsOcct.ps1` 描述应用构建
 和 SDK 获取方式。Qt 的原始构建信息位于 `share/licenses/OpenAutoPath/build-evidence`。
-FFmpeg SDK 的 `ffprobe -L` 报告如下配置：
+已直接调用所部署 FFmpeg 四个 DLL 的配置导出函数（avcodec、avformat、avutil、swscale），
+四者均报告下列配置；av_version_info 报告 3.3.4，avcodec_license 报告 LGPL 2.1 或更高版本。
+结果保存在 `windows-runtime.json` 的 `ffmpeg.runtimeBuildEvidence` 中：
 
 ```text
 --enable-shared --disable-static --prefix=/d/build_ffmpeg/ffmpeg-3.3.4-64
 --toolchain=msvc --arch=amd64 --disable-asm --disable-yasm --disable-swresample
 ```
+
+## FreeImage 源码构建
+
+桌面 CI 不再采用供应商预编译的 FreeImage.dll，而是执行
+`tools/Build-WindowsFreeImage.ps1`。该脚本校验源码归档，在独立目录解压，使用上游
+`FreeImage.2017.vcxproj` 构建 Release/x64，并运行 PNG 逐像素读写回归验证。
+它不修改 `external/3rdparty-vc14-64` 中原有的 SDK。
+
+唯一源码补丁删除 OpenEXR 比较器对已移除的 `std::binary_function` 的继承，保留原比较逻辑。
+补丁位于 `tools/dependencies/freeimage-openexr-modern-cxx.patch`。实际编译器、工具集、
+Windows SDK、命令参数、源归档/脚本/补丁/修改前后文件/DLL 的 SHA-256 均写入
+`build-record.json`；安装后路径为 `share/licenses/OpenAutoPath/build-evidence/FreeImage-build-record.json`。
+
+本地复现（在仓库根目录运行，输出目录必须尚不存在）：
+
+```powershell
+./tools/Build-WindowsFreeImage.ps1 `
+  -SourceArchive artifacts/license-inputs/FreeImage3180-mirror.zip `
+  -OutputDir build/dependencies/freeimage -Parallel 4
+cmake -S . -B build -DOAP_FREEIMAGE_ROOT="$PWD/build/dependencies/freeimage"
+cmake --build build --config RelWithDebInfo
+```
+
+`SourceArchive` 可以使用随包源码目录中的同名归档。脚本自动选择 VS C++ 工具和 Windows SDK，
+也可显式传入 `-VisualStudioRoot`、`-Toolset v143`（VS 2022）或 `v145`（VS 2026）、
+`-WindowsSdkVersion`。包内 `share/sources/OpenAutoPath/OpenAutoPath-build-support` 保留
+构建脚本、回归验证脚本、补丁及清单；进入该目录后也可执行相同构建命令。
+打包允许已核实的原供应商 DLL，或带匹配构建记录的源码构建 DLL；不能通过只改 DLL
+哈希来接纳新的源码构建。自建记录提供本项目构建链的可追溯信息，不是外部签名证明。
 
 ## 其他原始来源和鸣谢
 
@@ -48,8 +79,13 @@ FreeImage 采用 FreeImage Public License；其内嵌 LibRaw 采用可选的 CDD
 
 ## 核对边界
 
-源码归档是固定版本的上游源文件，不是“已经复现出相同二进制”的证明。OCCT 官方
-第三方预编译 SDK 未随包提供所有构建脚本和补丁说明；目前未验证每个 DLL 与上游源码
-的逐项对应关系。特别是 FreeImage/FFmpeg 等供应商构建，仍应取得或复现实际构建所需
-的补丁和配置，才能完成对完整对应源码的核实。本项目不会把版本相同或文件齐全等同于
-这项核实已经完成。替换 SDK 或新增依赖时，需重新核对并更新许可清单，不能只改哈希。
+已按官方发布资产摘要校验两个 SDK 压缩包，并逐项确认现有 48 个 OCCT 及附带运行库
+DLL 与其中的文件相同。归档地址、摘要、资产 ID 和对应条目记录在 `windows-runtime.json`。
+这证明二进制分发来源，不能证明完整源码对应关系。
+
+FreeImage 的桌面 CI 路径已改为受记录的源码构建；OpenCAMLib 本来就由项目构建。
+FFmpeg 的实际编译参数已从 DLL 核实，但仍未复现其工具链和供应商补丁。OCCT 及其他
+预编译依赖也没有全部重新构建；jemalloc SDK 头文件的版本宏为
+`0.0.0-0-g000000missing_version_try_git_fetch_tags`，不能据此确定实际上游提交。
+这些剩余项仍需供应商构建材料或受控源码构建，不能将版本相同、哈希一致或文件齐全
+视为完整对应源码已经核实。更换 SDK 或新增依赖时需重新核对。

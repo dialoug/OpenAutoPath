@@ -52,11 +52,29 @@ jobs:
           key: windows-occt-7.9.3-${{ hashFiles('tools/Install-WindowsOcct.ps1') }}
       - name: Install OCCT SDK
         run: ./tools/Install-WindowsOcct.ps1
+      - name: Build FreeImage from reviewed source
+        if: matrix.preset == 'windows-vs2022'
+        run: |
+          $manifest = Get-Content licenses/windows-runtime.json -Raw | ConvertFrom-Json
+          $source = $manifest.sources | Where-Object component -eq 'freeimage'
+          $cache = 'external/release-sources'
+          New-Item -ItemType Directory -Force -Path $cache | Out-Null
+          $archive = Join-Path $cache $source.file
+          if (-not (Test-Path -LiteralPath $archive)) {
+            Invoke-WebRequest -Uri $source.url -OutFile $archive
+          }
+          ./tools/Build-WindowsFreeImage.ps1 -SourceArchive $archive `
+            -OutputDir build/dependencies/freeimage -Toolset v143 -Parallel 4
       - name: Configure
-        run: >-
-          cmake --preset ${{ matrix.preset }}
-          "-DOAP_QT_ROOT=$env:QT_ROOT_DIR"
-          "-DFETCHCONTENT_BASE_DIR=$env:RUNNER_TEMP/oap-dependencies"
+        env:
+          BUILD_PRESET: ${{ matrix.preset }}
+        run: |
+          $options = @("-DOAP_QT_ROOT=$env:QT_ROOT_DIR",
+            "-DFETCHCONTENT_BASE_DIR=$env:RUNNER_TEMP/oap-dependencies")
+          if ($env:BUILD_PRESET -eq 'windows-vs2022') {
+            $options += "-DOAP_FREEIMAGE_ROOT=$env:GITHUB_WORKSPACE/build/dependencies/freeimage"
+          }
+          cmake --preset $env:BUILD_PRESET @options
       - name: Build application and tests
         run: cmake --build --preset ${{ matrix.preset }}
       - name: Run fast tests
@@ -65,7 +83,9 @@ jobs:
         run: ctest --preset ${{ matrix.preset }}-packaging
       - name: Verify release metadata guards
         if: matrix.preset == 'windows-vs2022'
-        run: ./tools/tests/Test-WindowsReleaseMetadata.ps1 -BuildDir build/${{ matrix.preset }}
+        run: >-
+          ./tools/tests/Test-WindowsReleaseMetadata.ps1 -BuildDir build/${{ matrix.preset }}
+          -FreeImageRoot build/dependencies/freeimage
       - name: Cache dependency source archives
         if: matrix.preset == 'windows-vs2022' && inputs.package_version != ''
         uses: actions/cache@v4

@@ -1,0 +1,5 @@
+--- a/Source/OpenEXR/IlmImf/ImfAttribute.cpp
++++ b/Source/OpenEXR/IlmImf/ImfAttribute.cpp
+@@ -66,1 +66,1 @@
+-struct NameCompare: std::binary_function <const char *, const char *, bool>
++struct NameCompare

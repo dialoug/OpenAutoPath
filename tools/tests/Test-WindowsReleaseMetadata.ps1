@@ -1,6 +1,6 @@
 # Exercise release guards with an isolated fixture. No release or network access.
 [CmdletBinding()]
-param([Parameter(Mandatory)][string]$BuildDir)
+param([Parameter(Mandatory)][string]$BuildDir, [string]$FreeImageRoot)
 $ErrorActionPreference = 'Stop'
 Set-StrictMode -Version Latest
 $root = Split-Path (Split-Path $PSScriptRoot -Parent) -Parent
@@ -47,3 +47,24 @@ Assert-Rejected { & $collector -Stage $fixture -BuildDir $buildPath -SourceCache
 [IO.File]::WriteAllText((Join-Path $sourceCache 'qtbase-6.11.1.tar.xz'), 'not a source archive')
 Assert-Rejected { & $collector -Stage $fixture -BuildDir $buildPath -SourceCache $sourceCache -Offline } 'Cached source archive SHA256 mismatch'
 Write-Host "Release metadata guard tests passed. Fixture: $fixture"
+if ($FreeImageRoot) {
+    $evidence = Join-Path $notices 'build-evidence'
+    New-Item -ItemType Directory -Force -Path $evidence | Out-Null
+    $recordFile = Join-Path $evidence 'FreeImage-build-record.json'
+    Copy-Item (Join-Path $FreeImageRoot 'bin/FreeImage.dll') (Join-Path $fixture 'bin/FreeImage.dll')
+    Copy-Item (Join-Path $FreeImageRoot 'build-record.json') $recordFile
+    & $collector -Stage $fixture -BuildDir $buildPath -VerifyOnly
+    $recordText = Get-Content $recordFile -Raw -Encoding UTF8
+    $record = $recordText | ConvertFrom-Json
+    $record.dllSha256 = 'invalid'
+    $record | ConvertTo-Json -Depth 6 | Set-Content $recordFile -Encoding UTF8
+    Assert-Rejected { & $collector -Stage $fixture -BuildDir $buildPath -VerifyOnly } 'FreeImage source build record does not match'
+    $record = $recordText | ConvertFrom-Json
+    $record.sourceSha256 = 'invalid'
+    $record | ConvertTo-Json -Depth 6 | Set-Content $recordFile -Encoding UTF8
+    Assert-Rejected { & $collector -Stage $fixture -BuildDir $buildPath -VerifyOnly } 'FreeImage source build record does not match'
+    $recordText | Set-Content $recordFile -Encoding UTF8
+    Move-Item $recordFile ($recordFile + '.fixture')
+    Assert-Rejected { & $collector -Stage $fixture -BuildDir $buildPath -VerifyOnly } 'Changed FreeImage runtime has no source build record'
+    Write-Host 'FreeImage source build record guard tests passed.'
+}

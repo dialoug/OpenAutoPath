@@ -1,6 +1,8 @@
+set(OAP_FREEIMAGE_ROOT "${OAP_THIRDPARTY_ROOT}/freeimage-3.18.0-x64" CACHE PATH
+    "FreeImage runtime SDK; may point to an SDK built by Build-WindowsFreeImage.ps1")
 set(OAP_THIRDPARTY_DLLS
     "${OAP_THIRDPARTY_ROOT}/freetype-2.13.3-x64/bin/freetype.dll"
-    "${OAP_THIRDPARTY_ROOT}/freeimage-3.18.0-x64/bin/FreeImage.dll"
+    "${OAP_FREEIMAGE_ROOT}/bin/FreeImage.dll"
     "${OAP_THIRDPARTY_ROOT}/tbb-2021.13.0-x64/bin/tbb12.dll"
     "${OAP_THIRDPARTY_ROOT}/jemalloc-vc14-64/bin/jemalloc.dll"
     "${OAP_THIRDPARTY_ROOT}/openvr-1.14.15-64/bin/win64/openvr_api.dll"
