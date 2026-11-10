@@ -84,20 +84,10 @@ foreach(component Runtime Development)
     endif()
 endforeach()
 if(WIN32 AND OAP_BUILD_GUI)
-    foreach(component_root IN ITEMS "ffmpeg|${OAP_FFMPEG_ROOT}" "occt|${OAP_OCCT_ROOT}")
-        string(REPLACE "|" ";" component_root "${component_root}")
-        list(GET component_root 0 component_name)
-        list(GET component_root 1 component_path)
-        if(EXISTS "${component_path}/build-record.json")
-            install(FILES "${component_path}/build-record.json"
-                DESTINATION ${CMAKE_INSTALL_DATADIR}/licenses/OpenAutoPath/build-evidence
-                RENAME "${component_name}-build-record.json" COMPONENT Runtime)
-        endif()
-    endforeach()
-    if(EXISTS "${OAP_FFMPEG_ROOT}/build-record.json")
-        install(FILES "${OAP_FFMPEG_ROOT}/config.h" "${OAP_FFMPEG_ROOT}/config.mak"
-            DESTINATION ${CMAKE_INSTALL_DATADIR}/licenses/OpenAutoPath/build-evidence/ffmpeg
-            COMPONENT Runtime)
+    if(EXISTS "${OAP_OCCT_ROOT}/build-record.json")
+        install(FILES "${OAP_OCCT_ROOT}/build-record.json"
+            DESTINATION ${CMAKE_INSTALL_DATADIR}/licenses/OpenAutoPath/build-evidence
+            RENAME occt-build-record.json COMPONENT Runtime)
     endif()
     if(EXISTS "${OAP_FREEIMAGE_ROOT}/build-record.json")
         install(FILES "${OAP_FREEIMAGE_ROOT}/build-record.json"

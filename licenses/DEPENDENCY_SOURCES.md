@@ -8,30 +8,20 @@ Windows 发布 ZIP 的 `share/sources/OpenAutoPath` 随包提供下列上游源�
 | 组件 | 源码 | 构建信息 |
 | --- | --- | --- |
 | Qt | qtbase 6.11.1 官方源码包 | 随包保留 SDK 的 SPDX 清单及 `config_qtbase.opt`、`config_qtbase.summary`；清单记录源码提交 `59c81a3c2247b821b9b84b4eb8d939b77e07e276` 和编译器信息 |
-| OCCT | `V7_9_3` 标签源码 | 桌面 CI 使用 `tools/Build-WindowsOCCT.ps1` 构建应用所需工具包，保留图像、视频、VR 和 TBB 支持；使用 NATIVE 内存分配器 |
+| OCCT | `V7_9_3` 标签源码 | 桌面 CI 使用 `tools/Build-WindowsOCCT.ps1` 构建应用所需工具包，保留图像、VR 和 TBB 支持，关闭 FFmpeg；使用 NATIVE 内存分配器 |
 | OpenCAMLib | `1a450b7c3d3b669224a2a5d09aab7f319794574c` | 项目 `cmake/OAPOpenCamLib.cmake` 提供构建封装，生成共享库，关闭内部 OpenMP；上游 C++ 源码未修改 |
 | FreeImage | 3.18.0 源码，含内部编解码库 | 桌面 CI 使用本项目构建脚本从固定归档构建，并应用一个 OpenEXR 标准库兼容补丁；随包保留构建记录及可重用脚本 |
-| FFmpeg | 3.3.4 官方源码包 | 桌面 CI 使用 `tools/Build-WindowsFFmpeg.ps1` 构建四个运行库和测试工具 ffprobe；未启用 GPL 或 nonfree |
 | FreeType | 2.13.3 官方源码包 | 包含 FTL 及内部组件声明；Qt 内置的另一版本随 qtbase 源码提供 |
 
 ## 构建与库替换
 
-Qt、OCCT、OpenCAMLib、FFmpeg 都以可替换 DLL 使用。使用者可以为自身用途修改库，
+Qt、OCCT、OpenCAMLib 都以可替换 DLL 使用。使用者可以为自身用途修改库，
 并进行调试这些修改所需的逆向工程；项目不对这些 LGPL 权利附加限制。
 替换 DLL 时须保持架构、ABI 和运行库兼容；Qt 私有头文件的使用使本项目依赖具体 Qt 构建。
 OpenAutoPath 不使用阻止用户替换 DLL 的签名校验或安装锁。
 
 源码仓库的 `BUILDING.md`、CMake 配置及 `tools/Install-WindowsOcct.ps1` 描述应用构建
 和 SDK 获取方式。Qt 的原始构建信息位于 `share/licenses/OpenAutoPath/build-evidence`。
-已直接调用原供应商 FFmpeg 四个 DLL 的配置导出函数（avcodec、avformat、avutil、swscale），
-四者均报告下列配置；av_version_info 报告 3.3.4，avcodec_license 报告 LGPL 2.1 或更高版本。
-结果保存在 `windows-runtime.json` 的 `ffmpeg.runtimeBuildEvidence` 中：
-
-```text
---enable-shared --disable-static --prefix=/d/build_ffmpeg/ffmpeg-3.3.4-64
---toolchain=msvc --arch=amd64 --disable-asm --disable-yasm --disable-swresample
-```
-
 ## FreeImage 源码构建
 
 桌面 CI 不再采用供应商预编译的 FreeImage.dll，而是执行
@@ -59,54 +49,43 @@ cmake --build build --config RelWithDebInfo
 `-WindowsSdkVersion`。包内 `share/sources/OpenAutoPath/OpenAutoPath-build-support` 保留
 构建脚本、回归验证脚本、补丁及清单；进入该目录后也可执行相同构建命令。
 本地 `preview-*` 打包允许已核实的原供应商 DLL，或带匹配构建记录的源码构建 DLL。
-`v*` 版本打包要求 FreeImage、FFmpeg、OCCT 三者都有匹配的源码构建记录，不能通过只改 DLL
+`v*` 版本打包要求 FreeImage、OCCT 两者都有匹配的源码构建记录，不能通过只改 DLL
 哈希来接纳新的源码构建。自建记录提供本项目构建链的可追溯信息，不是外部签名证明。
 
-## FFmpeg 与 OCCT 源码构建
+## OCCT 源码构建（不含视频支持）
 
-需要 Visual Studio C++ 工具、CMake、Git for Windows，以及清单固定的源码归档。
-FFmpeg 使用 Git Bash 和 GNU Make。构建工具包为
-`https://repo.msys2.org/msys/x86_64/make-4.4.1-2-x86_64.pkg.tar.zst`，SHA-256 为
-`2408af61717dae87b00c855b132769a125c708907fc94a46bb16dae076113e5c`；脚本在使用前校验。
-GNU Make 只参与构建，不进入应用运行时包。
-
-先按上节构建 FreeImage，再在仓库根目录执行（输出目录应尚不存在）：
+需要 Visual Studio C++ 工具和 CMake。先下载固定源码归档（构建脚本会再次核对 SHA-256）：
 
 ```powershell
-./tools/Build-WindowsFFmpeg.ps1 `
-  -SourceArchive artifacts/license-inputs/ffmpeg-3.3.4.tar.xz `
-  -MakePackage artifacts/license-inputs/make-4.4.1-2-x86_64.pkg.tar.zst `
-  -OutputDir build/dependencies/ffmpeg -Parallel 4
-./tools/Build-WindowsOCCT.ps1 `
-  -SourceArchive artifacts/license-inputs/OCCT-V7_9_3.tar.gz `
-  -ThirdPartyRoot external/3rdparty-vc14-64 `
-  -FreeImageRoot build/dependencies/freeimage `
-  -FFmpegRoot build/dependencies/ffmpeg `
-  -OutputDir build/dependencies/occt -Parallel 4
-cmake -S . -B build `
-  -DOAP_FREEIMAGE_ROOT="$PWD/build/dependencies/freeimage" `
-  -DOAP_FFMPEG_ROOT="$PWD/build/dependencies/ffmpeg" `
-  -DOAP_OCCT_ROOT="$PWD/build/dependencies/occt/install"
-cmake --build build --config RelWithDebInfo
+$manifest = Get-Content licenses/windows-runtime.json -Raw | ConvertFrom-Json
+New-Item -ItemType Directory -Force external/release-sources | Out-Null
+foreach ($id in @('freeimage', 'occt')) {
+  $source = $manifest.sources | Where-Object component -eq $id
+  Invoke-WebRequest -Uri $source.url -OutFile (Join-Path external/release-sources $source.file)
+}
+./tools/Build-WindowsFreeImage.ps1 -SourceArchive external/release-sources/FreeImage3180-mirror.zip -OutputDir build/dependencies/freeimage -Parallel 4
+./tools/Build-WindowsOCCT.ps1 -SourceArchive external/release-sources/OCCT-V7_9_3.tar.gz -ThirdPartyRoot external/3rdparty-vc14-64 -FreeImageRoot build/dependencies/freeimage -OutputDir build/dependencies/occt -Parallel 4
+cmake --preset windows-vs2022 -DOAP_FREEIMAGE_ROOT="$PWD/build/dependencies/freeimage" -DOAP_OCCT_ROOT="$PWD/build/dependencies/occt/install"
+cmake --build --preset windows-vs2022
 ```
 
+先运行仓库的 `tools/Install-WindowsOcct.ps1` 获取其余第三方 SDK。上面两个构建输出目录应尚不存在。
 OCCT 默认生成器为 VS 2022；VS 2026 传入 `-Generator "Visual Studio 18 2026"`。
-`-ReuseExistingBuild` 可用于同一输出目录的增量构建，但脚本先将已有源码逐文件与原始归档比较，
-不接受修改或新增的源文件。脚本限制编译并发，避免 MSBuild 与 `/MP` 叠加产生过多编译进程。
+`-ReuseExistingBuild` 可复用同一 OCCT 目录；脚本先将全部源码与原始归档逐文件比较。
+脚本限制编译并发，避免 MSBuild 与 `/MP` 叠加造成过多编译进程。
 
-FFmpeg 保留 avcodec、avformat、avutil、swscale，关闭未部署的 avfilter、avdevice、
-swresample 及播放器等程序，不使用 GPL/nonfree 配置或外部编解码库，也不修改上游源码。
-ffprobe 用于 PPM 解码、数据包校验，另直接调用 swscale 检查 RGB/BGR 逐像素转换。
-配置参数、编译器、SDK、输出 DLL 摘要写入记录；`config.h`、`config.mak` 随包保留。
+OCCT 使用未修改的 7.9.3 上游源码，设置 `USE_FFMPEG=OFF`、`USE_MMGR_TYPE=NATIVE`。
+保留 FreeImage、FreeType、TBB 和 OpenVR。当前应用没有调用 OCCT 的视频录制、媒体播放或视频纹理接口；
+关闭这些能力不改变项目自己的刀路动画与余料仿真。桌面 ZIP 不再包含 FFmpeg DLL、源码归档或构建工具。
 
-OCCT 从未修改的上游源码构建，链接源码构建的 FreeImage 和 FFmpeg；FreeType、oneTBB、
-OpenVR 继续使用已核实的官方 SDK 二进制。选择上游的 NATIVE 分配器，因此该路径不部署
-版本来源不完整的 jemalloc。原供应商 SDK 本地配置仍保留 jemalloc，不能混用两种运行目录。
+构建记录安装到 `build-evidence/occt-build-record.json`，包含 `ffmpegEnabled: false`、源码/脚本/DLL 摘要和依赖 DLL 摘要。
+打包会拒绝启用了视频支持的旧记录、残留 FFmpeg DLL、依赖混用和残留 jemalloc。
+切换已有构建目录时，应将旧运行目录中的 `avcodec-57.dll`、`avformat-57.dll`、`avutil-55.dll`、`swscale-4.dll`
+移到备份目录，或使用新的构建目录；同时移走旧 FFmpeg 构建记录与许可目录。
 
-两者的 `build-record.json` 安装到 `build-evidence/ffmpeg-build-record.json` 和
-`build-evidence/occt-build-record.json`。打包核对源码、脚本、DLL 摘要，另外核对 OCCT
-记录的依赖 DLL；NATIVE 配置若残留 jemalloc 会停止打包。构建脚本与测试脚本随源码归档提供。
-桌面 CI 缓存三个源码 SDK，源码清单、构建脚本或测试变更会改变缓存键。
+桌面部署要求这套关闭视频的 OCCT SDK。原供应商 OCCT SDK 仍可用于核心开发和测试，其附带的 FFmpeg
+仅通过测试加载路径使用，不能据此生成桌面发布包。Linux/macOS 核心 CI 使用各自环境中的 OCCT 包。
+桌面 CI 缓存 FreeImage、OCCT 两套源码 SDK，源码清单、脚本或测试变化会改变缓存键。
 
 ## 其他原始来源和鸣谢
 
@@ -130,8 +109,8 @@ FreeImage 采用 FreeImage Public License；其内嵌 LibRaw 采用可选的 CDD
 DLL 与其中的文件相同。归档地址、摘要、资产 ID 和对应条目记录在 `windows-runtime.json`。
 这证明二进制分发来源，不能证明完整源码对应关系。
 
-桌面 CI 的 FreeImage、FFmpeg、OCCT 路径使用本项目记录的源码构建；OpenCAMLib 本来就由项目构建。
-这条路径不再依赖原供应商这三个 DLL 集合的未知构建过程，也不分发 jemalloc。
+桌面 CI 的 FreeImage、OCCT 路径使用本项目记录的源码构建；OpenCAMLib 本来就由项目构建。
+这条路径不再依赖原供应商这两个 DLL 集合的未知构建过程，也不分发 jemalloc。
 仍可选择的供应商 SDK 路径不能据此宣称已复现：尤其 jemalloc 的版本宏为
 `0.0.0-0-g000000missing_version_try_git_fetch_tags`，不能确定其上游提交。
 

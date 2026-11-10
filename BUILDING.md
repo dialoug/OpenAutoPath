@@ -44,6 +44,12 @@ powershell -NoProfile -ExecutionPolicy Bypass -File tools/Install-WindowsOcct.ps
 The installer preserves existing SDK directories and does not install Qt.
 Qt defaults to `C:/Qt/6.11.1/msvc2022_64` on Windows.
 
+For desktop deployment, build FreeImage and OCCT with video support disabled,
+following [dependency source instructions](licenses/DEPENDENCY_SOURCES.md).
+Pass their roots as `-DOAP_FREEIMAGE_ROOT=.../build/dependencies/freeimage`
+and `-DOAP_OCCT_ROOT=.../build/dependencies/occt/install` to the desktop preset.
+The vendor OCCT SDK remains usable for core-only builds and tests.
+
 Clipper2 and OpenCAMLib use pinned Git revisions when no local checkout exists:
 `21ebba05db8894f0c7217ad35ea518080f324946` and
 `1a450b7c3d3b669224a2a5d09aab7f319794574c` respectively. Local checkouts should
@@ -61,7 +67,7 @@ precedence. Changing an environment variable does not replace a cached path.
 For the local VS 2026 installation:
 
 ```powershell
-cmake --preset windows-vs2026
+cmake --preset windows-vs2026 -DOAP_FREEIMAGE_ROOT="$PWD/build/dependencies/freeimage" -DOAP_OCCT_ROOT="$PWD/build/dependencies/occt/install"
 cmake --build --preset windows-vs2026
 ctest --preset windows-vs2026
 ctest --preset windows-vs2026-packaging
@@ -319,36 +325,44 @@ Windows Runtime 还安装 Qt、OCCT 及附带运行库的声明。打包脚本�
 未知 DLL、已审核 SDK 二进制变化或许可文件缺失会阻止打包；更换 SDK 时需重新审核
 `licenses/windows-runtime.json`，不能仅更新哈希以跳过检查。
 
-打包还会下载并校验六份依赖源码归档，存入 ZIP 的 `share/sources/OpenAutoPath`。
+打包还会下载并校验五份依赖源码归档，存入 ZIP 的 `share/sources/OpenAutoPath`。
 默认下载缓存位于构建目录的 `release-source-cache`；可用 `-SourceCache 路径` 复用缓存，
 加 `-OfflineSources` 则只允许使用已缓存且哈希匹配的归档。普通 CMake 配置、构建和
 安装不会触发这些下载；发布 CI 按清单缓存归档。源码归档会增加 ZIP 体积。
 
-桌面 CI 从固定源码构建 FreeImage、FFmpeg 和 OCCT，并保留构建记录；Qt 及其余预编译
+桌面 CI 从固定源码构建 FreeImage 和 OCCT，并保留构建记录；Qt 及其余预编译
 依赖的核对范围见 [依赖源码说明](licenses/DEPENDENCY_SOURCES.md)。文件校验不是外部签名认证。
 已发布的 ZIP 不会因源码新增许可文件而自动更新。
 
 The Windows packager validates deployed libraries against `licenses/windows-runtime.json`,
-includes upstream notices and Qt build evidence, and bundles six hash-verified dependency
+includes upstream notices and Qt build evidence, and bundles five hash-verified dependency
 source archives. `-SourceCache` selects a reusable cache; `-OfflineSources` disables downloads.
 Ordinary CMake configure/build/install remains offline with respect to these source archives.
 Vendor binary/source correspondence limitations are documented in `licenses/DEPENDENCY_SOURCES.md`.
 
-**Windows 依赖源码构建：** 桌面 CI 依次构建 FreeImage 3.18.0、FFmpeg 3.3.4 和 OCCT 7.9.3。
-FreeImage 应用仓库中的 OpenEXR 兼容补丁，FFmpeg 与 OCCT 不修改上游源码。
-FreeImage 验证 PNG 读写，FFmpeg 验证解码与像素转换，应用随后运行现有 CTest。
-源码 SDK 有独立缓存；首次构建耗时较长，Windows 作业超时上限为 120 分钟。
+**Windows 依赖源码构建：** 桌面 CI 构建 FreeImage 3.18.0 和 OCCT 7.9.3。
+FreeImage 应用仓库中的 OpenEXR 兼容补丁并验证 PNG 读写；OCCT 不修改上游源码，关闭 FFmpeg，使用 NATIVE 分配器。
+源码 SDK 有独立缓存，首次构建较慢。Windows 构建作业上限为 120 分钟。
 
-CMake 的 `OAP_FREEIMAGE_ROOT`、`OAP_FFMPEG_ROOT`、`OAP_OCCT_ROOT` 选择对应 SDK，
-默认本地配置仍可使用供应商 SDK。源码构建的 OCCT 使用 NATIVE 分配器，不部署 jemalloc；
-切换已有构建目录时应移走运行目录中旧的 jemalloc.dll，或使用新的构建目录。
-完整命令见 [依赖源码说明](licenses/DEPENDENCY_SOURCES.md)。
+桌面配置必须用 `OAP_FREEIMAGE_ROOT`、`OAP_OCCT_ROOT` 指向这两套源码 SDK，具体命令见
+[依赖源码说明](licenses/DEPENDENCY_SOURCES.md)。供应商 SDK 保留给核心开发/测试，不能用于桌面部署。
+旧构建目录需移走 FFmpeg 四个 DLL 和 jemalloc，建议采用新的构建目录。
 
-自建 DLL 的构建记录、配套脚本、补丁和 FFmpeg 配置文件进入发布包。`v*` 版本打包
-要求三个组件的源码构建记录均匹配，缺失 DLL、记录不匹配或混入旧 jemalloc 会阻止打包。
-`preview-*` 仍允许清单中已核实的供应商二进制，便于本地验证；桌面 CI 默认使用源码构建。
+`v*` 版本要求两份源码构建记录匹配。所有桌面包都会拒绝 FFmpeg DLL、启用视频的 OCCT 构建记录、
+缺失/混用依赖和残留 jemalloc。配套脚本、补丁和五份源码归档随包提供。
 
-The desktop workflow builds pinned FreeImage, FFmpeg and OCCT sources and caches the SDKs.
-Select them with `OAP_FREEIMAGE_ROOT`, `OAP_FFMPEG_ROOT` and `OAP_OCCT_ROOT`.
-Versioned (`v*`) packages require matching source-build records for all three components;
-preview packages can also use the reviewed vendor SDK. Source-built OCCT uses the native allocator.
+The desktop workflow builds and caches pinned FreeImage and OCCT sources. OCCT uses
+`USE_FFMPEG=OFF` and the native allocator. Desktop deployment requires this SDK;
+the vendor SDK remains available for core-only tests. Versioned packages require
+matching build records for both libraries. FFmpeg is not shipped.
+
+### 独立测试包验证
+
+手动运行 Release 工作流生成测试包，不创建正式版本标签。构建成功后，另一个 Windows runner
+下载 ZIP，校验完整性、五份源码归档、两份构建记录和全部 DLL/EXE 的直接及延迟导入表，确认没有 FFmpeg。
+随后清除 Qt/QML 环境变量，将 PATH 限制为 Windows 系统目录，从空工作目录启动包内启动器，
+检查主窗口响应以及 Qt/OCCT 等模块确实来自包内。报告上传为 `windows-package-validation`。
+
+这个独立 runner 没有执行 Qt/OCCT SDK 安装步骤，但 GitHub runner 本身带有开发工具和系统运行库，
+因此不能称为纯净 Windows 安装，也不能代替人工检查 STEP 显示和加工界面。
+真正的纯净系统交互验证仍需 Windows Sandbox 或专门的虚拟机。

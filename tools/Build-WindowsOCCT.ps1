@@ -5,7 +5,6 @@ param(
     [Parameter(Mandatory)][string]$OutputDir,
     [Parameter(Mandatory)][string]$ThirdPartyRoot,
     [Parameter(Mandatory)][string]$FreeImageRoot,
-    [Parameter(Mandatory)][string]$FFmpegRoot,
     [ValidateSet('Visual Studio 17 2022', 'Visual Studio 18 2026')]
     [string]$Generator = 'Visual Studio 17 2022',
     [ValidateRange(1, 8)][int]$Parallel = 4,
@@ -21,7 +20,6 @@ if ((Get-FileHash $archive).Hash -ne $source.sha256) { throw 'OCCT source archiv
 $output = [IO.Path]::GetFullPath($OutputDir)
 $thirdparty = (Resolve-Path -LiteralPath $ThirdPartyRoot).Path
 $freeimage = (Resolve-Path -LiteralPath $FreeImageRoot).Path
-$ffmpeg = (Resolve-Path -LiteralPath $FFmpegRoot).Path
 $sourceDir = Join-Path $output 'OCCT-7_9_3'
 $build = Join-Path $output 'build'
 $install = Join-Path $output 'install'
@@ -71,24 +69,17 @@ public static class OCCTSourceVerifier {
     if ($LASTEXITCODE -ne 0) { throw 'OCCT extraction failed' }
 }
 # Match the application's toolkit closure, rather than building DRAW, samples,
-# VTK integrations or unused exchange formats. Keep image/video/VR support.
+# VTK integrations or unused exchange formats. Keep image/VR support, no video.
 $toolkits = 'TKDESTEP TKDECascade TKBinXCAF TKStd TKStdL TKMesh TKBO TKBool TKFillet TKOffset TKPrim TKV3d TKOpenGl TKBinTObj TKHLR TKTObj TKVCAF TKXml TKXmlL TKXmlTObj TKXmlXCAF'
 $options = @('-S', $sourceDir, '-B', $build, '-G', $Generator, '-A', 'x64',
     "-DCMAKE_INSTALL_PREFIX=$install", "-D3RDPARTY_DIR=$thirdparty", "-D3RDPARTY_FREEIMAGE_DIR=$freeimage",
-    "-D3RDPARTY_FFMPEG_DIR=$ffmpeg",
     "-DBUILD_ADDITIONAL_TOOLKITS=$toolkits", '-DBUILD_MODULE_FoundationClasses=OFF',
     '-DBUILD_MODULE_ModelingData=OFF', '-DBUILD_MODULE_ModelingAlgorithms=OFF',
     '-DBUILD_MODULE_Visualization=OFF', '-DBUILD_MODULE_ApplicationFramework=OFF',
     '-DBUILD_MODULE_DataExchange=OFF', '-DBUILD_MODULE_Draw=OFF', '-DBUILD_MODULE_DETools=OFF',
     '-DBUILD_DOC_Overview=OFF', '-DBUILD_USE_PCH=ON', '-DUSE_TBB=ON', '-DUSE_FREEIMAGE=ON',
-    '-DUSE_FREETYPE=ON', '-DUSE_OPENVR=ON', '-DUSE_FFMPEG=ON', '-DUSE_MMGR_TYPE=NATIVE',
+    '-DUSE_FREETYPE=ON', '-DUSE_OPENVR=ON', '-DUSE_FFMPEG=OFF', '-DUSE_MMGR_TYPE=NATIVE',
     '-DINSTALL_DIR_BIN=win64/vc14/bin', '-DINSTALL_DIR_LIB=win64/vc14/lib', '-DINSTALL_DIR_INCLUDE=inc')
-# FFmpeg's upstream MSVC install places import libraries next to the DLLs.
-# Override each library so OCCT does not assume the vendor SDK's lib directory.
-foreach ($library in @('avcodec', 'avformat', 'avutil', 'swscale')) {
-    $options += "-D3RDPARTY_FFMPEG_LIBRARY_DIR_${library}:PATH=$ffmpeg/bin"
-    $options += "-D3RDPARTY_FFMPEG_LIBRARY_${library}:FILEPATH=$ffmpeg/bin/$library.lib"
-}
 $oldErrorAction = $ErrorActionPreference
 try {
     $ErrorActionPreference = 'Continue'
@@ -118,9 +109,7 @@ $dependencies = @()
 foreach ($filePath in @((Join-Path $thirdparty 'freetype-2.13.3-x64/bin/freetype.dll'),
         (Join-Path $thirdparty 'tbb-2021.13.0-x64/bin/tbb12.dll'),
         (Join-Path $thirdparty 'openvr-1.14.15-64/bin/win64/openvr_api.dll'),
-        (Join-Path $freeimage 'bin/FreeImage.dll'),
-        (Join-Path $ffmpeg 'bin/avcodec-57.dll'), (Join-Path $ffmpeg 'bin/avformat-57.dll'),
-        (Join-Path $ffmpeg 'bin/avutil-55.dll'), (Join-Path $ffmpeg 'bin/swscale-4.dll'))) {
+        (Join-Path $freeimage 'bin/FreeImage.dll'))) {
     $file = Get-Item -LiteralPath $filePath
     $dependencies += @{ file = $file.Name; sha256 = (Get-FileHash -LiteralPath $file.FullName).Hash.ToLowerInvariant() }
 }
@@ -134,7 +123,8 @@ $record = [ordered]@{
     patches = @(); generator = $Generator; compilerVersion = $compilerVersion
     incrementalBuild = [bool]$ReuseExistingBuild
     toolkits = $toolkits; configuration = 'Release'; memoryManager = 'NATIVE'
-    features = @('TBB', 'FreeImage', 'FreeType', 'OpenVR', 'FFmpeg')
+    ffmpegEnabled = $false
+    features = @('TBB', 'FreeImage', 'FreeType', 'OpenVR')
     dependencyBinaries = $dependencies
     outputs = $outputs
 }

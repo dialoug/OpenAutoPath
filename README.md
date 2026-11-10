@@ -70,6 +70,8 @@ OpenAutoPath 是一个基于 **C++20、Qt 和 Open CASCADE（OCCT）** 的 CAD/C
 
 ### Windows 桌面版
 
+桌面版需要按[依赖源码说明](licenses/DEPENDENCY_SOURCES.md)构建 FreeImage 和关闭 FFmpeg 的 OCCT；原预编译 OCCT SDK 可用于核心测试。
+
 先安装 Visual Studio 2022 的 C++ 桌面开发工具和 Qt 6.11.1 的
 `msvc2022_64` 组件（含 Qt Shader Tools），然后在 PowerShell 中执行：
 
@@ -80,8 +82,9 @@ cd OpenAutoPath
 # 下载并校验 OCCT SDK；此脚本不安装 Qt。
 powershell -NoProfile -ExecutionPolicy Bypass -File tools/Install-WindowsOcct.ps1
 
+# 先按下文链接的“依赖源码说明”构建 FreeImage 和不含视频支持的 OCCT。
 # Qt 安装在其他位置时，替换下面的路径。
-cmake --preset windows-vs2022 -DOAP_QT_ROOT=C:/Qt/6.11.1/msvc2022_64
+cmake --preset windows-vs2022 -DOAP_QT_ROOT=C:/Qt/6.11.1/msvc2022_64 -DOAP_FREEIMAGE_ROOT="$PWD/build/dependencies/freeimage" -DOAP_OCCT_ROOT="$PWD/build/dependencies/occt/install"
 cmake --build --preset windows-vs2022
 ctest --preset windows-vs2022
 ctest --preset windows-vs2022-packaging

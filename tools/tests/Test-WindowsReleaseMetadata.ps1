@@ -1,6 +1,6 @@
 # Exercise release guards with an isolated fixture. No release or network access.
 [CmdletBinding()]
-param([Parameter(Mandatory)][string]$BuildDir, [string]$FreeImageRoot, [string]$FFmpegRoot, [string]$OCCTRoot)
+param([Parameter(Mandatory)][string]$BuildDir, [string]$FreeImageRoot, [string]$OCCTRoot)
 $ErrorActionPreference = 'Stop'
 Set-StrictMode -Version Latest
 $root = Split-Path (Split-Path $PSScriptRoot -Parent) -Parent
@@ -71,8 +71,7 @@ if ($FreeImageRoot) {
     Move-Item ($recordFile + '.fixture') $recordFile
     Write-Host 'FreeImage source build record guard tests passed.'
 }
-foreach ($sdk in @(@{ id = 'ffmpeg'; root = $FFmpegRoot; bin = 'bin' },
-        @{ id = 'occt'; root = $OCCTRoot; bin = 'win64/vc14/bin' })) {
+foreach ($sdk in @(@{ id = 'occt'; root = $OCCTRoot; bin = 'win64/vc14/bin' })) {
     if (-not $sdk.root) { continue }
     $id = $sdk.id
     $evidence = Join-Path $notices 'build-evidence'
@@ -118,7 +117,16 @@ foreach ($sdk in @(@{ id = 'ffmpeg'; root = $FFmpegRoot; bin = 'bin' },
         Assert-Rejected { & $collector -Stage $fixture -BuildDir $buildPath -VerifyOnly } 'stale jemalloc.dll'
         Move-Item $jemalloc ($jemalloc + '.fixture')
         & $collector -Stage $fixture -BuildDir $buildPath -VerifyOnly -RequireSourceBuilds
-        $missing = Join-Path $fixture 'bin/avformat-57.dll'
+        $record = $recordText | ConvertFrom-Json
+        $record.ffmpegEnabled = $true
+        $record | ConvertTo-Json -Depth 8 | Set-Content $recordFile -Encoding UTF8
+        Assert-Rejected { & $collector -Stage $fixture -BuildDir $buildPath -VerifyOnly } 'OCCT source build must disable FFmpeg'
+        $recordText | Set-Content $recordFile -Encoding UTF8
+        $stale = Join-Path $fixture 'bin/avcodec-57.dll'
+        [IO.File]::WriteAllText($stale, 'stale FFmpeg fixture')
+        Assert-Rejected { & $collector -Stage $fixture -BuildDir $buildPath -VerifyOnly } 'FFmpeg runtime is disabled'
+        Move-Item $stale ($stale + '.fixture')
+        $missing = Join-Path $fixture 'bin/TKOpenGl.dll'
         Move-Item $missing ($missing + '.fixture')
         Assert-Rejected { & $collector -Stage $fixture -BuildDir $buildPath -VerifyOnly -RequireSourceBuilds } 'Source-built release is missing runtime'
         Move-Item ($missing + '.fixture') $missing

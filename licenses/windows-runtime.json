@@ -283,7 +283,8 @@
         "record": "share/licenses/OpenAutoPath/build-evidence/occt-build-record.json",
         "patches": [],
         "status": "Desktop CI builds the pinned upstream source; tagged packages require matching source-build records.",
-        "memoryManager": "NATIVE (does not require jemalloc)"
+        "memoryManager": "NATIVE (does not require jemalloc)",
+        "ffmpegEnabled": false
       }
     },
     {
@@ -399,59 +400,6 @@
       }
     },
     {
-      "id": "ffmpeg",
-      "version": "3.3.4",
-      "license": "LGPL-2.1-or-later",
-      "notice": "runtime/FFmpeg/COPYING.LGPLv2.1",
-      "files": [
-        {
-          "path": "bin/avcodec-57.dll",
-          "sha256": "4d7a6a2cff37c782ce1a3c74fa83ebbebcc43dfc774e3f497a406c84c1458c7e",
-          "vendorArchiveEntry": "3rdparty-vc14-64/ffmpeg-3.3.4-64/bin/avcodec-57.dll"
-        },
-        {
-          "path": "bin/avformat-57.dll",
-          "sha256": "297d3207dd0e6325dab7a080472a4fd2f743cfc53861615b4dc96b91227cd3af",
-          "vendorArchiveEntry": "3rdparty-vc14-64/ffmpeg-3.3.4-64/bin/avformat-57.dll"
-        },
-        {
-          "path": "bin/avutil-55.dll",
-          "sha256": "be7c03ff47618916d16af446e2f7c00e48f2ff8934c6ace4c0d0e3d804732e8e",
-          "vendorArchiveEntry": "3rdparty-vc14-64/ffmpeg-3.3.4-64/bin/avutil-55.dll"
-        },
-        {
-          "path": "bin/swscale-4.dll",
-          "sha256": "67bcffb3ccdaebf2bbd3149542d92dd9430abfdff1d7b79b3a529af712926412",
-          "vendorArchiveEntry": "3rdparty-vc14-64/ffmpeg-3.3.4-64/bin/swscale-4.dll"
-        }
-      ],
-      "vendorBinaryOrigin": {
-        "url": "https://github.com/Open-Cascade-SAS/OCCT/releases/download/V7_9_3/3rdparty-vc14-64.zip",
-        "sha256": "f25be51af6160a2db74d19a4adc0c08728517822167b01459f8e775927a2a2f6",
-        "assetId": 325110670,
-        "verification": "Runtime file SHA256 matched the official release archive entry on 2026-11-11; this verifies binary distribution origin, not complete corresponding source."
-      },
-      "runtimeBuildEvidence": {
-        "version": "3.3.4",
-        "license": "LGPL version 2.1 or later",
-        "avcodec": "--enable-shared --disable-static --prefix=/d/build_ffmpeg/ffmpeg-3.3.4-64 --toolchain=msvc --arch=amd64 --disable-asm --disable-yasm --disable-swresample",
-        "avformat": "--enable-shared --disable-static --prefix=/d/build_ffmpeg/ffmpeg-3.3.4-64 --toolchain=msvc --arch=amd64 --disable-asm --disable-yasm --disable-swresample",
-        "avutil": "--enable-shared --disable-static --prefix=/d/build_ffmpeg/ffmpeg-3.3.4-64 --toolchain=msvc --arch=amd64 --disable-asm --disable-yasm --disable-swresample",
-        "swscale": "--enable-shared --disable-static --prefix=/d/build_ffmpeg/ffmpeg-3.3.4-64 --toolchain=msvc --arch=amd64 --disable-asm --disable-yasm --disable-swresample"
-      },
-      "sourceBuild": {
-        "recipe": "tools/Build-WindowsFFmpeg.ps1",
-        "record": "share/licenses/OpenAutoPath/build-evidence/ffmpeg-build-record.json",
-        "patches": [],
-        "status": "Desktop CI builds the pinned upstream source; tagged packages require matching source-build records.",
-        "buildTool": {
-          "file": "make-4.4.1-2-x86_64.pkg.tar.zst",
-          "url": "https://repo.msys2.org/msys/x86_64/make-4.4.1-2-x86_64.pkg.tar.zst",
-          "sha256": "2408af61717dae87b00c855b132769a125c708907fc94a46bb16dae076113e5c"
-        }
-      }
-    },
-    {
       "id": "dxc",
       "version": "1.9.2602.17 (21d28f727)",
       "license": "NCSA/MIT and Microsoft DirectX Shader Compiler terms",
@@ -504,12 +452,6 @@
       "file": "FreeImage3180-mirror.zip",
       "url": "https://distfiles.macports.org/freeimage/FreeImage3180.zip",
       "sha256": "f41379682f9ada94ea7b34fe86bf9ee00935a3147be41b6569c9605a53e438fd"
-    },
-    {
-      "component": "ffmpeg",
-      "file": "ffmpeg-3.3.4.tar.xz",
-      "url": "https://ffmpeg.org/releases/ffmpeg-3.3.4.tar.xz",
-      "sha256": "98b97e1b908dfeb6aeb6d407e5a5eacdfc253a40c2d195f5867ed2d1d46ea957"
     },
     {
       "component": "freetype",

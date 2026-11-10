@@ -11,7 +11,6 @@
 | OCCT | OCCT 7.9.3 官方 Windows SDK 的 LICENSE_LGPL_21.txt 和 OCCT_LGPL_EXCEPTION.txt |
 | FreeImage | FreeImage3180.zip 中根目录许可及 Source 目录的许可、版权、专利和 README 文件；额外保留 TIFF/JXR/zlib 含许可的源文件 |
 | FreeType | freetype-2.13.3.tar.xz 的许可、FTL/GPL 及 BDF/PCF/zlib/HarfBuzz 相关声明源文件 |
-| FFmpeg | ffmpeg-3.3.4.tar.xz 的 LICENSE.md、COPYING 文件和 CREDITS；当前 SDK 使用 LGPL 构建，保留 GPL 文本不代表启用 GPL 代码 |
 | oneTBB-LICENSE.txt | OCCT 第三方 SDK 中 tbb-2021.13.0-x64/LICENSE.txt |
 | jemalloc-COPYRIGHT.txt | OCCT 第三方 SDK 中 jemalloc-vc14-64/share/jemalloc/copyright |
 | OpenVR-LICENSE.txt | https://raw.githubusercontent.com/ValveSoftware/openvr/v1.14.15/LICENSE |

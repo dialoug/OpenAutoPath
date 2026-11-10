@@ -48,19 +48,22 @@ foreach ($file in Get-ChildItem -LiteralPath (Join-Path $stagePath 'bin') -Recur
     if ($file.Extension -notin @('.dll', '.exe')) { continue }
     $relative = $file.FullName.Substring($stagePath.Length + 1).Replace('\', '/')
     if ($relative -eq 'bin/OpenAutoPathApp.exe') { continue }
+    if ($file.Name -match '^(avcodec|avformat|avutil|swscale|avdevice|avfilter|swresample)-[0-9]+\.dll$') {
+        throw "FFmpeg runtime is disabled; remove stale DLL: $relative"
+    }
     if (-not $known.ContainsKey($relative)) {
         throw "Unreviewed runtime file: $relative. Update licenses/windows-runtime.json and its notices."
     }
     $entry = $known[$relative]
     $hash = (Get-FileHash -LiteralPath $file.FullName -Algorithm SHA256).Hash.ToLowerInvariant()
     if ($entry.File.PSObject.Properties['sha256'] -and $hash -ne $entry.File.sha256) {
-        if ($entry.Component.id -in @('ffmpeg', 'occt')) {
+        if ($entry.Component.id -eq 'occt') {
             $id = $entry.Component.id
             $recordPath = Join-Path $licensePath "build-evidence/$id-build-record.json"
             if (-not (Test-Path -LiteralPath $recordPath)) { throw "Changed $id runtime has no source build record" }
             $record = Get-Content -LiteralPath $recordPath -Raw -Encoding UTF8 | ConvertFrom-Json
             $source = $manifest.sources | Where-Object component -eq $id
-            $recipe = @{ ffmpeg = 'tools/Build-WindowsFFmpeg.ps1'; occt = 'tools/Build-WindowsOCCT.ps1' }[$id]
+            $recipe = 'tools/Build-WindowsOCCT.ps1'
             $output = @($record.outputs | Where-Object file -eq $file.Name)
             if ($record.schemaVersion -ne 1 -or $record.component -ne $id -or
                 $record.version -ne $entry.Component.version -or $record.sourceSha256 -ne $source.sha256 -or
@@ -110,7 +113,7 @@ foreach ($file in Get-ChildItem -LiteralPath (Join-Path $stagePath 'bin') -Recur
 # by Package-WindowsRelease.ps1. Never allow an empty inventory to pass.
 if ($inventory.Count -eq 0) { throw 'No runtime binaries found' }
 if ($RequireSourceBuilds) {
-    foreach ($id in @('freeimage', 'ffmpeg', 'occt')) {
+    foreach ($id in @('freeimage', 'occt')) {
         if (@($sourceBuildRecords | Where-Object component -eq $id).Count -ne 1) {
             throw "Source-built release requires a verified $id build record"
         }
@@ -124,6 +127,11 @@ if ($RequireSourceBuilds) {
 }
 $occtRecord = $sourceBuildRecords | Where-Object component -eq 'occt'
 if ($occtRecord) {
+    if (-not $occtRecord.PSObject.Properties['ffmpegEnabled'] -or
+        $occtRecord.ffmpegEnabled -isnot [bool] -or $occtRecord.ffmpegEnabled -or
+        'FFmpeg' -in $occtRecord.features) {
+        throw 'OCCT source build must disable FFmpeg'
+    }
     foreach ($dependency in $occtRecord.dependencyBinaries) {
         $deployed = @($inventory | Where-Object { [IO.Path]::GetFileName($_.file) -eq $dependency.file })
         if ($deployed.Count -ne 1 -or $deployed[0].sha256 -ne $dependency.sha256) {
@@ -194,7 +202,7 @@ Copy-Item -LiteralPath $manifestPath -Destination $sourcesPath
 $support = Join-Path $sourcesPath 'OpenAutoPath-build-support'
 foreach ($relative in @('LICENSE', 'licenses/windows-runtime.json', 'tools/Build-WindowsFreeImage.ps1',
         'tools/tests/Test-FreeImageRuntime.ps1', 'tools/dependencies/freeimage-openexr-modern-cxx.patch',
-        'tools/Build-WindowsFFmpeg.ps1', 'tools/tests/Test-FFmpegRuntime.ps1', 'tools/Build-WindowsOCCT.ps1',
+        'tools/Build-WindowsOCCT.ps1',
         'tools/Install-WindowsOcct.ps1')) {
     $destination = Join-Path $support $relative
     New-Item -ItemType Directory -Force -Path (Split-Path $destination -Parent) | Out-Null
