@@ -41,6 +41,16 @@ with the locally validated runtime, regardless of extra Qt modules on the host.
 中文说明：部署时也排除未使用的 SVG 插件及 Qt SDK 的 OpenGL 软件渲染库，
 避免 CI 因安装了额外 Qt 模块而扩大分发范围。三维显示使用系统图形驱动。
 
+DXC (`dxcompiler.dll`, `dxil.dll`) is deployed from the pinned Microsoft
+`v1.9.2602` archive, with SHA-256 checks for both the archive and x64 DLLs.
+CMake downloads it for Windows desktop deployment; offline builds can set
+`OAP_DXC_ROOT` to an extracted `dxc_2026_02_20.zip`. The host Windows SDK's DXC
+is not copied by `windeployqt`.
+
+中文说明：DXC 固定使用已核对的微软 `v1.9.2602` 版本，归档和两个 x64 DLL
+都校验 SHA-256，不再随构建机 Windows SDK 的版本变化。离线构建可通过
+`-DOAP_DXC_ROOT=解压目录` 指定同一归档；版本不符时配置会直接失败。
+
 ## Windows dependencies
 
 The default local layout is:

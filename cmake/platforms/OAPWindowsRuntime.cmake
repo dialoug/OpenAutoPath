@@ -1,6 +1,8 @@
 # GUI 目标的运行时部署配置。将部署逻辑与目标定义分离，便于根构建文件
 # 清晰表达项目架构。
 
+include("${CMAKE_CURRENT_LIST_DIR}/../dependencies/OAPDXC.cmake")
+
 # 仅部署实际参与链接的 OCCT 工具包。旧逻辑复制整个 SDK bin，连同 DRAWEXE、
 # Inspector 和数十个未使用 DLL 一起进入应用目录，既混乱又放大分发体积。
 # 部分 OCCT 工具包通过 DLL 导入表间接依赖持久化、XCAF 和隐藏线模块；
@@ -49,7 +51,7 @@ if(OAP_QT_DEPLOY_TOOL)
     add_custom_command(TARGET OpenAutoPathApp POST_BUILD
         COMMAND ${CMAKE_COMMAND} -E env ${oap_qt_deploy_environment}
                 "${OAP_QT_DEPLOY_TOOL}" --no-translations --no-system-d3d-compiler
-                --no-opengl-sw --exclude-plugins qsvg,qsvgicon
+                --no-system-dxc-compiler --no-opengl-sw --exclude-plugins qsvg,qsvgicon
                 "$<TARGET_FILE:OpenAutoPathApp>"
         VERBATIM
         COMMENT "Deploying Qt runtime")
@@ -59,7 +61,7 @@ else()
         "find_package(Qt6): ${OAP_QT_BIN_DIR}")
 endif()
 
-foreach(thirdparty_dll IN LISTS OAP_THIRDPARTY_DLLS)
+foreach(thirdparty_dll IN LISTS OAP_THIRDPARTY_DLLS OAP_DXC_RUNTIME_DLLS)
     if(NOT EXISTS "${thirdparty_dll}")
         message(FATAL_ERROR
             "Required OCCT third-party runtime is missing: ${thirdparty_dll}")
@@ -67,9 +69,9 @@ foreach(thirdparty_dll IN LISTS OAP_THIRDPARTY_DLLS)
 endforeach()
 add_custom_command(TARGET OpenAutoPathApp POST_BUILD
     COMMAND ${CMAKE_COMMAND} -E copy_if_different
-            ${OAP_THIRDPARTY_DLLS} "$<TARGET_FILE_DIR:OpenAutoPathApp>"
+            ${OAP_THIRDPARTY_DLLS} ${OAP_DXC_RUNTIME_DLLS} "$<TARGET_FILE_DIR:OpenAutoPathApp>"
     VERBATIM
-    COMMENT "Copying OCCT third-party runtime DLLs")
+    COMMENT "Copying reviewed third-party runtime DLLs")
 
 if(OAP_VCOMP_RUNTIME_DLL)
     add_custom_command(TARGET OpenAutoPathApp POST_BUILD
