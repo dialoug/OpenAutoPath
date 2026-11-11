@@ -1,6 +1,6 @@
 # Source ownership for recognition targets.
 
-set(OAP_RECOGNITION_SOURCES
+oap_module_sources(oap_recognition OAP_RECOGNITION_SOURCES
     src/recognition/AAG.cpp
     src/recognition/AAG.h
     src/recognition/AxisParallelPlaneRecognizer.cpp

@@ -10,6 +10,7 @@ endif()
 include("${OAP_SOURCE_DIR}/cmake/OAPSources.cmake")
 include("${OAP_SOURCE_DIR}/cmake/OAPModuleDependencies.cmake")
 include("${OAP_SOURCE_DIR}/cmake/OAPPublicHeaders.cmake")
+include("${OAP_SOURCE_DIR}/cmake/tests/OAPTestPrivateHeaders.cmake")
 
 if(OAP_BOUNDARY_FIXTURE STREQUAL "dependency_cycle")
     list(APPEND OAP_INTERNAL_DEPS_oap_analysis oap_recognition)
@@ -101,82 +102,10 @@ function(oap_register_boundary_target target source_variable)
     endforeach()
 endfunction()
 
-oap_register_boundary_target(oap_analysis OAP_ANALYSIS_SOURCES
-    ${OAP_INTERNAL_DEPS_oap_analysis})
-oap_register_boundary_target(oap_app_cam_renderer OAP_APP_CAM_RENDERER_SOURCES
-    ${OAP_INTERNAL_DEPS_oap_app_cam_renderer})
-oap_register_boundary_target(oap_recognition OAP_RECOGNITION_SOURCES
-    ${OAP_INTERNAL_DEPS_oap_recognition})
-oap_register_boundary_target(oap_toolpath_core OAP_TOOLPATH_CORE_SOURCES
-    ${OAP_INTERNAL_DEPS_oap_toolpath_core})
-oap_register_boundary_target(oap_toolpath_finishing OAP_TOOLPATH_FINISHING_SOURCES
-    ${OAP_INTERNAL_DEPS_oap_toolpath_finishing})
-oap_register_boundary_target(oap_toolpath_program OAP_TOOLPATH_PROGRAM_SOURCES
-    ${OAP_INTERNAL_DEPS_oap_toolpath_program})
-oap_register_boundary_target(oap_toolpath_hole OAP_TOOLPATH_HOLE_SOURCES
-    ${OAP_INTERNAL_DEPS_oap_toolpath_hole})
-oap_register_boundary_target(oap_toolpath_pocket OAP_TOOLPATH_POCKET_SOURCES
-    ${OAP_INTERNAL_DEPS_oap_toolpath_pocket})
-oap_register_boundary_target(oap_toolpath_profile OAP_TOOLPATH_PROFILE_SOURCES
-    ${OAP_INTERNAL_DEPS_oap_toolpath_profile})
-oap_register_boundary_target(oap_toolpath_algorithms OAP_TOOLPATH_ALGORITHM_SOURCES
-    ${OAP_INTERNAL_DEPS_oap_toolpath_algorithms})
-oap_register_boundary_target(oap_toolpath_workflow OAP_TOOLPATH_WORKFLOW_SOURCES
-    ${OAP_INTERNAL_DEPS_oap_toolpath_workflow})
-oap_register_boundary_target(oap_toollibrary OAP_TOOLING_CORE_SOURCES
-    ${OAP_INTERNAL_DEPS_oap_toollibrary})
-oap_register_boundary_target(oap_toolpath_adapter OAP_TOOLPATH_ADAPTER_SOURCES
-    ${OAP_INTERNAL_DEPS_oap_toolpath_adapter})
-oap_register_boundary_target(oap_manufacturing OAP_MANUFACTURING_SOURCES
-    ${OAP_INTERNAL_DEPS_oap_manufacturing})
-oap_register_boundary_target(oap_app_workflow_base
-    OAP_APP_WORKFLOW_BASE_SOURCES
-    ${OAP_INTERNAL_DEPS_oap_app_workflow_base})
-oap_register_boundary_target(oap_app_workflow_playback
-    OAP_APP_WORKFLOW_PLAYBACK_SOURCES
-    ${OAP_INTERNAL_DEPS_oap_app_workflow_playback})
-oap_register_boundary_target(oap_app_workflow_cam
-    OAP_APP_WORKFLOW_CAM_SOURCES
-    ${OAP_INTERNAL_DEPS_oap_app_workflow_cam})
-oap_register_boundary_target(oap_app_workflow_simulation
-    OAP_APP_WORKFLOW_SIMULATION_SOURCES
-    ${OAP_INTERNAL_DEPS_oap_app_workflow_simulation})
-oap_register_boundary_target(oap_app_dialogs OAP_APP_DIALOG_SOURCES
-    ${OAP_INTERNAL_DEPS_oap_app_dialogs})
-oap_register_boundary_target(oap_app_view OAP_APP_VIEW_SOURCES
-    ${OAP_INTERNAL_DEPS_oap_app_view})
-oap_register_boundary_target(oap_app_presentation OAP_APP_PRESENTATION_SOURCES
-    ${OAP_INTERNAL_DEPS_oap_app_presentation})
-oap_register_boundary_target(oap_app_playback OAP_APP_PLAYBACK_SOURCES
-    ${OAP_INTERNAL_DEPS_oap_app_playback})
-oap_register_boundary_target(oap_app_playback_ui OAP_APP_PLAYBACK_UI_SOURCES
-    ${OAP_INTERNAL_DEPS_oap_app_playback_ui})
-oap_register_boundary_target(oap_app_recognition_ui OAP_APP_RECOGNITION_UI_SOURCES
-    ${OAP_INTERNAL_DEPS_oap_app_recognition_ui})
-oap_register_boundary_target(oap_app_document_ui OAP_APP_DOCUMENT_UI_SOURCES
-    ${OAP_INTERNAL_DEPS_oap_app_document_ui})
-oap_register_boundary_target(oap_app_cam_ui OAP_APP_CAM_UI_SOURCES
-    ${OAP_INTERNAL_DEPS_oap_app_cam_ui})
-oap_register_boundary_target(oap_app_simulation_ui OAP_APP_SIMULATION_UI_SOURCES
-    ${OAP_INTERNAL_DEPS_oap_app_simulation_ui})
-oap_register_boundary_target(oap_app_simulation OAP_APP_SIMULATION_SOURCES
-    ${OAP_INTERNAL_DEPS_oap_app_simulation})
-oap_register_boundary_target(oap_app_recognition OAP_APP_RECOGNITION_SOURCES
-    ${OAP_INTERNAL_DEPS_oap_app_recognition})
-oap_register_boundary_target(oap_app_scene OAP_APP_SCENE_SOURCES
-    ${OAP_INTERNAL_DEPS_oap_app_scene})
-oap_register_boundary_target(oap_app_document OAP_APP_DOCUMENT_SOURCES
-    ${OAP_INTERNAL_DEPS_oap_app_document})
-oap_register_boundary_target(oap_app_machining OAP_APP_MACHINING_SOURCES
-    ${OAP_INTERNAL_DEPS_oap_app_machining})
-oap_register_boundary_target(oap_app_orchestration OAP_APP_ORCHESTRATION_SOURCES
-    ${OAP_INTERNAL_DEPS_oap_app_orchestration})
-oap_register_boundary_target(oap_app_analysis OAP_APP_ANALYSIS_SOURCES
-    ${OAP_INTERNAL_DEPS_oap_app_analysis})
-oap_register_boundary_target(oap_app_panels OAP_APP_PANEL_SOURCES
-    ${OAP_INTERNAL_DEPS_oap_app_panels})
-oap_register_boundary_target(OpenAutoPathApp OAP_APP_SOURCES
-    ${OAP_INTERNAL_DEPS_OpenAutoPathApp})
+foreach(target IN LISTS OAP_FIRST_PARTY_TARGETS)
+    oap_register_boundary_target(${target} ${OAP_SOURCE_VARIABLE_${target}}
+        ${OAP_INTERNAL_DEPS_${target}})
+endforeach()
 
 foreach(public_header IN LISTS OAP_PUBLIC_TARGET_HEADERS)
     if(public_header MATCHES "(^|/)detail/")

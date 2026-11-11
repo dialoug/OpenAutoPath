@@ -62,6 +62,17 @@ directory matching their responsibility and be registered in the matching
 manifest under `cmake/modules`. Headers used only inside one target belong in a
 `detail/` directory and must not be listed as public API.
 
+中文说明：模块源码通过 `oap_module_sources(目标名 源码变量 ...)` 声明，
+构建和架构检查共同使用这份归属清单；无需再在边界检查脚本中重复登记目标。
+直接依赖仍在 `cmake/OAPModuleDependencies.cmake` 中显式维护，公共头文件仍由
+`cmake/public` 控制。C++20 要求由目标声明，与是否安装开发 SDK 无关。
+
+测试配置集中在 `cmake/tests/OAPCoreTests.cmake` 和
+`cmake/tests/OAPAppTests.cmake`：一个 `oap_add_smoke_test` 同时声明源码、
+链接库、标签、超时和环境变量。同一可执行文件的不同参数或线程预算用
+`oap_add_smoke_test_case` 紧邻声明；架构检查和安装验证保留独立入口。
+测试访问私有头文件的例外单独记录在 `OAPTestPrivateHeaders.cmake`，不扩大公共 API。
+
 Development installation follows the core subset of this public API manifest.
 `cmake/OAPSdkHeaders.cmake` maintains an explicit exception list for support
 types embedded in public interfaces, without changing cross-target include

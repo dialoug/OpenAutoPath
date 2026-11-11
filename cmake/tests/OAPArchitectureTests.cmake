@@ -62,3 +62,7 @@ add_test(NAME documentation_links
     COMMAND "${CMAKE_COMMAND}"
         "-DOAP_SOURCE_DIR=${CMAKE_CURRENT_SOURCE_DIR}"
         -P "${CMAKE_CURRENT_SOURCE_DIR}/cmake/CheckDocumentationLinks.cmake")
+
+set_tests_properties(module_boundaries module_boundaries_forbidden_target module_boundaries_private_header module_boundaries_transitive_target module_boundaries_dependency_cycle module_boundaries_workflow_reverse_target workflow_internal_boundaries documentation_links PROPERTIES
+        LABELS "fast;architecture"
+        TIMEOUT 30)

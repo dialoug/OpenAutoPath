@@ -17,6 +17,13 @@ function(oap_configure_first_party_includes target)
         "${CMAKE_CURRENT_SOURCE_DIR}/src")
 endfunction()
 
+# Language requirements belong to targets, independently of SDK installation.
+# Libraries publish the requirement so consumers also compile as C++20.
+function(oap_require_cxx20 target visibility)
+    target_compile_features(${target} ${visibility} cxx_std_20)
+    set_target_properties(${target} PROPERTIES CXX_EXTENSIONS OFF)
+endfunction()
+
 # 无界面算法与命令行工具只链接 OCCT 核心组件。
 function(oap_configure_occt_core_target target visibility)
     oap_configure_occt_target_with_libraries(

@@ -362,6 +362,11 @@ endif()
 foreach(first_party_target IN LISTS OAP_FIRST_PARTY_TARGETS)
     if(TARGET ${first_party_target})
         oap_configure_first_party_includes(${first_party_target})
+        if(first_party_target IN_LIST OAP_FIRST_PARTY_LIBRARY_TARGETS)
+            oap_require_cxx20(${first_party_target} PUBLIC)
+        else()
+            oap_require_cxx20(${first_party_target} PRIVATE)
+        endif()
     endif()
 endforeach()
 
@@ -371,6 +376,7 @@ if(OAP_BUILD_GUI AND WIN32)
     # 与 Qt/OCCT 运行库继续整齐地留在 bin/。
     add_executable(OpenAutoPath WIN32
         src/launcher/OpenAutoPathLauncher.cpp)
+    oap_require_cxx20(OpenAutoPath PRIVATE)
     set_target_properties(OpenAutoPath PROPERTIES
         RUNTIME_OUTPUT_DIRECTORY "${OAP_OUTPUT_ROOT}"
         MSVC_RUNTIME_LIBRARY "MultiThreaded$<$<CONFIG:Debug>:Debug>"

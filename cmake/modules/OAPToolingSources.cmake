@@ -1,6 +1,6 @@
 # Source ownership for tooling targets.
 
-set(OAP_TOOLING_CORE_SOURCES
+oap_module_sources(oap_toollibrary OAP_TOOLING_CORE_SOURCES
     src/tooling/library/ToolAssetCatalog.cpp
     src/tooling/library/ToolAssetCatalog.h
     src/tooling/library/ToolLibrary.cpp
@@ -8,7 +8,7 @@ set(OAP_TOOLING_CORE_SOURCES
     src/tooling/library/ToolLibraryStorage.cpp
     src/tooling/library/ToolLibraryStorage.h)
 
-set(OAP_TOOLPATH_ADAPTER_SOURCES
+oap_module_sources(oap_toolpath_adapter OAP_TOOLPATH_ADAPTER_SOURCES
     src/tooling/adapter/hole/HoleStageIdentity.cpp
     src/tooling/adapter/hole/HoleStageIdentity.h
     src/tooling/adapter/AssignedToolContext.cpp

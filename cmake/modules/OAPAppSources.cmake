@@ -1,6 +1,6 @@
 # Source ownership for app targets.
 
-set(OAP_APP_VIEW_SOURCES
+oap_module_sources(oap_app_view OAP_APP_VIEW_SOURCES
     src/app/view/ToolPreviewGeometryBuilder.cpp
     src/app/view/ToolPreviewGeometryBuilder.h
     src/app/view/HolePreviewGeometryBuilder.cpp
@@ -8,7 +8,7 @@ set(OAP_APP_VIEW_SOURCES
     src/app/view/DisplayMaterials.h
     src/app/view/IpwDisplayGeometry.h)
 
-set(OAP_APP_PRESENTATION_SOURCES
+oap_module_sources(oap_app_presentation OAP_APP_PRESENTATION_SOURCES
     src/app/presentation/StepLoadPreviewPresenter.cpp
     src/app/presentation/StepLoadPreviewPresenter.h
     src/app/presentation/SceneController.cpp
@@ -37,7 +37,7 @@ set(OAP_APP_PRESENTATION_SOURCES
     src/app/presentation/OverlayController.cpp
     src/app/presentation/OverlayController.h)
 
-set(OAP_APP_PLAYBACK_SOURCES
+oap_module_sources(oap_app_playback OAP_APP_PLAYBACK_SOURCES
     src/app/playback/PlaybackCameraFollower.cpp
     src/app/playback/PlaybackCameraFollower.h
     src/app/playback/PlaybackPanelViewModel.cpp
@@ -45,23 +45,23 @@ set(OAP_APP_PLAYBACK_SOURCES
     src/app/playback/PlaybackWorkspaceCoordinator.cpp
     src/app/playback/PlaybackWorkspaceCoordinator.h)
 
-set(OAP_APP_PLAYBACK_UI_SOURCES
+oap_module_sources(oap_app_playback_ui OAP_APP_PLAYBACK_UI_SOURCES
     src/app/ui/playback/PlaybackUiController.cpp
     src/app/ui/playback/PlaybackUiController.h
     src/app/ui/panels/ToolpathPlayerPanel.cpp
     src/app/ui/panels/ToolpathPlayerPanel.h)
 
-set(OAP_APP_RECOGNITION_UI_SOURCES
+oap_module_sources(oap_app_recognition_ui OAP_APP_RECOGNITION_UI_SOURCES
     src/app/ui/recognition/RecognitionSelectionUiController.cpp
     src/app/ui/recognition/RecognitionSelectionUiController.h)
 
-set(OAP_APP_DOCUMENT_UI_SOURCES
+oap_module_sources(oap_app_document_ui OAP_APP_DOCUMENT_UI_SOURCES
     src/app/ui/document/DocumentUiController.cpp
     src/app/ui/document/DocumentUiController.h
     src/app/ui/panels/FileListPanel.cpp
     src/app/ui/panels/FileListPanel.h)
 
-set(OAP_APP_CAM_UI_SOURCES
+oap_module_sources(oap_app_cam_ui OAP_APP_CAM_UI_SOURCES
     src/app/ui/cam/CamUiController.cpp
     src/app/ui/cam/CamUiController.h
     src/app/ui/panels/CamWorkflowPanel.cpp
@@ -73,38 +73,38 @@ set(OAP_APP_CAM_UI_SOURCES
     src/app/ui/panels/FeatureAllowancePanel.cpp
     src/app/ui/panels/FeatureAllowancePanel.h)
 
-set(OAP_APP_SIMULATION_UI_SOURCES
+oap_module_sources(oap_app_simulation_ui OAP_APP_SIMULATION_UI_SOURCES
     src/app/ui/simulation/SimulationUiController.cpp
     src/app/ui/simulation/SimulationUiController.h)
 
-set(OAP_APP_SIMULATION_SOURCES
+oap_module_sources(oap_app_simulation OAP_APP_SIMULATION_SOURCES
     src/app/simulation/StockSimulationWorkspaceCoordinator.cpp
     src/app/simulation/StockSimulationWorkspaceCoordinator.h)
 
-set(OAP_APP_RECOGNITION_SOURCES
+oap_module_sources(oap_app_recognition OAP_APP_RECOGNITION_SOURCES
     src/app/recognition/RecognitionWorkspaceCoordinator.cpp
     src/app/recognition/RecognitionWorkspaceCoordinator.h)
 
-set(OAP_APP_SCENE_SOURCES
+oap_module_sources(oap_app_scene OAP_APP_SCENE_SOURCES
     src/app/scene/SceneInteractionCoordinator.cpp
     src/app/scene/SceneInteractionCoordinator.h)
 
-set(OAP_APP_DOCUMENT_SOURCES
+oap_module_sources(oap_app_document OAP_APP_DOCUMENT_SOURCES
     src/app/document/ModelDocumentWorkspaceCoordinator.cpp
     src/app/document/ModelDocumentWorkspaceCoordinator.h)
 
 
 
-set(OAP_APP_MACHINING_SOURCES
+oap_module_sources(oap_app_machining OAP_APP_MACHINING_SOURCES
     src/app/machining/MachiningWorkspaceFinishing.cpp
     src/app/machining/MachiningWorkspaceCoordinator.cpp
     src/app/machining/MachiningWorkspaceCoordinator.h)
 
-set(OAP_APP_ORCHESTRATION_SOURCES
+oap_module_sources(oap_app_orchestration OAP_APP_ORCHESTRATION_SOURCES
     src/app/orchestration/DesktopWorkspaceCoordinator.cpp
     src/app/orchestration/DesktopWorkspaceCoordinator.h)
 
-set(OAP_APP_ANALYSIS_SOURCES
+oap_module_sources(oap_app_analysis OAP_APP_ANALYSIS_SOURCES
     src/app/analysis/AnalysisLoadResult.h
     src/app/analysis/StepAnalysisCache.cpp
     src/app/analysis/StepAnalysisCache.h
@@ -115,7 +115,7 @@ set(OAP_APP_ANALYSIS_SOURCES
     src/app/analysis/ThreeAxisRecognitionController.cpp
     src/app/analysis/ThreeAxisRecognitionController.h)
 
-set(OAP_APP_PANEL_SOURCES
+oap_module_sources(oap_app_panels OAP_APP_PANEL_SOURCES
     src/app/panels/ResultPanel.cpp
     src/app/panels/ResultPanel.h
     src/app/panels/FeaturePanel.cpp
@@ -236,7 +236,7 @@ set(OAP_APP_WORKFLOW_ALL_SOURCES
 # Keep physical workflow ownership aligned with CheckWorkflowBoundaries.cmake.
 # The four targets form a one-way dependency graph:
 # base <- playback <- cam <- simulation.
-set(OAP_APP_WORKFLOW_BASE_SOURCES ${OAP_APP_WORKFLOW_ALL_SOURCES})
+oap_module_sources(oap_app_workflow_base OAP_APP_WORKFLOW_BASE_SOURCES ${OAP_APP_WORKFLOW_ALL_SOURCES})
 list(FILTER OAP_APP_WORKFLOW_BASE_SOURCES INCLUDE REGEX
     "^src/app/workflows/shared/")
 list(REMOVE_ITEM OAP_APP_WORKFLOW_BASE_SOURCES
@@ -248,24 +248,24 @@ list(REMOVE_ITEM OAP_APP_WORKFLOW_BASE_SOURCES
     src/app/workflows/shared/ToolpathRequestBuilder.cpp
     src/app/workflows/shared/detail/ToolpathRequestBuilder.h)
 
-set(OAP_APP_WORKFLOW_PLAYBACK_SOURCES ${OAP_APP_WORKFLOW_ALL_SOURCES})
+oap_module_sources(oap_app_workflow_playback OAP_APP_WORKFLOW_PLAYBACK_SOURCES ${OAP_APP_WORKFLOW_ALL_SOURCES})
 list(FILTER OAP_APP_WORKFLOW_PLAYBACK_SOURCES INCLUDE REGEX
     "^src/app/workflows/playback/")
 
-set(OAP_APP_WORKFLOW_SIMULATION_SOURCES ${OAP_APP_WORKFLOW_ALL_SOURCES})
+oap_module_sources(oap_app_workflow_simulation OAP_APP_WORKFLOW_SIMULATION_SOURCES ${OAP_APP_WORKFLOW_ALL_SOURCES})
 list(FILTER OAP_APP_WORKFLOW_SIMULATION_SOURCES INCLUDE REGEX
     "^src/app/workflows/simulation/")
 list(APPEND OAP_APP_WORKFLOW_SIMULATION_SOURCES
     src/app/workflows/hole/HoleStockSimulationRunner.cpp
     src/app/workflows/hole/HoleStockSimulationRunner.h)
 
-set(OAP_APP_WORKFLOW_CAM_SOURCES ${OAP_APP_WORKFLOW_ALL_SOURCES})
+oap_module_sources(oap_app_workflow_cam OAP_APP_WORKFLOW_CAM_SOURCES ${OAP_APP_WORKFLOW_ALL_SOURCES})
 list(REMOVE_ITEM OAP_APP_WORKFLOW_CAM_SOURCES
     ${OAP_APP_WORKFLOW_BASE_SOURCES}
     ${OAP_APP_WORKFLOW_PLAYBACK_SOURCES}
     ${OAP_APP_WORKFLOW_SIMULATION_SOURCES})
 
-set(OAP_APP_DIALOG_SOURCES
+oap_module_sources(oap_app_dialogs OAP_APP_DIALOG_SOURCES
     src/app/dialogs/DirectToolParameterSection.h
     src/app/dialogs/DirectToolParameterSection.cpp
     src/app/dialogs/EngravingParameterSection.h
@@ -277,7 +277,7 @@ set(OAP_APP_DIALOG_SOURCES
     src/app/dialogs/ToolpathParameterDialog.cpp
     src/app/dialogs/ToolpathParameterDialog.h)
 
-set(OAP_APP_SOURCES
+oap_module_sources(OpenAutoPathApp OAP_APP_SOURCES
     src/app/ui/shell/MainWindowFinishing.cpp
     src/app/ui/main.cpp
     src/app/ui/shell/MainWindow.cpp
@@ -326,6 +326,6 @@ set(OAP_APP_SOURCES
     src/app/ui/dialogs/detail/PocketCamRenderSupport.cpp)
 
 # Simulation presentation is a linkable module shared by the desktop and GPU tests.
-set(OAP_APP_CAM_RENDERER_SOURCES ${OAP_APP_SOURCES})
+oap_module_sources(oap_app_cam_renderer OAP_APP_CAM_RENDERER_SOURCES ${OAP_APP_SOURCES})
 list(FILTER OAP_APP_CAM_RENDERER_SOURCES INCLUDE REGEX "/PocketCam[^/]*\\.(cpp|h)$")
 list(REMOVE_ITEM OAP_APP_SOURCES ${OAP_APP_CAM_RENDERER_SOURCES})

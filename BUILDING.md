@@ -4,6 +4,23 @@ CMake 3.22 or newer and C++20 are required. Shared presets are the entry point
 for the command line, VS Code CMake Tools and CI. Generated `.vcxproj` files
 are build outputs: edit CMake source files instead.
 
+中文说明：维护构建配置时，普通新增源码只需加入 `cmake/modules` 中所属模块的
+`oap_module_sources` 清单；新增模块还需声明构建目标及其直接依赖，公开接口需登记
+到 `cmake/public`。新增回归测试在 `cmake/tests/OAPCoreTests.cmake`（核心）或
+`OAPAppTests.cmake`（桌面）内一次声明，例如：
+
+```cmake
+oap_add_smoke_test(example
+    SOURCES tests/smoke/analysis/example_smoke.cpp
+    LIBRARIES OAP::Analysis
+    LABELS fast analysis
+    TIMEOUT 30)
+```
+
+标签和超时按测试实际用途填写；GPU 测试的串行运行、跳过返回码及 Qt 环境也在同一
+声明中配置。`OAP_INSTALL_DEVELOPMENT=OFF` 只关闭开发 SDK 的安装，不会取消库向
+使用方传递的 C++20 要求。
+
 ## Platform scope
 
 | Platform | Build | Preset |

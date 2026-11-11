@@ -21,7 +21,6 @@ if(OAP_INSTALL_DEVELOPMENT)
         set_target_properties(${target} PROPERTIES EXPORT_NAME ${export_name})
         target_include_directories(${target} INTERFACE
             "$<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}/OpenAutoPath>")
-        target_compile_features(${target} PUBLIC cxx_std_20)
         list(APPEND oap_install_targets ${target})
     endforeach()
     install(TARGETS ${oap_install_targets} EXPORT OpenAutoPathTargets

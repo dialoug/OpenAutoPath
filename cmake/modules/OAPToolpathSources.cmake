@@ -1,13 +1,13 @@
 # Source ownership for toolpath targets.
 
-set(OAP_TOOLPATH_FINISHING_SOURCES
+oap_module_sources(oap_toolpath_finishing OAP_TOOLPATH_FINISHING_SOURCES
     src/toolpath/finishing/SurfaceFinishingBatch.h
     src/toolpath/finishing/SurfaceFinishing.h
     src/toolpath/finishing/SurfaceFinishing.cpp
     src/toolpath/finishing/detail/SurfaceFinishingMesh.h
     src/toolpath/finishing/detail/SurfaceFinishingMesh.cpp)
 
-set(OAP_TOOLPATH_CORE_SOURCES
+oap_module_sources(oap_toolpath_core OAP_TOOLPATH_CORE_SOURCES
     src/toolpath/core/simulation/FixedAxisToolpathView.h
     src/toolpath/core/HeavyJobScheduler.h
     src/toolpath/core/HeavyJobScheduler.cpp
@@ -58,7 +58,7 @@ set(OAP_TOOLPATH_CORE_SOURCES
     "${OAP_CLIPPER2_SOURCE_DIR}/clipper.engine.cpp"
     "${OAP_CLIPPER2_SOURCE_DIR}/clipper.offset.cpp")
 
-set(OAP_TOOLPATH_ALGORITHM_SOURCES
+oap_module_sources(oap_toolpath_algorithms OAP_TOOLPATH_ALGORITHM_SOURCES
     src/toolpath/algorithms/ToolpathAlgorithm.cpp
     src/toolpath/algorithms/ToolpathAlgorithm.h
     src/toolpath/algorithms/hole/BuiltinHoleToolpathAlgorithm.cpp
@@ -76,7 +76,7 @@ set(OAP_TOOLPATH_ALGORITHM_SOURCES
 
 )
 
-set(OAP_TOOLPATH_HOLE_SOURCES
+oap_module_sources(oap_toolpath_hole OAP_TOOLPATH_HOLE_SOURCES
     src/toolpath/hole/HoleMachiningInput.h
     src/toolpath/hole/DrillTipParameterBinding.h
     src/toolpath/hole/HoleCoverage.cpp
@@ -110,7 +110,7 @@ set(OAP_TOOLPATH_HOLE_SOURCES
     src/toolpath/hole/detail/HoleVisitOptimizer.cpp
     src/toolpath/hole/detail/HoleVisitOptimizer.h)
 
-set(OAP_TOOLPATH_POCKET_SOURCES
+oap_module_sources(oap_toolpath_pocket OAP_TOOLPATH_POCKET_SOURCES
     src/toolpath/pocket/simulation/fixedaxis/AnalyticFixedAxisLayeredBRepBuilder.cpp
     src/toolpath/pocket/simulation/fixedaxis/AnalyticFixedAxisLayeredBRepBuilder.h
     src/toolpath/pocket/simulation/fixedaxis/AnalyticPlanarBoolean.cpp
@@ -207,7 +207,7 @@ set(OAP_TOOLPATH_POCKET_SOURCES
     src/toolpath/pocket/simulation/fixedaxis/detail/AnalyticFixedAxisSweeps.h
     src/toolpath/pocket/simulation/fixedaxis/detail/AnalyticFixedAxisTypes.h)
 
-set(OAP_TOOLPATH_PROFILE_SOURCES
+oap_module_sources(oap_toolpath_profile OAP_TOOLPATH_PROFILE_SOURCES
     src/toolpath/profile/geometry/ProfileRegion.h
     src/toolpath/profile/geometry/ProfileRegionBuilder.cpp
     src/toolpath/profile/geometry/ProfileRegionBuilder.h
@@ -226,7 +226,7 @@ set(OAP_TOOLPATH_PROFILE_SOURCES
     src/toolpath/profile/validation/ProfileSafetyValidator.h)
 
 
-set(OAP_TOOLPATH_PROGRAM_SOURCES
+oap_module_sources(oap_toolpath_program OAP_TOOLPATH_PROGRAM_SOURCES
     src/toolpath/program/GCodePostProcessor.cpp
     src/toolpath/program/GCodePostProcessor.h
     src/toolpath/program/ToolpathProgramExport.cpp
@@ -236,7 +236,7 @@ set(OAP_TOOLPATH_PROGRAM_SOURCES
     src/toolpath/program/validation/ToolpathProgramValidator.cpp
     src/toolpath/program/validation/ToolpathProgramValidator.h)
 
-set(OAP_TOOLPATH_WORKFLOW_SOURCES
+oap_module_sources(oap_toolpath_workflow OAP_TOOLPATH_WORKFLOW_SOURCES
     src/toolpath/workflow/compatibility/LegacyProfileSimulationAdapter.cpp
     src/toolpath/workflow/compatibility/LegacyProfileSimulationAdapter.h
     src/toolpath/workflow/detail/ToolpathServiceSupport.h

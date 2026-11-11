@@ -1,6 +1,6 @@
 # Source ownership for manufacturing targets.
 
-set(OAP_MANUFACTURING_SOURCES
+oap_module_sources(oap_manufacturing OAP_MANUFACTURING_SOURCES
     src/manufacturing/job/detail/SurfaceFinishingJson.h
     src/manufacturing/job/detail/SurfaceFinishingJson.cpp
     src/manufacturing/finishing/SurfaceFinishingMachiningJobService.h

@@ -1,6 +1,6 @@
 # Source ownership for analysis targets.
 
-set(OAP_ANALYSIS_SOURCES
+oap_module_sources(oap_analysis OAP_ANALYSIS_SOURCES
     src/analysis/AnalysisPipeline.cpp
     src/analysis/AnalysisPipeline.h
     src/analysis/FeatureTypes.h

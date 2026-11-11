@@ -5,46 +5,10 @@
 # name a target in the owner's direct dependency list; relying only on another
 # target's PUBLIC/transitive dependencies is intentionally forbidden.
 
-set(OAP_FIRST_PARTY_LIBRARY_TARGETS
-    oap_app_cam_renderer
-    oap_analysis
-    oap_recognition
-    oap_toolpath_core
-    oap_toolpath_program
-    oap_toolpath_hole
-    oap_toolpath_pocket
-    oap_toolpath_profile
-    oap_toolpath_finishing
-    oap_toolpath_algorithms
-    oap_toolpath_workflow
-    oap_toollibrary
-    oap_toolpath_adapter
-    oap_manufacturing
-    oap_app_view
-    oap_app_workflow_base
-    oap_app_workflow_playback
-    oap_app_workflow_cam
-    oap_app_workflow_simulation
-    oap_app_dialogs
-    oap_app_presentation
-    oap_app_playback
-    oap_app_playback_ui
-    oap_app_recognition_ui
-    oap_app_document_ui
-    oap_app_cam_ui
-    oap_app_simulation_ui
-    oap_app_simulation
-    oap_app_recognition
-    oap_app_scene
-    oap_app_document
-    oap_app_machining
-    oap_app_orchestration
-    oap_app_analysis
-    oap_app_panels)
-
-set(OAP_FIRST_PARTY_TARGETS
-    ${OAP_FIRST_PARTY_LIBRARY_TARGETS}
-    OpenAutoPathApp)
+include(${CMAKE_CURRENT_LIST_DIR}/OAPSources.cmake)
+set(OAP_FIRST_PARTY_TARGETS ${OAP_SOURCE_TARGETS})
+set(OAP_FIRST_PARTY_LIBRARY_TARGETS ${OAP_FIRST_PARTY_TARGETS})
+list(REMOVE_ITEM OAP_FIRST_PARTY_LIBRARY_TARGETS OpenAutoPathApp)
 
 set(OAP_INTERNAL_DEPS_oap_analysis)
 set(OAP_INTERNAL_DEPS_oap_recognition
