@@ -1,9 +1,4 @@
 # 第三方库
-/3rdparty-vc14-64/
-/opencascade-7.9.3-vc14-64/
-/AnalysisSitus-master/
-/AnalysisSitus-v2026.1/
-/FreeCAD-main/
 /external/
 /local-data/
 /artifacts/
@@ -43,15 +38,6 @@ cmake_install.cmake
 Thumbs.db
 .DS_Store
 
-# 样例按文件纳入版本库，其他本地模型及生成产物继续忽略。
-/samples/*
-!/samples/README.md
-!/samples/cam_feature_test.stp
-!/samples/generate_cam_feature_test.cpp
-!/samples/rounded_relief.step
-# 根目录的本地 STEP 模型不纳入版本库。
-/*.stp
-
 # 备份压缩包（产物，超过 GitHub 100MB 上限）
 *.rar
 /*.zip
@@ -59,26 +45,16 @@ Thumbs.db
 # 本地文档与记忆（不纳入版本库）
 /docs/
 /memory/
-/FreeCAD/
 /AGENTS.md
-/刀路模块P0_P1优化说明.md
 /scripts/generate_occt_documents.py
 /scripts/generate_project_documents.py
-/模座刀库.xls
-/普通钻头-小机.xls
-/中心出水钨钢钻.xlsx
-/冲压模具资料/
-/机床手册/
+
 
 # 运行时孔刀路诊断日志（生成在项目根目录，与 src 同级）
 /孔刀路避障日志.txt
 /腔清腔日志.txt
 /外轮廓刀路日志.txt
 /G-code/
-
-# 本地生成的参考 NC 对比目录
-/path-NC/
-/path-dzd/
 
 # Locally exported reference NC programs.
 /*.nc
