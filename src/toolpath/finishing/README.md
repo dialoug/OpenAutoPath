@@ -113,7 +113,16 @@ IPW 减料结果不等同于完整工具装配碰撞认证。
 以及非法参数、资源预算和取消的事务性输出。
 分层回归还覆盖移动层高折点、往返扫描行的固定断点、翻转装夹、模板计算阶段的取消和采样预算拒绝。可单独运行 `oap_test_surface_finishing --stable-layer-template`。
 
-构建后运行 `ctest --test-dir build -C RelWithDebInfo -R surface_finishing --output-on-failure`。
+先按 [BUILDING.md](../../../BUILDING.md) 配置并构建桌面预设，在仓库根目录运行：
+
+```powershell
+cmake --build --preset windows-vs2022
+ctest --test-dir build/windows-vs2022 -C RelWithDebInfo -R surface_finishing --output-on-failure --parallel 1 --no-tests=error
+```
+
+VS 2026 同时替换预设名和目录为 `windows-vs2026`；核心构建须使用对应预设的目录与配置。
+以下带日期的测试数量和日志是历史验证记录，不代表本次文档更新重新执行了这些测试。
+
 测试可执行文件支持 `--write-samples <目录>`，生成斜面、球体、平面块和分离岛屿
 STEP 模型用于交互验收；运行时 PATH 需包含 OCCT 和应用 bin 目录。
 

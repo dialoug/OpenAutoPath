@@ -2,8 +2,10 @@
 
 `oap_manufacturing` owns the persistent machining Job and the runtime lifecycle
 needed to rebuild, execute and compare hole, pocket, profile and surface-finishing operations.
-The persistent format is schema v11; `surface_finishing_operations` stores the
-new OpenCAMLib operation definitions. Legacy files with nonempty or malformed
+The persistent format is schema v12; `surface_finishing_operations` stores the
+OpenCAMLib operation definitions, including engraving mode, maximum step-down
+and roughing allowance. Older finishing-only definitions retain that mode when
+migrated; layered roughing must not silently become finishing-only. Legacy files with nonempty or malformed
 `surface_operations` are rejected before the active definition changes; older
 files without those retired operations remain loadable. Projects with retired manual hole plans, local batches, operation overrides or
 manual tool controllers are rejected before installation; automatic library-backed
@@ -13,8 +15,7 @@ scene updates belong to the focused `oap_app_workflow_*` targets or
 `OpenAutoPathApp`.
 
 The repository-wide dependency rules are defined in
-[`ARCHITECTURE.md`](../../ARCHITECTURE.md). Current Job and IPW contracts are
-maintained in the module development plans linked below.
+[`ARCHITECTURE.md`](../../ARCHITECTURE.md). The component map and boundary contracts below describe the current Job and IPW responsibilities.
 
 ## Current components
 
@@ -43,19 +44,11 @@ maintained in the module development plans linked below.
 - `ipw/HoleMultiDexelUpdater.*` applies hole results to the shared stock model; the executor also applies
   pocket/profile semantic toolpaths and finishing moves to the same material chain.
 
-## Development plans
+## Related documentation
 
-- [`job/DEVELOPMENT_PLAN.md`](job/DEVELOPMENT_PLAN.md) tracks schema evolution,
-  stable references, rebuild transactions and runtime invalidation.
-- [`ipw/DEVELOPMENT_PLAN.md`](ipw/DEVELOPMENT_PLAN.md) tracks the unified
-  Multi-Dexel material chain, immutable checkpoints and new operation backends.
-- Feature-specific plans live beside the corresponding toolpath code for
-  [holes](../toolpath/hole/DEVELOPMENT_PLAN.md),
-  [pockets](../toolpath/pocket/DEVELOPMENT_PLAN.md),
-  [profiles](../toolpath/profile/DEVELOPMENT_PLAN.md),
-  [surface finishing](../toolpath/finishing/README.md),
-  and the
-  [program/post-processing boundary](../toolpath/program/DEVELOPMENT_PLAN.md).
+- [Toolpath modules](../toolpath/README.md) describe generation, validation and the program boundary.
+- [Surface finishing](../toolpath/finishing/README.md) describes engraving parameters and integration.
+- [Application workflows](../app/workflows/README.md) describe desktop transactions and project coordination.
 
 ## Boundary contract
 
@@ -82,8 +75,11 @@ dependency graph.
 The deterministic fast suite exercises Job validation and storage projections,
 project-level neutral-program assembly/partitioning and IPW publication gates, hole batch identity,
 Hole/Pocket/Profile/SurfaceFinishing IPW behavior, project regeneration and DTO mapping.
-Run it with:
+After configuring dependencies as described in [BUILDING.md](../../BUILDING.md),
+run the fast suite from the repository root (use `windows-vs2026` for VS 2026).
+For full regression, use the unfiltered commands in the build guide:
 
 ```powershell
-ctest --test-dir build -C RelWithDebInfo --output-on-failure
+cmake --build --preset windows-vs2022
+ctest --preset windows-vs2022 --parallel 1
 ```

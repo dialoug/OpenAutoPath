@@ -148,6 +148,30 @@ directories under `build/<preset>/`. Outputs within each build are under
 `<configuration>/`: launcher at the root, application/DLLs in `bin/`, archives
 in `lib/`, symbols in `symbols/` and tests in `tests/`.
 
+### Full regression / 全量回归
+
+The standard test presets select the `fast` label; `*-packaging` presets select
+`packaging`. For a full suite in an already configured and built directory, run
+CTest without a label or name filter. The configuration must match the build:
+
+| Preset / 预设 | Build directory / 构建目录 | Configuration / 配置 |
+| --- | --- | --- |
+| `windows-vs2022` / `windows-vs2026` | `build/<preset>` | `RelWithDebInfo` |
+| `windows-core` / `windows-core-vs2026` | `build/<preset>` | `Release` |
+| `linux-core` / `macos-core` | `build/<preset>` | `RelWithDebInfo` |
+
+For example, after configuring the Windows desktop dependencies above:
+
+```powershell
+cmake --build --preset windows-vs2022
+ctest --test-dir build/windows-vs2022 -C RelWithDebInfo --output-on-failure --parallel 1 --no-tests=error
+```
+
+中文说明：默认测试预设只跑 `fast` 标签，不能将其结果称为全量回归。全量测试使用
+实际预设的构建目录和配置，不加 `-L` 或 `-R`；上例串行运行，避免多个几何测试争抢资源。
+模块文档中的 `-R` 命令是定向检查，不能替代里程碑的全量验证。自定义构建目录须同步替换
+目录和配置；GPU 等测试仍可能按环境跳过，报告时应保留跳过信息。
+
 ## Linux and macOS core
 
 The native provider uses `find_package(OpenCASCADE 7.9.3 EXACT CONFIG)` and

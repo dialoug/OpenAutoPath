@@ -62,17 +62,17 @@ MainWindow / UI callback
     suffixes are playback-only identities; stale, disabled and missing-IPW
     operations remain selectable with an explicit no-replay state.
 
-## Feature ownership and plans
+## Feature ownership
 
-| Workflow folder | Domain plan | Current formal state |
+| Workflow folder | Domain | Current formal state |
 | --- | --- | --- |
-| `hole/` | [`toolpath/hole`](../../toolpath/hole/DEVELOPMENT_PLAN.md) | formal Job, program and IPW |
-| `pocket/` | [`toolpath/pocket`](../../toolpath/pocket/DEVELOPMENT_PLAN.md) | formal Job, program and IPW |
-| `profile/` | [`toolpath/profile`](../../toolpath/profile/DEVELOPMENT_PLAN.md) | formal Job, program and IPW |
+| `hole/` | [`toolpath/hole`](../../toolpath/README.md) | formal Job, program and IPW |
+| `pocket/` | [`toolpath/pocket`](../../toolpath/README.md) | formal Job, program and IPW |
+| `profile/` | [`toolpath/profile`](../../toolpath/README.md) | formal Job, program and IPW |
 | `engraving/` | [`toolpath/finishing`](../../toolpath/finishing/README.md) | full-model raster engraving, all six faces or any individual face, dedicated library/direct tool, formal Job and IPW |
-| `project/` | [`manufacturing/job`](../../manufacturing/job/DEVELOPMENT_PLAN.md) | v11 lifecycle, project loading and shared regeneration |
-| `simulation/` | [`manufacturing/ipw`](../../manufacturing/ipw/DEVELOPMENT_PLAN.md) | unified Hole/Pocket/Profile/Engraving material chain |
-| shared export | [`toolpath/program`](../../toolpath/program/DEVELOPMENT_PLAN.md) | active-program reference NC export |
+| `project/` | [`manufacturing/job`](../../manufacturing/README.md) | schema v12 lifecycle, project loading and shared regeneration |
+| `simulation/` | [`manufacturing/ipw`](../../manufacturing/README.md) | unified Hole/Pocket/Profile/Engraving material chain |
+| shared export | [`toolpath/program`](../../toolpath/README.md) | active-program reference NC export |
 
 Engraving shares the normal parameter editor and workflow panel. One admitted heavy
 job generates the requested faces sequentially, then replaces the engraving family
@@ -123,8 +123,11 @@ program. Other operation families remain intact.
 
 ## Verification
 
+Run from the repository root after dependency setup and preset configuration in [BUILDING.md](../../../BUILDING.md). The example uses the Windows desktop `windows-vs2022` preset; for VS 2026, change both the preset name and build directory to `windows-vs2026`. See the build guide for core configurations and full-suite commands.
+
 ```powershell
-ctest --test-dir build -C Release --output-on-failure --parallel 4 `
+cmake --build --preset windows-vs2022
+ctest --test-dir build/windows-vs2022 -C RelWithDebInfo --output-on-failure --parallel 1 --no-tests=error `
   -R "^(app_workflow_controllers|machining_project_controller|machining_workspace|desktop_workspace|stock_simulation_workspace|playback_workspace|task_lifecycle|workflow_internal_boundaries|module_boundaries)$"
 ```
 

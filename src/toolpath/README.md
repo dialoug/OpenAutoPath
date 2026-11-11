@@ -8,22 +8,22 @@ lists are the source of truth for source ownership and direct dependencies; see
 
 ## Module map
 
-| Target | Directory | Responsibility | Development plan |
-| --- | --- | --- | --- |
-| `oap_toolpath_core` | `core/` | common moves, primitives, parameters, tools, Setup, validation and stock primitives | [`core/DEVELOPMENT_PLAN.md`](core/DEVELOPMENT_PLAN.md) |
-| `oap_toolpath_program` | `program/` | neutral-program validation, post-processing, NC review and atomic export | [`program/DEVELOPMENT_PLAN.md`](program/DEVELOPMENT_PLAN.md) |
-| `oap_toolpath_hole` | `hole/` | fixed-axis drilling and hole-milling kernels | [`hole/DEVELOPMENT_PLAN.md`](hole/DEVELOPMENT_PLAN.md) |
-| `oap_toolpath_pocket` | `pocket/` | pocket geometry, clearing, safety and Multi-Dexel primitives | [`pocket/DEVELOPMENT_PLAN.md`](pocket/DEVELOPMENT_PLAN.md) |
-| `oap_toolpath_profile` | `profile/` | fixed-axis external clearing and contour finishing | [`profile/DEVELOPMENT_PLAN.md`](profile/DEVELOPMENT_PLAN.md) |
-| `oap_toolpath_finishing` | `finishing/` | OpenCAMLib fixed-axis raster relief engraving and neutral program adaptation | [`finishing/README.md`](finishing/README.md) |
-| `oap_toolpath_algorithms` | `algorithms/` | stable algorithm interfaces, built-ins and immutable registry | [`algorithms/DEVELOPMENT_PLAN.md`](algorithms/DEVELOPMENT_PLAN.md) |
-| `oap_toolpath_workflow` | `workflow/` | UI-independent feature services, batch orchestration and async execution | [`workflow/DEVELOPMENT_PLAN.md`](workflow/DEVELOPMENT_PLAN.md) |
+| Target | Directory | Responsibility |
+| --- | --- | --- |
+| `oap_toolpath_core` | `core/` | common moves, primitives, parameters, tools, Setup, validation and stock primitives |
+| `oap_toolpath_program` | `program/` | neutral-program validation, post-processing, NC review and atomic export |
+| `oap_toolpath_hole` | `hole/` | fixed-axis drilling and hole-milling kernels |
+| `oap_toolpath_pocket` | `pocket/` | pocket geometry, clearing, safety and Multi-Dexel primitives |
+| `oap_toolpath_profile` | `profile/` | fixed-axis external clearing and contour finishing |
+| `oap_toolpath_finishing` | `finishing/` | OpenCAMLib fixed-axis raster relief engraving and neutral program adaptation |
+| `oap_toolpath_algorithms` | `algorithms/` | stable algorithm interfaces, built-ins and immutable registry |
+| `oap_toolpath_workflow` | `workflow/` | UI-independent feature services, batch orchestration and async execution |
 
-The persistent operation model and ordered material-state chain are owned by
-[`manufacturing/job`](../manufacturing/job/DEVELOPMENT_PLAN.md) and
-[`manufacturing/ipw`](../manufacturing/ipw/DEVELOPMENT_PLAN.md). Desktop
-orchestration rules are documented in
-[`app/workflows`](../app/workflows/README.md).
+The persistent operation model and ordered material-state chain are described in
+[manufacturing](../manufacturing/README.md). See [surface finishing](finishing/README.md)
+for engraving capabilities and [app/workflows](../app/workflows/README.md) for desktop
+orchestration rules. The [FreePath design contract](pocket/planning/detail/ADAPTIVE_FREEPATH_DESIGN.md)
+describes the current pocket planning algorithm.
 
 ## Dependency direction
 
@@ -130,25 +130,6 @@ these checks do not substitute for manual interactive OpenGL validation.
 Local verification logs are `build/inc-refactor-final-build.log` and
 `build/inc-refactor-ctest.log`.
 
-## Canonical documentation ownership
-
-To prevent several roadmaps from becoming competing sources of truth:
-
-| Decision | Canonical document |
-| --- | --- |
-| common move/primitive/parameter/tool contracts | [`core/DEVELOPMENT_PLAN.md`](core/DEVELOPMENT_PLAN.md) |
-| algorithm IDs, registry and default-admission policy | [`algorithms/DEVELOPMENT_PLAN.md`](algorithms/DEVELOPMENT_PLAN.md) |
-| batch, cancellation, async and publication orchestration | [`workflow/DEVELOPMENT_PLAN.md`](workflow/DEVELOPMENT_PLAN.md) |
-| Hole/Pocket/Profile geometry and safety semantics | the corresponding feature plan |
-| `.oapjob` schema, migrations, stable references and runtime invalidation | [`manufacturing/job/DEVELOPMENT_PLAN.md`](../manufacturing/job/DEVELOPMENT_PLAN.md) |
-| Multi-Dexel truth, node/checkpoint identity and engine versions | [`manufacturing/ipw/DEVELOPMENT_PLAN.md`](../manufacturing/ipw/DEVELOPMENT_PLAN.md) |
-| neutral program packaging and post-processor capability | [`program/DEVELOPMENT_PLAN.md`](program/DEVELOPMENT_PLAN.md) |
-| desktop Runner/UseCase/Controller transactions | [`app/workflows/README.md`](../app/workflows/README.md) |
-
-Feature plans may summarize a cross-module dependency, but version numbers,
-field definitions and engine IDs must be changed in the canonical document
-first and linked from the summary.
-
 ## Shared release gate
 
 Every production toolpath change must preserve:
@@ -161,22 +142,15 @@ Every production toolpath change must preserve:
 6. module ownership, public-header and direct-dependency checks;
 7. explicit sample/parallel budgets rather than unbounded work.
 
-From the repository root:
+From the repository root, after configuring the desktop preset as described in [BUILDING.md](../../BUILDING.md). For VS 2026, replace both the preset name and build directory with `windows-vs2026`. Core configurations and full-suite commands are documented in the same guide:
 
 ```powershell
-cmake --build build --config Release --parallel 16 -- /verbosity:minimal
-ctest --test-dir build -C Release --output-on-failure --parallel 4
+cmake --build --preset windows-vs2022
+ctest --test-dir build/windows-vs2022 -C RelWithDebInfo --output-on-failure --parallel 1 --no-tests=error
 cmake -DOAP_SOURCE_DIR="$PWD" -P cmake/CheckDocumentationLinks.cmake
 ```
 
 ## Parallel execution and optimized builds
-
-Current scheduling and budget contracts are maintained in
-[`core/DEVELOPMENT_PLAN.md`](core/DEVELOPMENT_PLAN.md) and
-[`workflow/DEVELOPMENT_PLAN.md`](workflow/DEVELOPMENT_PLAN.md).
-Generated STEP inputs, reproducible benchmark commands and measured policy
-comparisons are recorded in
-[`core/PARALLEL_BENCHMARK_RESULTS.md`](core/PARALLEL_BENCHMARK_RESULTS.md).
 
 Use `RelWithDebInfo` for performance measurements; it enables compiler optimization
 while retaining symbols. With the Visual Studio generator, `OAP_BUILD_PARALLEL_JOBS`
@@ -259,21 +233,8 @@ worker budget or imply a measured hardware cache hit rate. The interval smoke te
 has an exact private-header exception for ownership and lifetime checks; this
 container is not part of the module's public API.
 
-- Every plan records its current stage, task key, code baseline, maintenance
-  role and latest verified test evidence.
-- Update a plan in the same change that alters its public contract, roadmap
-  status or default algorithm behavior.
-- Keep raw experiment logs in ignored local artifacts; retain reproducible benchmark
-  methods and results beside the owning module. Active contracts and next work
-  remain beside production code.
-- Add a full development plan only for a target or independently owned domain.
-  Small implementation folders should link to their owner instead of copying a
-  roadmap.
-
-## Verification record
-
-| Date | Code baseline | Evidence |
-| --- | --- | --- |
-| 2026-11-09 | `d3278da` + current working changes | RelWithDebInfo application build and CTest 62/62 passed. Exact target caching, six-axis audit equivalence, incremental tile statistics and concurrent lazy fingerprints verified. Local rounded_relief STEP (-Z setup, simulation library): first audit 78.49→2.48 s (1M cells), 90.37→10.74 s (~8M cells); both material fingerprints and allowance/overcut volumes match the previous baseline. |
-| 2026-11-08 | `ee6f2cd` + current working changes | RelWithDebInfo full application build and CTest 51/51 passed after Tile/recognition budgeting and heavy-job admission |
-| 2026-08-24 | `612ab76` | Release CTest 51/51 passed, including feature, manufacturing, app-workflow, architecture and documentation-link suites |
+- Update module READMEs alongside changes to public contracts and default behavior.
+- Keep raw experiment logs and historical measurements in local artifacts; current
+  usage instructions belong in the module README and build guide.
+- Small implementation folders should link to their owning module rather than
+  duplicate its documentation.

@@ -313,7 +313,7 @@ files retain only command adapters that still span multiple workspaces.
 
 The current manufacturing entry points and persistence/runtime split are
 documented in [`src/manufacturing/README.md`](src/manufacturing/README.md).
-Toolpath target ownership, canonical development plans and shared release gates
+Toolpath target ownership, module responsibilities and shared release gates
 are indexed in [`src/toolpath/README.md`](src/toolpath/README.md). Application
 workflow source ownership and transaction rules are documented in
 [`src/app/workflows/README.md`](src/app/workflows/README.md).
@@ -555,12 +555,13 @@ rewrite is not justified by this first-stage result alone.
 
 ### General regression
 
-From the repository root:
+From the repository root, after dependency setup and desktop preset configuration
+in [BUILDING.md](BUILDING.md). For VS 2026, replace both the preset name and build
+directory with `windows-vs2026`:
 
 ```powershell
-cmake -S . -B build
-cmake --build build --config Release --parallel
-ctest --test-dir build -C Release --output-on-failure
+cmake --build --preset windows-vs2022
+ctest --test-dir build/windows-vs2022 -C RelWithDebInfo --output-on-failure --parallel 1 --no-tests=error
 ```
 
 The fast test suite covers module boundaries plus representative analysis,
