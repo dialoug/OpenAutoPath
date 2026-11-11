@@ -317,8 +317,6 @@ Toolpath target ownership, canonical development plans and shared release gates
 are indexed in [`src/toolpath/README.md`](src/toolpath/README.md). Application
 workflow source ownership and transaction rules are documented in
 [`src/app/workflows/README.md`](src/app/workflows/README.md).
-Current UI state rules and manual release checks are documented in
-[`docs/16_ui_coordination_audit.md`](docs/16_ui_coordination_audit.md).
 
 ## Enforced boundary rules
 

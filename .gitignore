@@ -57,10 +57,7 @@ Thumbs.db
 /*.zip
 
 # 本地文档与记忆（不纳入版本库）
-/docs/*
-!/docs/15_freecad_cam_implementation.md
-!/docs/16_ui_coordination_audit.md
-/docs/14_code_commenting_guide.md
+/docs/
 /memory/
 /FreeCAD/
 /AGENTS.md
