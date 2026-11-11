@@ -21,6 +21,18 @@ and OCCT 7.9.3 as their dependency baseline. The GUI uses Qt private headers:
 build and deploy it with the same Qt installation. Core-only builds still need
 Qt Core, OCCT, Clipper2, OpenCAMLib and Boost.
 
+The desktop package targets Windows 10 1809 or later and Windows 11 (x64),
+matching the [Qt 6.11 Windows baseline](https://doc.qt.io/qt-6.11/windows.html).
+Deployment uses `windeployqt --no-system-d3d-compiler`: `D3Dcompiler_47.dll`
+is loaded from Windows, not copied from the build machine's SDK. The isolated
+package test verifies the system DLL and its `D3DCompile` entry point.
+See [Microsoft's system-component explanation](https://devblogs.microsoft.com/cppblog/on-c-amp-remappable-shader/).
+
+中文说明：桌面包面向 Windows 10 1809 及以上版本和 Windows 11（x64）。
+`D3Dcompiler_47.dll` 使用系统自带版本，不随包复制开发机的 SDK 版本；
+独立测试包验证会检查系统 DLL 及其编译入口能否加载。旧构建目录若残留该 DLL，
+请先将它移到运行目录之外再打包；分发检查仍会拒绝未登记的文件。
+
 ## Windows dependencies
 
 The default local layout is:

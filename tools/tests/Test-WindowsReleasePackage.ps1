@@ -45,6 +45,15 @@ using System.Text;
 using System.Collections.Generic;
 using System.Runtime.InteropServices;
 public static class __TYPE__ {
+    [DllImport("kernel32.dll",CharSet=CharSet.Unicode,SetLastError=true)] static extern IntPtr LoadLibraryEx(string file,IntPtr reserved,uint flags);
+    [DllImport("kernel32.dll",CharSet=CharSet.Ansi,ExactSpelling=true)] static extern IntPtr GetProcAddress(IntPtr module,string name);
+    [DllImport("kernel32.dll")] static extern bool FreeLibrary(IntPtr module);
+    public static void CheckSystemCompiler(string file) {
+        IntPtr module=LoadLibraryEx(file,IntPtr.Zero,0x800);
+        if(module==IntPtr.Zero) throw new System.ComponentModel.Win32Exception(Marshal.GetLastWin32Error(),"Cannot load Windows D3D compiler");
+        try { if(GetProcAddress(module,"D3DCompile")==IntPtr.Zero) throw new Exception("System D3DCompile entry point is missing"); }
+        finally { FreeLibrary(module); }
+    }
     delegate bool EnumProc(IntPtr h,IntPtr p);
     [DllImport("user32.dll")] static extern bool EnumWindows(EnumProc callback,IntPtr p);
     [DllImport("user32.dll")] static extern uint GetWindowThreadProcessId(IntPtr h,out uint pid);
@@ -96,6 +105,7 @@ $forbidden = '^(avcodec|avformat|avutil|swscale|avdevice|avfilter|swresample)(-[
 $imports = @()
 foreach($file in Get-ChildItem -LiteralPath $package -Recurse -File | Where-Object Extension -in '.dll','.exe'){
     if($file.Name -match $forbidden){throw "FFmpeg binary in package: $($file.Name)"}
+    if($file.Name -ieq 'D3Dcompiler_47.dll'){throw 'Use the Windows system D3D compiler, not a bundled SDK copy'}
     $dependencies = @($native::Imports($file.FullName))
     if(@($dependencies | Where-Object {$_ -match $forbidden}).Count){throw "FFmpeg import in $($file.Name)"}
     $imports += @{file=$file.FullName.Substring($package.Length+1);imports=$dependencies}
@@ -109,6 +119,8 @@ $window = [IntPtr]::Zero
 try {
     $env:PATH = "$env:SystemRoot\System32;$env:SystemRoot"
     foreach($key in $envNames | Where-Object {$_ -ne 'PATH'}){[Environment]::SetEnvironmentVariable($key,$null,'Process')}
+    $systemCompiler = Join-Path ([Environment]::SystemDirectory) 'D3Dcompiler_47.dll'
+    $native::CheckSystemCompiler($systemCompiler)
     $working = Join-Path $output 'empty-working-directory'
     New-Item -ItemType Directory -Path $working | Out-Null
     $launcher = Start-Process -FilePath (Join-Path $package 'OpenAutoPath.exe') -WorkingDirectory $working -WindowStyle Hidden -PassThru
@@ -135,12 +147,15 @@ try {
     foreach($binary in $inventory.binaries){$bundledNames[[IO.Path]::GetFileName($binary.file)]=$true}
     foreach($module in $modules){
         if($module.ModuleName -match $forbidden){throw 'Application loaded FFmpeg'}
+        if($module.ModuleName -ieq 'D3Dcompiler_47.dll' -and $module.FileName -ine $systemCompiler){
+            throw 'Application loaded a non-system D3D compiler'
+        }
         if($bundledNames.ContainsKey($module.ModuleName) -and
             -not $module.FileName.StartsWith($bin+'\',[StringComparison]::OrdinalIgnoreCase)){
             throw "Application loaded an SDK module outside its package: $($module.ModuleName)"
         }
     }
-    @{commit=$info.commit;result='passed';scope='ZIP integrity, PE imports, isolated PATH and responsive main-window startup; not a pristine-OS or visual CAD test';modules=$modules} |
+    @{commit=$info.commit;result='passed';systemD3DCompiler=$systemCompiler;scope='ZIP integrity, PE imports, isolated PATH and responsive main-window startup; not a pristine-OS or visual CAD test';modules=$modules} |
         ConvertTo-Json -Depth 6 | Set-Content (Join-Path $output 'startup-result.json') -Encoding UTF8
     Write-Host "Package integrity, FFmpeg-free imports and isolated startup passed: $($info.commit)"
 } finally {

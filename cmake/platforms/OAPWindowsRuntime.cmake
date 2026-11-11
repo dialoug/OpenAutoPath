@@ -46,7 +46,7 @@ if(OAP_QT_DEPLOY_TOOL)
     endif()
     add_custom_command(TARGET OpenAutoPathApp POST_BUILD
         COMMAND ${CMAKE_COMMAND} -E env ${oap_qt_deploy_environment}
-                "${OAP_QT_DEPLOY_TOOL}" --no-translations
+                "${OAP_QT_DEPLOY_TOOL}" --no-translations --no-system-d3d-compiler
                 "$<TARGET_FILE:OpenAutoPathApp>"
         VERBATIM
         COMMENT "Deploying Qt runtime")
