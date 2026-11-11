@@ -52,7 +52,8 @@ OpenAutoPath 是一个基于 **C++20、Qt 和 Open CASCADE（OCCT）** 的 CAD/C
 6. **保存与导出**：保存加工项目；需要 NC 时，检查装夹、刀具和程序审查结果后导出参考 NC。
 
 曲面雕刻的具体参数和操作入口见 [雕刻加工说明](src/toolpath/finishing/README.md)。
-当前仓库尚未提供统一的公开入门样例包，需要自行准备可使用的 STEP 模型。
+仓库提供[测试样例及使用说明](samples/README.md)，可下载其中的 STEP 模型，
+用于尝试特征识别、孔/槽腔/轮廓加工及曲面雕刻流程。
 
 ## 当前边界
 

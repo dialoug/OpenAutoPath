@@ -43,8 +43,13 @@ cmake_install.cmake
 Thumbs.db
 .DS_Store
 
-# 大体积 STEP 样例（超过 GitHub 100MB 上限，不纳入版本库）
-/samples/
+# 样例按文件纳入版本库，其他本地模型及生成产物继续忽略。
+/samples/*
+!/samples/README.md
+!/samples/cam_feature_test.stp
+!/samples/generate_cam_feature_test.cpp
+!/samples/rounded_relief.step
+# 根目录的本地 STEP 模型不纳入版本库。
 /*.stp
 
 # 备份压缩包（产物，超过 GitHub 100MB 上限）
