@@ -44,9 +44,12 @@ if(OAP_QT_DEPLOY_TOOL)
         list(APPEND oap_qt_deploy_environment
             "VCINSTALLDIR=${CMAKE_GENERATOR_INSTANCE}/VC")
     endif()
+    # Keep deployment independent of optional modules installed on the build host.
+    # We use Windows' D3D compiler and native OpenGL drivers; no SVG assets/plugins.
     add_custom_command(TARGET OpenAutoPathApp POST_BUILD
         COMMAND ${CMAKE_COMMAND} -E env ${oap_qt_deploy_environment}
                 "${OAP_QT_DEPLOY_TOOL}" --no-translations --no-system-d3d-compiler
+                --no-opengl-sw --exclude-plugins qsvg,qsvgicon
                 "$<TARGET_FILE:OpenAutoPathApp>"
         VERBATIM
         COMMENT "Deploying Qt runtime")

@@ -33,6 +33,14 @@ See [Microsoft's system-component explanation](https://devblogs.microsoft.com/cp
 独立测试包验证会检查系统 DLL 及其编译入口能否加载。旧构建目录若残留该 DLL，
 请先将它移到运行目录之外再打包；分发检查仍会拒绝未登记的文件。
 
+Deployment also excludes optional SVG plugins (`qsvg`, `qsvgicon`) and the Qt
+SDK's `opengl32sw.dll` software rasterizer. The application has no SVG assets;
+3D rendering uses the system's graphics driver. This keeps CI packages aligned
+with the locally validated runtime, regardless of extra Qt modules on the host.
+
+中文说明：部署时也排除未使用的 SVG 插件及 Qt SDK 的 OpenGL 软件渲染库，
+避免 CI 因安装了额外 Qt 模块而扩大分发范围。三维显示使用系统图形驱动。
+
 ## Windows dependencies
 
 The default local layout is:
