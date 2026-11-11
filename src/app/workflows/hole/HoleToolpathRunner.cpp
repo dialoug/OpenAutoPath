@@ -1,5 +1,6 @@
 // 孔刀路运行器：调用无界面工作流，并通过交互端口发布进度和取消。
 #include "app/workflows/hole/HoleToolpathRunner.h"
+#include <QCoreApplication>
 
 #include <atomic>
 #include <exception>
@@ -71,10 +72,10 @@ std::optional<HoleGeometryRecognitionResult> recognizeHolesWithProgress(
     toolpath::ToolpathAsyncTask<HoleGeometryRecognitionResult> task(
         std::move(future), cancellation);
     WorkflowProgressRequest progressRequest;
-    progressRequest.title = QStringLiteral("孔特征识别");
-    progressRequest.label = QStringLiteral("正在后台识别孔特征…");
+    progressRequest.title = QCoreApplication::translate("OpenAutoPath", "孔特征识别");
+    progressRequest.label = QCoreApplication::translate("OpenAutoPath", "正在后台识别孔特征…");
     progressRequest.cancellingLabel =
-        QStringLiteral("正在取消，等待当前拓扑识别阶段结束…");
+        QCoreApplication::translate("OpenAutoPath", "正在取消，等待当前拓扑识别阶段结束…");
     progressRequest.initialTotal = 1;
     progressRequest.snapshot = [&] {
         return WorkflowProgressSnapshot{
@@ -158,11 +159,11 @@ tooling::HoleAutomaticToolpathResult generateAutomaticHolesWithProgress(
     toolpath::ToolpathAsyncTask<tooling::HoleAutomaticToolpathResult> task(
         std::move(future), cancellation);
     WorkflowProgressRequest progressRequest;
-    progressRequest.title = QStringLiteral("孔自动选刀");
+    progressRequest.title = QCoreApplication::translate("OpenAutoPath", "孔自动选刀");
     progressRequest.label =
-        QStringLiteral("正在按六面和刀库自动规划孔刀路…");
+        QCoreApplication::translate("OpenAutoPath", "正在按六面和刀库自动规划孔刀路…");
     progressRequest.cancellingLabel =
-        QStringLiteral("正在取消，等待当前刀具批次结束…");
+        QCoreApplication::translate("OpenAutoPath", "正在取消，等待当前刀具批次结束…");
     progressRequest.initialTotal = inputs.size();
     progressRequest.snapshot = [&] {
         return WorkflowProgressSnapshot{

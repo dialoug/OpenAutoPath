@@ -1,4 +1,5 @@
 #include "app/workflows/project/EngravingSettingsStorage.h"
+#include <QCoreApplication>
 
 #include "app/workflows/project/detail/ToolContextSettingsJson.h"
 
@@ -122,7 +123,7 @@ bool EngravingSettingsStorage::load(QSettings& settings, EngravingSettings& valu
     const auto document = QJsonDocument::fromJson(settings.value(kKey).toByteArray());
     EngravingSettings candidate;
     if (settings.status() != QSettings::NoError || !document.isObject() || !decode(document.object(), candidate)) {
-        if (error) *error = QStringLiteral("雕刻参数配置无效，已保留当前参数。");
+        if (error) *error = QCoreApplication::translate("OpenAutoPath", "雕刻参数配置无效，已保留当前参数。");
         return false;
     }
     value = std::move(candidate);
@@ -135,13 +136,13 @@ bool EngravingSettingsStorage::save(QSettings& settings, const EngravingSettings
     const auto object = encode(value);
     EngravingSettings validated;
     if (!decode(object, validated)) {
-        if (error) *error = QStringLiteral("雕刻参数配置无效，未覆盖已保存参数。");
+        if (error) *error = QCoreApplication::translate("OpenAutoPath", "雕刻参数配置无效，未覆盖已保存参数。");
         return false;
     }
     settings.setValue(kKey, QJsonDocument(object).toJson(QJsonDocument::Compact));
     settings.sync();
     if (settings.status() == QSettings::NoError) return true;
-    if (error) *error = QStringLiteral("无法保存雕刻参数配置。");
+    if (error) *error = QCoreApplication::translate("OpenAutoPath", "无法保存雕刻参数配置。");
     return false;
 }
 

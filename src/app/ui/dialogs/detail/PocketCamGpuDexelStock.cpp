@@ -1,4 +1,5 @@
 #include "app/ui/dialogs/detail/PocketCamOpenGLWidget.h"
+#include <QCoreApplication>
 
 #include <algorithm>
 #include <array>
@@ -113,7 +114,7 @@ bool PocketCamOpenGLWidget::cacheAnalyticBoundarySnapshot(int operationIndex)
             m_analyticBoundarySnapshots.begin());
     }
     return checkOpenGlStage(
-        QStringLiteral("解析边界工序检查点缓存"));
+        QCoreApplication::translate("OpenAutoPath", "解析边界工序检查点缓存"));
 }
 
 bool PocketCamOpenGLWidget::restoreAnalyticBoundarySnapshot(int operationIndex)
@@ -151,7 +152,7 @@ bool PocketCamOpenGLWidget::restoreAnalyticBoundarySnapshot(int operationIndex)
     m_gl43->glMemoryBarrier(
         GL_SHADER_STORAGE_BARRIER_BIT);
     return checkOpenGlStage(
-        QStringLiteral("解析边界工序检查点恢复"));
+        QCoreApplication::translate("OpenAutoPath", "解析边界工序检查点恢复"));
 }
 
 void PocketCamOpenGLWidget::destroyGpuDexelState()
@@ -220,8 +221,8 @@ bool PocketCamOpenGLWidget::uploadPlaybackStock(
     const auto meshOptions = IpwDisplayMeshController::meshOptionsForQuality(1, stock.resolution());
     if (triangulation.IsNull() && stock.intervalCount() > 0 && !stock.buildDisplayMesh(
             triangulation, nullptr, &error, {}, meshOptions)) {
-        m_error = QStringLiteral("IPW 兼容显示网格生成失败：%1（GPU：%2）")
-            .arg(QString::fromStdString(error), m_playbackDisplayWarning);
+        m_error = QCoreApplication::translate("OpenAutoPath", "IPW 兼容显示网格生成失败：%1（GPU：%2）")
+            .arg(QCoreApplication::translate("OpenAutoPathDiagnostic", QString::fromStdString(error).toUtf8().constData()), m_playbackDisplayWarning);
         return false;
     }
     RenderMesh mesh;
@@ -229,10 +230,10 @@ bool PocketCamOpenGLWidget::uploadPlaybackStock(
         mesh = meshTriangulation(triangulation, m_error);
         if (!m_error.isEmpty()) return false;
     }
-    beginOpenGlStage(QStringLiteral("IPW 兼容网格上传"));
+    beginOpenGlStage(QCoreApplication::translate("OpenAutoPath", "IPW 兼容网格上传"));
     GpuMesh replacement;
     uploadMesh(mesh, replacement);
-    if (!checkOpenGlStage(QStringLiteral("IPW 兼容网格上传"))) {
+    if (!checkOpenGlStage(QCoreApplication::translate("OpenAutoPath", "IPW 兼容网格上传"))) {
         destroyGpuMesh(replacement);
         return false;
     }
@@ -249,20 +250,20 @@ bool PocketCamOpenGLWidget::uploadGpuDexelStock(
     if (!m_gpuDexelSupported || !m_gl43 ||
         !stock.valid() ||
         (!m_scene.authoritativeIpwPlayback && !stock.axisAligned(m_scene.outwardToolAxis))) {
-        m_error = QStringLiteral("GPU 不支持、材料无效或材料轴与播放轴不一致");
+        m_error = QCoreApplication::translate("OpenAutoPath", "GPU 不支持、材料无效或材料轴与播放轴不一致");
         return false;
     }
     const int nx = stock.nx();
     const int ny = stock.ny();
     if (nx <= 0 || ny <= 0) {
-        m_error = QStringLiteral("IPW 网格尺寸无效：%1 × %2").arg(nx).arg(ny);
+        m_error = QCoreApplication::translate("OpenAutoPath", "IPW 网格尺寸无效：%1 × %2").arg(nx).arg(ny);
         return false;
     }
     const std::size_t cellCount =
         static_cast<std::size_t>(nx) *
         static_cast<std::size_t>(ny);
     if (cellCount == 0u || cellCount > 8'000'000u) {
-        m_error = QStringLiteral("IPW 网格 %1 × %2 超过 GPU 的 800 万单元预算").arg(nx).arg(ny);
+        m_error = QCoreApplication::translate("OpenAutoPath", "IPW 网格 %1 × %2 超过 GPU 的 800 万单元预算").arg(nx).arg(ny);
         return false;
     }
     if (!m_analyticBoundarySnapshots.empty() &&
@@ -272,7 +273,7 @@ bool PocketCamOpenGLWidget::uploadGpuDexelStock(
     }
 
     beginOpenGlStage(
-        QStringLiteral("GPU Multi-Dexel SSBO 上传"));
+        QCoreApplication::translate("OpenAutoPath", "GPU Multi-Dexel SSBO 上传"));
 
     int maximumIntervals = 0;
     std::size_t sourceIntervalCount = 0u;
@@ -294,7 +295,7 @@ bool PocketCamOpenGLWidget::uploadGpuDexelStock(
     constexpr std::size_t maximumIntervalSlots = 64'000'000u;
     if (cellCount > maximumIntervalSlots /
             static_cast<std::size_t>(maximumIntervals)) {
-        m_error = QStringLiteral("IPW 网格 %1 × %2、每单元最多 %3 个区间，超过 GPU 区间预算")
+        m_error = QCoreApplication::translate("OpenAutoPath", "IPW 网格 %1 × %2、每单元最多 %3 个区间，超过 GPU 区间预算")
             .arg(nx).arg(ny).arg(maximumIntervals);
         return false;
     }
@@ -304,7 +305,7 @@ bool PocketCamOpenGLWidget::uploadGpuDexelStock(
     const std::size_t intervalBytes = cellCount *
         static_cast<std::size_t>(maximumIntervals) * sizeof(QVector2D);
     if (maximumBlockBytes <= 0 || intervalBytes > static_cast<std::size_t>(maximumBlockBytes)) {
-        m_error = QStringLiteral("IPW 区间缓冲需要 %1 MiB，显卡单个 SSBO 上限为 %2 MiB")
+        m_error = QCoreApplication::translate("OpenAutoPath", "IPW 区间缓冲需要 %1 MiB，显卡单个 SSBO 上限为 %2 MiB")
             .arg(intervalBytes / (1024.0 * 1024.0), 0, 'f', 1)
             .arg(maximumBlockBytes / (1024.0 * 1024.0), 0, 'f', 1);
         return false;
@@ -483,7 +484,7 @@ bool PocketCamOpenGLWidget::uploadGpuDexelStock(
     m_dexelFineCapacity =
         static_cast<std::uint32_t>(fineCapacity);
     if (!checkOpenGlStage(
-            QStringLiteral("GPU Multi-Dexel SSBO 上传"))) {
+            QCoreApplication::translate("OpenAutoPath", "GPU Multi-Dexel SSBO 上传"))) {
         destroyGpuDexelState();
         return false;
     }

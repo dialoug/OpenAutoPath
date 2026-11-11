@@ -1,5 +1,6 @@
 // 刀库编辑对话框：在 Qt 表格模型与 ToolLibrary 领域对象之间同步用户修改。
 #include "app/ui/dialogs/ToolLibraryDialog.h"
+#include <QCoreApplication>
 
 #include "app/ui/view/OcctView.h"
 #include "app/view/ToolPreviewGeometryBuilder.h"
@@ -91,8 +92,7 @@ public:
     {
         setMinimumSize(240, 300);
         setSizePolicy(QSizePolicy::Preferred, QSizePolicy::Expanding);
-        setToolTip(QStringLiteral(
-            "按当前参数示意刀刃、刀杆、刀柄/夹头和主轴头包络；仅用于参数检查，不是碰撞计算模型。"));
+        setToolTip(QCoreApplication::translate("OpenAutoPath", "按当前参数示意刀刃、刀杆、刀柄/夹头和主轴头包络；仅用于参数检查，不是碰撞计算模型。"));
     }
 
     void setToolGeometry(const ToolGeometry& geometry)
@@ -259,7 +259,7 @@ protected:
         painter.drawText(
             QRectF(8, height() - 50, width() - 16, 40),
             Qt::AlignCenter,
-            QStringLiteral("%1  ·  Ø%2 mm  ·  刃长 %3 mm  ·  总长 %4 mm")
+            QCoreApplication::translate("OpenAutoPath", "%1  ·  Ø%2 mm  ·  刃长 %3 mm  ·  总长 %4 mm")
                 .arg(oap::tooling::toolTypeDisplayName(m_type),
                      QString::number(m_geometry.diameter, 'f', 3),
                      QString::number(m_geometry.cuttingEdgeLength, 'f', 3),
@@ -287,8 +287,7 @@ public:
         m_view = new OcctView(this);
         m_view->setBackgroundGray(0.18);
         m_view->setFaceSelectionEnabled(false);
-        m_view->setToolTip(QStringLiteral(
-            "中键旋转，右键拖动平移，滚轮缩放；实体仅用于刀具参数预览。"));
+        m_view->setToolTip(QCoreApplication::translate("OpenAutoPath", "中键旋转，右键拖动平移，滚轮缩放；实体仅用于刀具参数预览。"));
         layout->addWidget(m_view, 1);
 
         m_refreshTimer.setSingleShot(true);
@@ -379,7 +378,7 @@ bool editToolValues(QWidget* parent, ToolBit& tool,
 {
     // 对话框编辑副本，只有用户确认且字段校验通过后才回写领域对象。
     QDialog dialog(parent);
-    dialog.setWindowTitle(isNew ? QStringLiteral("新增刀具") : QStringLiteral("编辑刀具"));
+    dialog.setWindowTitle(isNew ? QCoreApplication::translate("OpenAutoPath", "新增刀具") : QCoreApplication::translate("OpenAutoPath", "编辑刀具"));
     dialog.setWindowFlag(Qt::WindowMaximizeButtonHint, true);
     dialog.setSizeGripEnabled(true);
     dialog.setMinimumSize(520, 420);
@@ -400,9 +399,9 @@ bool editToolValues(QWidget* parent, ToolBit& tool,
         tabs->addTab(scrollArea, title);
         return std::pair<QWidget*, QFormLayout*>(content, form);
     };
-    const auto geometryTab = makeFormTab(QStringLiteral("几何与装配"));
-    const auto cuttingTab = makeFormTab(QStringLiteral("刀位与切削默认值"));
-    const auto drillingTab = makeFormTab(QStringLiteral("钻削与备注"));
+    const auto geometryTab = makeFormTab(QCoreApplication::translate("OpenAutoPath", "几何与装配"));
+    const auto cuttingTab = makeFormTab(QCoreApplication::translate("OpenAutoPath", "刀位与切削默认值"));
+    const auto drillingTab = makeFormTab(QCoreApplication::translate("OpenAutoPath", "钻削与备注"));
     QWidget* geometryEditor = geometryTab.first;
     QWidget* cuttingEditor = cuttingTab.first;
     QWidget* drillingEditor = drillingTab.first;
@@ -412,12 +411,12 @@ bool editToolValues(QWidget* parent, ToolBit& tool,
     dialogLayout->addWidget(tabs, 1);
 
     auto* name = new QLineEdit(tool.name, geometryEditor);
-    geometryForm->addRow(QStringLiteral("名称"), name);
+    geometryForm->addRow(QCoreApplication::translate("OpenAutoPath", "名称"), name);
 
     auto* type = new QComboBox(geometryEditor);
     fillToolTypes(type);
     type->setCurrentIndex(std::max(0, type->findData(static_cast<int>(tool.type))));
-    geometryForm->addRow(QStringLiteral("类型"), type);
+    geometryForm->addRow(QCoreApplication::translate("OpenAutoPath", "类型"), type);
     auto* typeHelp = new QLabel(geometryEditor);
     typeHelp->setWordWrap(true);
     typeHelp->setStyleSheet(QStringLiteral("color: palette(mid);"));
@@ -443,31 +442,31 @@ bool editToolValues(QWidget* parent, ToolBit& tool,
     auto* spindleEnvelopeLength = makeLength(
         geometryEditor, tool.geometry.spindleEnvelopeLength);
     auto* cornerRadius = makeLength(geometryEditor, tool.geometry.cornerRadius);
-    auto* diameterLabel = new QLabel(QStringLiteral("直径"), geometryEditor);
+    auto* diameterLabel = new QLabel(QCoreApplication::translate("OpenAutoPath", "直径"), geometryEditor);
     auto* cuttingLengthLabel = new QLabel(
-        QStringLiteral("刀刃长度"), geometryEditor);
+        QCoreApplication::translate("OpenAutoPath", "刀刃长度"), geometryEditor);
     auto* cornerRadiusLabel = new QLabel(
-        QStringLiteral("刀尖圆角"), geometryEditor);
+        QCoreApplication::translate("OpenAutoPath", "刀尖圆角"), geometryEditor);
     geometryForm->addRow(diameterLabel, diameter);
     geometryForm->addRow(cuttingLengthLabel, cuttingLength);
-    geometryForm->addRow(QStringLiteral("总长"), overallLength);
-    geometryForm->addRow(QStringLiteral("刀杆直径"), shankDiameter);
-    geometryForm->addRow(QStringLiteral("刀柄/夹头直径"), holderDiameter);
-    geometryForm->addRow(QStringLiteral("刀柄/夹头长度"), holderLength);
-    geometryForm->addRow(QStringLiteral("主轴头包络直径"),
+    geometryForm->addRow(QCoreApplication::translate("OpenAutoPath", "总长"), overallLength);
+    geometryForm->addRow(QCoreApplication::translate("OpenAutoPath", "刀杆直径"), shankDiameter);
+    geometryForm->addRow(QCoreApplication::translate("OpenAutoPath", "刀柄/夹头直径"), holderDiameter);
+    geometryForm->addRow(QCoreApplication::translate("OpenAutoPath", "刀柄/夹头长度"), holderLength);
+    geometryForm->addRow(QCoreApplication::translate("OpenAutoPath", "主轴头包络直径"),
                  spindleEnvelopeDiameter);
-    geometryForm->addRow(QStringLiteral("主轴头包络长度"),
+    geometryForm->addRow(QCoreApplication::translate("OpenAutoPath", "主轴头包络长度"),
                  spindleEnvelopeLength);
     geometryForm->addRow(cornerRadiusLabel, cornerRadius);
 
     auto* fluteCount = new QSpinBox(geometryEditor);
     fluteCount->setRange(0, 100);
-    fluteCount->setSpecialValueText(QStringLiteral("未填写"));
+    fluteCount->setSpecialValueText(QCoreApplication::translate("OpenAutoPath", "未填写"));
     bool fluteCountOk = false;
     const int storedFluteCount = tool.attributes
         .value(QStringLiteral("flutes")).toInt(&fluteCountOk);
     fluteCount->setValue(fluteCountOk ? storedFluteCount : 0);
-    auto* fluteCountLabel = new QLabel(QStringLiteral("刃数"), geometryEditor);
+    auto* fluteCountLabel = new QLabel(QCoreApplication::translate("OpenAutoPath", "刃数"), geometryEditor);
     geometryForm->addRow(fluteCountLabel, fluteCount);
 
     auto* tipAngle = new QDoubleSpinBox(geometryEditor);
@@ -477,18 +476,18 @@ bool editToolValues(QWidget* parent, ToolBit& tool,
     tipAngle->setValue(tool.geometry.tipAngle);
     auto* tipCompensation = makeLength(
         geometryEditor, tool.geometry.tipCompensation);
-    tipCompensation->setSpecialValueText(QStringLiteral("未填写"));
+    tipCompensation->setSpecialValueText(QCoreApplication::translate("OpenAutoPath", "未填写"));
     tipCompensation->setToolTip(
-        QStringLiteral("实测或厂家给定的钻尖高度 h；大于 0 时优先于刀径和刀尖角公式"));
+        QCoreApplication::translate("OpenAutoPath", "实测或厂家给定的钻尖高度 h；大于 0 时优先于刀径和刀尖角公式"));
     auto* tipGeometryWidget = new QWidget(geometryEditor);
     auto* tipGeometryRow = new QHBoxLayout(tipGeometryWidget);
     tipGeometryRow->setContentsMargins(0, 0, 0, 0);
     tipGeometryRow->addWidget(tipAngle);
     auto* tipCompensationLabel = new QLabel(
-        QStringLiteral("直接补偿 h"), tipGeometryWidget);
+        QCoreApplication::translate("OpenAutoPath", "直接补偿 h"), tipGeometryWidget);
     tipGeometryRow->addWidget(tipCompensationLabel);
     tipGeometryRow->addWidget(tipCompensation);
-    auto* tipAngleLabel = new QLabel(QStringLiteral("刀尖角"), geometryEditor);
+    auto* tipAngleLabel = new QLabel(QCoreApplication::translate("OpenAutoPath", "刀尖角"), geometryEditor);
     geometryForm->addRow(tipAngleLabel, tipGeometryWidget);
 
     // FreeCAD ToolBitEditor 的几何属性 + Shape 预览布局；这里使用当前项目
@@ -507,10 +506,10 @@ bool editToolValues(QWidget* parent, ToolBit& tool,
     auto* previewPaneLayout = new QVBoxLayout(previewPane);
     previewPaneLayout->setContentsMargins(0, 0, 0, 0);
     auto* previewModeRow = new QHBoxLayout;
-    previewModeRow->addWidget(new QLabel(QStringLiteral("预览"), previewPane));
+    previewModeRow->addWidget(new QLabel(QCoreApplication::translate("OpenAutoPath", "预览"), previewPane));
     auto* previewMode = new QComboBox(previewPane);
-    previewMode->addItem(QStringLiteral("二维装配"));
-    previewMode->addItem(QStringLiteral("三维刀具"));
+    previewMode->addItem(QCoreApplication::translate("OpenAutoPath", "二维装配"));
+    previewMode->addItem(QCoreApplication::translate("OpenAutoPath", "三维刀具"));
     previewModeRow->addWidget(previewMode, 1);
     previewPaneLayout->addLayout(previewModeRow);
     auto* previewStack = new QStackedWidget(previewPane);
@@ -529,7 +528,7 @@ bool editToolValues(QWidget* parent, ToolBit& tool,
     geometrySplitter->setStretchFactor(1, 2);
     geometrySplitter->setSizes({500, 340});
     geometryPageLayout->addWidget(geometrySplitter);
-    tabs->insertTab(0, geometryPage, QStringLiteral("几何与装配"));
+    tabs->insertTab(0, geometryPage, QCoreApplication::translate("OpenAutoPath", "几何与装配"));
     // QTabWidget::removeTab() 会显式隐藏原页面；重新放入 splitter 后必须恢复
     // 可见状态，否则只剩右侧预览，用户无法编辑几何参数。
     geometryScroll->show();
@@ -571,15 +570,15 @@ bool editToolValues(QWidget* parent, ToolBit& tool,
 
     auto* toolNumber = new QSpinBox(cuttingEditor);
     toolNumber->setRange(0, 9999);
-    toolNumber->setSpecialValueText(QStringLiteral("未分配"));
+    toolNumber->setSpecialValueText(QCoreApplication::translate("OpenAutoPath", "未分配"));
     toolNumber->setValue(assigned ? slot.toolNumber : 0);
-    cuttingForm->addRow(QStringLiteral("刀号"), toolNumber);
+    cuttingForm->addRow(QCoreApplication::translate("OpenAutoPath", "刀号"), toolNumber);
 
     auto makeCutting = [&](double value, const QString& suffix) {
         auto* input = new QDoubleSpinBox(cuttingEditor);
         input->setRange(0.0, 1000000.0);
         input->setDecimals(2);
-        input->setSpecialValueText(QStringLiteral("沿用当前值"));
+        input->setSpecialValueText(QCoreApplication::translate("OpenAutoPath", "沿用当前值"));
         input->setSuffix(suffix);
         input->setValue(value);
         return input;
@@ -598,11 +597,11 @@ bool editToolValues(QWidget* parent, ToolBit& tool,
     auto* verticalRapid =
         makeCutting(slot.cuttingDefaults.verticalRapid,
                     QStringLiteral(" mm/min"));
-    cuttingForm->addRow(QStringLiteral("主轴转速"), spindle);
-    cuttingForm->addRow(QStringLiteral("水平进给"), horizontalFeed);
-    cuttingForm->addRow(QStringLiteral("垂直进给"), verticalFeed);
-    cuttingForm->addRow(QStringLiteral("水平快速移动"), horizontalRapid);
-    cuttingForm->addRow(QStringLiteral("垂直快速移动"), verticalRapid);
+    cuttingForm->addRow(QCoreApplication::translate("OpenAutoPath", "主轴转速"), spindle);
+    cuttingForm->addRow(QCoreApplication::translate("OpenAutoPath", "水平进给"), horizontalFeed);
+    cuttingForm->addRow(QCoreApplication::translate("OpenAutoPath", "垂直进给"), verticalFeed);
+    cuttingForm->addRow(QCoreApplication::translate("OpenAutoPath", "水平快速移动"), horizontalRapid);
+    cuttingForm->addRow(QCoreApplication::translate("OpenAutoPath", "垂直快速移动"), verticalRapid);
 
     auto* coolant = new QComboBox(cuttingEditor);
     for (CoolantMode mode : {CoolantMode::Off, CoolantMode::Flood,
@@ -612,17 +611,17 @@ bool editToolValues(QWidget* parent, ToolBit& tool,
     coolant->setCurrentIndex(
         std::max(0, coolant->findData(
             static_cast<int>(slot.coolantDefault))));
-    cuttingForm->addRow(QStringLiteral("冷却"), coolant);
+    cuttingForm->addRow(QCoreApplication::translate("OpenAutoPath", "冷却"), coolant);
 
     auto* throughCoolant = new QCheckBox(
-        QStringLiteral("刀具结构支持中心内冷"), drillingEditor);
+        QCoreApplication::translate("OpenAutoPath", "刀具结构支持中心内冷"), drillingEditor);
     throughCoolant->setChecked(tool.throughCoolant);
-    drillingForm->addRow(QStringLiteral("刀具能力"), throughCoolant);
+    drillingForm->addRow(QCoreApplication::translate("OpenAutoPath", "刀具能力"), throughCoolant);
 
     auto* peckDepth = makeLength(
         drillingEditor, slot.cuttingDefaults.peckDepth);
     auto* peckDepthLabel = new QLabel(
-        QStringLiteral("每次钻深 Q"), drillingEditor);
+        QCoreApplication::translate("OpenAutoPath", "每次钻深 Q"), drillingEditor);
     drillingForm->addRow(peckDepthLabel, peckDepth);
 
     auto* drillCycle = new QComboBox(drillingEditor);
@@ -635,16 +634,16 @@ bool editToolValues(QWidget* parent, ToolBit& tool,
         std::max(0, drillCycle->findData(
             static_cast<int>(slot.cuttingDefaults.drillCycle))));
     auto* drillCycleLabel = new QLabel(
-        QStringLiteral("钻孔循环"), drillingEditor);
+        QCoreApplication::translate("OpenAutoPath", "钻孔循环"), drillingEditor);
     drillingForm->addRow(drillCycleLabel, drillCycle);
 
     auto* threadSize = new QLineEdit(tool.attributes.value(QStringLiteral("thread_size")),
                                      drillingEditor);
     auto* note = new QLineEdit(tool.note, drillingEditor);
     auto* threadSizeLabel = new QLabel(
-        QStringLiteral("螺纹规格"), drillingEditor);
+        QCoreApplication::translate("OpenAutoPath", "螺纹规格"), drillingEditor);
     drillingForm->addRow(threadSizeLabel, threadSize);
-    drillingForm->addRow(QStringLiteral("备注"), note);
+    drillingForm->addRow(QCoreApplication::translate("OpenAutoPath", "备注"), note);
 
     const auto setRowVisible = [](QLabel* label, QWidget* field,
                                   bool visible) {
@@ -685,7 +684,7 @@ bool editToolValues(QWidget* parent, ToolBit& tool,
             cornerRadius->setValue(diameter->value() * 0.5);
             cornerRadius->setEnabled(false);
             cornerRadius->setToolTip(
-                QStringLiteral("球刀圆角由刀具直径自动计算。"));
+                QCoreApplication::translate("OpenAutoPath", "球刀圆角由刀具直径自动计算。"));
         } else {
             cornerRadius->setEnabled(true);
             cornerRadius->setToolTip(QString());
@@ -697,20 +696,20 @@ bool editToolValues(QWidget* parent, ToolBit& tool,
             activeParameters << schema.cuttingEdgeLengthLabel;
         if (schema.cornerRadiusVisible)
             activeParameters << (schema.cornerRadiusDerivedFromDiameter
-                ? QStringLiteral("球半径（自动）")
-                : QStringLiteral("刀尖圆角"));
+                ? QCoreApplication::translate("OpenAutoPath", "球半径（自动）")
+                : QCoreApplication::translate("OpenAutoPath", "刀尖圆角"));
         if (schema.tipAngleVisible)
             activeParameters << schema.tipAngleLabel;
         if (schema.fluteCountVisible)
             activeParameters << schema.fluteCountLabel;
-        typeHelp->setText(QStringLiteral("当前刀型参数：%1。装配包络参数始终可编辑。")
+        typeHelp->setText(QCoreApplication::translate("OpenAutoPath", "当前刀型参数：%1。装配包络参数始终可编辑。")
                               .arg(activeParameters.join(QStringLiteral("、"))));
         tabs->setTabText(2,
             schema.drillingDefaultsVisible
-                ? QStringLiteral("钻削与备注")
+                ? QCoreApplication::translate("OpenAutoPath", "钻削与备注")
                 : schema.threadSpecificationVisible
-                    ? QStringLiteral("螺纹与备注")
-                    : QStringLiteral("能力与备注"));
+                    ? QCoreApplication::translate("OpenAutoPath", "螺纹与备注")
+                    : QCoreApplication::translate("OpenAutoPath", "能力与备注"));
         refreshGeometryPreview();
     };
     QObject::connect(type, QOverload<int>::of(&QComboBox::currentIndexChanged),
@@ -730,13 +729,13 @@ bool editToolValues(QWidget* parent, ToolBit& tool,
     if (!hasLibraryContext) {
         tabs->setTabEnabled(1, false);
         tabs->setTabToolTip(
-            1, QStringLiteral("请进入具体刀库设置 T 刀号与切削默认值。"));
+            1, QCoreApplication::translate("OpenAutoPath", "请进入具体刀库设置 T 刀号与切削默认值。"));
         peckDepth->setEnabled(false);
         drillCycle->setEnabled(false);
         peckDepth->setToolTip(
-            QStringLiteral("钻孔循环参数属于刀库刀位。"));
+            QCoreApplication::translate("OpenAutoPath", "钻孔循环参数属于刀库刀位。"));
         drillCycle->setToolTip(
-            QStringLiteral("钻孔循环参数属于刀库刀位。"));
+            QCoreApplication::translate("OpenAutoPath", "钻孔循环参数属于刀库刀位。"));
     }
 
     auto* buttons = new QDialogButtonBox(QDialogButtonBox::Ok | QDialogButtonBox::Cancel,
@@ -746,8 +745,8 @@ bool editToolValues(QWidget* parent, ToolBit& tool,
     QObject::connect(buttons, &QDialogButtonBox::accepted, &dialog, [&] {
         const ToolType selectedType = static_cast<ToolType>(type->currentData().toInt());
         if (name->text().trimmed().isEmpty()) {
-            QMessageBox::warning(&dialog, QStringLiteral("刀具"),
-                                 QStringLiteral("刀具名称不能为空。"));
+            QMessageBox::warning(&dialog, QCoreApplication::translate("OpenAutoPath", "刀具"),
+                                 QCoreApplication::translate("OpenAutoPath", "刀具名称不能为空。"));
             return;
         }
         ToolGeometry candidateGeometry;
@@ -770,7 +769,7 @@ bool editToolValues(QWidget* parent, ToolBit& tool,
             oap::tooling::toolGeometryValidationErrors(
                 selectedType, candidateGeometry);
         if (!geometryErrors.isEmpty()) {
-            QMessageBox::warning(&dialog, QStringLiteral("刀具"),
+            QMessageBox::warning(&dialog, QCoreApplication::translate("OpenAutoPath", "刀具"),
                                  geometryErrors.join(QLatin1Char('\n')));
             return;
         }
@@ -849,7 +848,7 @@ ToolLibraryDialog::ToolLibraryDialog(oap::tooling::ToolAssetCatalog catalog,
       m_catalog(std::move(catalog))
 {
     // 主对话框只维护内存副本；是否保存目录由调用方在 accept 后统一决定。
-    setWindowTitle(QStringLiteral("刀库管理"));
+    setWindowTitle(QCoreApplication::translate("OpenAutoPath", "刀库管理"));
     setMinimumSize(760, 480);
     resize(1180, 720);
     auto* layout = new QVBoxLayout(this);
@@ -860,7 +859,7 @@ ToolLibraryDialog::ToolLibraryDialog(oap::tooling::ToolAssetCatalog catalog,
     auto* libraryPane = new QWidget(splitter);
     auto* libraryLayout = new QVBoxLayout(libraryPane);
     libraryLayout->setContentsMargins(0, 0, 0, 0);
-    auto* libraryTitle = new QLabel(QStringLiteral("刀库"), libraryPane);
+    auto* libraryTitle = new QLabel(QCoreApplication::translate("OpenAutoPath", "刀库"), libraryPane);
     QFont libraryTitleFont = libraryTitle->font();
     libraryTitleFont.setBold(true);
     libraryTitle->setFont(libraryTitleFont);
@@ -870,17 +869,17 @@ ToolLibraryDialog::ToolLibraryDialog(oap::tooling::ToolAssetCatalog catalog,
     libraryLayout->addWidget(m_libraryList, 1);
 
     auto* libraryActionRow = new QHBoxLayout;
-    auto* newLibrary = new QPushButton(QStringLiteral("新建"), libraryPane);
-    auto* renameLibraryButton = new QPushButton(QStringLiteral("重命名"), libraryPane);
-    auto* deleteLibraryButton = new QPushButton(QStringLiteral("删除"), libraryPane);
+    auto* newLibrary = new QPushButton(QCoreApplication::translate("OpenAutoPath", "新建"), libraryPane);
+    auto* renameLibraryButton = new QPushButton(QCoreApplication::translate("OpenAutoPath", "重命名"), libraryPane);
+    auto* deleteLibraryButton = new QPushButton(QCoreApplication::translate("OpenAutoPath", "删除"), libraryPane);
     libraryActionRow->addWidget(newLibrary);
     libraryActionRow->addWidget(renameLibraryButton);
     libraryActionRow->addWidget(deleteLibraryButton);
     libraryLayout->addLayout(libraryActionRow);
 
     auto* transferRow = new QHBoxLayout;
-    auto* importButton = new QPushButton(QStringLiteral("导入刀库"), libraryPane);
-    auto* exportButton = new QPushButton(QStringLiteral("导出刀库"), libraryPane);
+    auto* importButton = new QPushButton(QCoreApplication::translate("OpenAutoPath", "导入刀库"), libraryPane);
+    auto* exportButton = new QPushButton(QCoreApplication::translate("OpenAutoPath", "导出刀库"), libraryPane);
     transferRow->addWidget(importButton);
     transferRow->addWidget(exportButton);
     libraryLayout->addLayout(transferRow);
@@ -895,14 +894,14 @@ ToolLibraryDialog::ToolLibraryDialog(oap::tooling::ToolAssetCatalog catalog,
     toolLayout->setContentsMargins(0, 0, 0, 0);
 
     auto* toolActionRow = new QHBoxLayout;
-    auto* addToolButton = new QPushButton(QStringLiteral("新增刀具"), toolPane);
-    m_duplicateToolButton = new QPushButton(QStringLiteral("复制刀具"), toolPane);
+    auto* addToolButton = new QPushButton(QCoreApplication::translate("OpenAutoPath", "新增刀具"), toolPane);
+    m_duplicateToolButton = new QPushButton(QCoreApplication::translate("OpenAutoPath", "复制刀具"), toolPane);
     m_copyToLibraryButton =
-        new QPushButton(QStringLiteral("复制到刀库…"), toolPane);
+        new QPushButton(QCoreApplication::translate("OpenAutoPath", "复制到刀库…"), toolPane);
     m_moveToLibraryButton =
-        new QPushButton(QStringLiteral("移动到刀库…"), toolPane);
-    m_editButton = new QPushButton(QStringLiteral("编辑刀具"), toolPane);
-    m_removeToolButton = new QPushButton(QStringLiteral("删除刀具"), toolPane);
+        new QPushButton(QCoreApplication::translate("OpenAutoPath", "移动到刀库…"), toolPane);
+    m_editButton = new QPushButton(QCoreApplication::translate("OpenAutoPath", "编辑刀具"), toolPane);
+    m_removeToolButton = new QPushButton(QCoreApplication::translate("OpenAutoPath", "删除刀具"), toolPane);
     toolActionRow->addWidget(addToolButton);
     toolActionRow->addWidget(m_duplicateToolButton);
     toolActionRow->addWidget(m_copyToLibraryButton);
@@ -913,30 +912,30 @@ ToolLibraryDialog::ToolLibraryDialog(oap::tooling::ToolAssetCatalog catalog,
     toolLayout->addLayout(toolActionRow);
 
     auto* filterRow = new QHBoxLayout;
-    filterRow->addWidget(new QLabel(QStringLiteral("搜索"), toolPane));
+    filterRow->addWidget(new QLabel(QCoreApplication::translate("OpenAutoPath", "搜索"), toolPane));
     m_filter = new QLineEdit(toolPane);
-    m_filter->setPlaceholderText(QStringLiteral("刀号、名称、类型、规格或备注"));
+    m_filter->setPlaceholderText(QCoreApplication::translate("OpenAutoPath", "刀号、名称、类型、规格或备注"));
     filterRow->addWidget(m_filter, 1);
     m_typeFilter = new QComboBox(toolPane);
-    m_typeFilter->addItem(QStringLiteral("全部类型"), -1);
+    m_typeFilter->addItem(QCoreApplication::translate("OpenAutoPath", "全部类型"), -1);
     fillToolTypes(m_typeFilter);
     filterRow->addWidget(m_typeFilter);
     m_sortMode = new QComboBox(toolPane);
-    m_sortMode->addItem(QStringLiteral("按刀号排序"), 0);
-    m_sortMode->addItem(QStringLiteral("按名称排序"), 1);
-    m_sortMode->addItem(QStringLiteral("按类型排序"), 2);
-    m_sortMode->addItem(QStringLiteral("按直径排序"), 3);
+    m_sortMode->addItem(QCoreApplication::translate("OpenAutoPath", "按刀号排序"), 0);
+    m_sortMode->addItem(QCoreApplication::translate("OpenAutoPath", "按名称排序"), 1);
+    m_sortMode->addItem(QCoreApplication::translate("OpenAutoPath", "按类型排序"), 2);
+    m_sortMode->addItem(QCoreApplication::translate("OpenAutoPath", "按直径排序"), 3);
     filterRow->addWidget(m_sortMode);
     toolLayout->addLayout(filterRow);
 
     m_table = new QTableWidget(toolPane);
     m_table->setColumnCount(11);
     m_table->setHorizontalHeaderLabels({
-        QStringLiteral("刀号"), QStringLiteral("名称"), QStringLiteral("类型"),
-        QStringLiteral("直径/mm"), QStringLiteral("刃长/mm"),
-        QStringLiteral("转速/rpm"), QStringLiteral("水平进给"),
-        QStringLiteral("垂直进给"), QStringLiteral("冷却"), QStringLiteral("备注"),
-        QStringLiteral("所属刀库")});
+        QCoreApplication::translate("OpenAutoPath", "刀号"), QCoreApplication::translate("OpenAutoPath", "名称"), QCoreApplication::translate("OpenAutoPath", "类型"),
+        QCoreApplication::translate("OpenAutoPath", "直径/mm"), QCoreApplication::translate("OpenAutoPath", "刃长/mm"),
+        QCoreApplication::translate("OpenAutoPath", "转速/rpm"), QCoreApplication::translate("OpenAutoPath", "水平进给"),
+        QCoreApplication::translate("OpenAutoPath", "垂直进给"), QCoreApplication::translate("OpenAutoPath", "冷却"), QCoreApplication::translate("OpenAutoPath", "备注"),
+        QCoreApplication::translate("OpenAutoPath", "所属刀库")});
     m_table->setSelectionBehavior(QAbstractItemView::SelectRows);
     m_table->setSelectionMode(QAbstractItemView::ExtendedSelection);
     m_table->setEditTriggers(QAbstractItemView::NoEditTriggers);
@@ -949,33 +948,33 @@ ToolLibraryDialog::ToolLibraryDialog(oap::tooling::ToolAssetCatalog catalog,
     m_table->setContextMenuPolicy(Qt::ActionsContextMenu);
     toolLayout->addWidget(m_table, 1);
 
-    m_editToolAction = new QAction(QStringLiteral("编辑刀具"), m_table);
+    m_editToolAction = new QAction(QCoreApplication::translate("OpenAutoPath", "编辑刀具"), m_table);
     m_editToolAction->setShortcut(QKeySequence(Qt::Key_F2));
     m_editToolAction->setShortcutContext(Qt::WidgetShortcut);
     m_table->addAction(m_editToolAction);
-    m_duplicateToolAction = new QAction(QStringLiteral("复制刀具"), m_table);
+    m_duplicateToolAction = new QAction(QCoreApplication::translate("OpenAutoPath", "复制刀具"), m_table);
     m_duplicateToolAction->setShortcut(QKeySequence::Copy);
     m_duplicateToolAction->setShortcutContext(Qt::WidgetShortcut);
     m_table->addAction(m_duplicateToolAction);
     m_copyToLibraryAction =
-        new QAction(QStringLiteral("复制到其他刀库…"), m_table);
+        new QAction(QCoreApplication::translate("OpenAutoPath", "复制到其他刀库…"), m_table);
     m_table->addAction(m_copyToLibraryAction);
     m_moveToLibraryAction =
-        new QAction(QStringLiteral("移动到其他刀库…"), m_table);
+        new QAction(QCoreApplication::translate("OpenAutoPath", "移动到其他刀库…"), m_table);
     m_table->addAction(m_moveToLibraryAction);
-    m_removeToolAction = new QAction(QStringLiteral("删除刀具"), m_table);
+    m_removeToolAction = new QAction(QCoreApplication::translate("OpenAutoPath", "删除刀具"), m_table);
     m_removeToolAction->setShortcut(QKeySequence::Delete);
     m_removeToolAction->setShortcutContext(Qt::WidgetShortcut);
     m_table->addAction(m_removeToolAction);
 
     m_libraryList->setContextMenuPolicy(Qt::ActionsContextMenu);
     auto* renameLibraryAction =
-        new QAction(QStringLiteral("重命名刀库"), m_libraryList);
+        new QAction(QCoreApplication::translate("OpenAutoPath", "重命名刀库"), m_libraryList);
     renameLibraryAction->setShortcut(QKeySequence(Qt::Key_F2));
     renameLibraryAction->setShortcutContext(Qt::WidgetShortcut);
     m_libraryList->addAction(renameLibraryAction);
     auto* deleteLibraryAction =
-        new QAction(QStringLiteral("删除刀库"), m_libraryList);
+        new QAction(QCoreApplication::translate("OpenAutoPath", "删除刀库"), m_libraryList);
     deleteLibraryAction->setShortcut(QKeySequence::Delete);
     deleteLibraryAction->setShortcutContext(Qt::WidgetShortcut);
     m_libraryList->addAction(deleteLibraryAction);
@@ -992,7 +991,7 @@ ToolLibraryDialog::ToolLibraryDialog(oap::tooling::ToolAssetCatalog catalog,
     auto* buttons = new QDialogButtonBox(QDialogButtonBox::Ok | QDialogButtonBox::Cancel,
                                          this);
     m_useButton = buttons->button(QDialogButtonBox::Ok);
-    m_useButton->setText(QStringLiteral("保存更改"));
+    m_useButton->setText(QCoreApplication::translate("OpenAutoPath", "保存更改"));
     layout->addWidget(buttons);
 
     connect(m_libraryList, &QListWidget::currentRowChanged,
@@ -1103,7 +1102,7 @@ void ToolLibraryDialog::refreshLibraryList(const QString& preferredId)
     const QSignalBlocker signalBlocker(m_libraryList);
     m_libraryList->clear();
     auto* allTools = new QListWidgetItem(
-        QStringLiteral("全部刀具\n跨刀库资产视图"), m_libraryList);
+        QCoreApplication::translate("OpenAutoPath", "全部刀具\n跨刀库资产视图"), m_libraryList);
     allTools->setData(Qt::UserRole, kAllToolsLibraryId);
     QFont allToolsFont = allTools->font();
     allToolsFont.setBold(true);
@@ -1148,7 +1147,7 @@ void ToolLibraryDialog::refreshTable(const QString& preferredToolId)
     const int unassignedCount = library->tools().size() - assignedCount;
     m_description->setText(
         library->description() +
-        QStringLiteral("\n当前刀库已分配 T 刀具 %1 把，未分配备用刀具 %2 把。"
+        QCoreApplication::translate("OpenAutoPath", "\n当前刀库已分配 T 刀具 %1 把，未分配备用刀具 %2 把。"
                        "启用后只把前者作为可用刀具集合，暂不自动匹配孔。")
             .arg(assignedCount).arg(unassignedCount));
 
@@ -1210,7 +1209,7 @@ void ToolLibraryDialog::refreshTable(const QString& preferredToolId)
         const int row = m_table->rowCount();
         m_table->insertRow(row);
         auto* numberItem = tableItem(number > 0 ? QStringLiteral("T%1").arg(number)
-                                                : QStringLiteral("未分配"));
+                                                : QCoreApplication::translate("OpenAutoPath", "未分配"));
         numberItem->setData(kToolIdRole, id);
         numberItem->setData(kToolNumberRole, number);
         m_table->setItem(row, 0, numberItem);
@@ -1243,8 +1242,7 @@ void ToolLibraryDialog::refreshAllToolsTable(
 {
     const QMap<QString, ToolBit>& assets = m_catalog.assets();
 
-    m_description->setText(QStringLiteral(
-        "全局刀具资产库，共 %1 个独立 ToolBit。刀库仅引用这些资产并维护 T 刀号与切削默认值；"
+    m_description->setText(QCoreApplication::translate("OpenAutoPath", "全局刀具资产库，共 %1 个独立 ToolBit。刀库仅引用这些资产并维护 T 刀号与切削默认值；"
         "未被刀库引用的资产也会在此保留。")
         .arg(assets.size()));
     QVector<QString> ids;
@@ -1311,7 +1309,7 @@ void ToolLibraryDialog::refreshAllToolsTable(
         m_table->setItem(row, 9, tableItem(tool->note));
         m_table->setItem(row, 10, tableItem(
             assetLibraries.isEmpty()
-                ? QStringLiteral("未加入刀库")
+                ? QCoreApplication::translate("OpenAutoPath", "未加入刀库")
                 : assetLibraries.join(QStringLiteral("、"))));
         if (id == preferredToolId)
             selectedRow = row;
@@ -1336,12 +1334,12 @@ void ToolLibraryDialog::updateSelectionState()
         (globalAssetsSelected ? !m_catalog.libraries().isEmpty()
                               : m_catalog.libraries().size() > 1);
     m_copyToLibraryButton->setText(
-        globalAssetsSelected ? QStringLiteral("加入刀库…")
-                             : QStringLiteral("加入其他刀库…"));
-    m_moveToLibraryButton->setText(QStringLiteral("移至其他刀库…"));
+        globalAssetsSelected ? QCoreApplication::translate("OpenAutoPath", "加入刀库…")
+                             : QCoreApplication::translate("OpenAutoPath", "加入其他刀库…"));
+    m_moveToLibraryButton->setText(QCoreApplication::translate("OpenAutoPath", "移至其他刀库…"));
     m_removeToolButton->setText(
-        globalAssetsSelected ? QStringLiteral("删除资产")
-                             : QStringLiteral("从刀库移除"));
+        globalAssetsSelected ? QCoreApplication::translate("OpenAutoPath", "删除资产")
+                             : QCoreApplication::translate("OpenAutoPath", "从刀库移除"));
     m_copyToLibraryAction->setText(m_copyToLibraryButton->text());
     m_moveToLibraryAction->setText(m_moveToLibraryButton->text());
     m_removeToolAction->setText(m_removeToolButton->text());
@@ -1366,13 +1364,13 @@ void ToolLibraryDialog::createLibrary()
 {
     bool ok = false;
     const QString name = QInputDialog::getText(
-        this, QStringLiteral("新建刀库"), QStringLiteral("刀库名称"),
-        QLineEdit::Normal, QStringLiteral("新刀库"), &ok).trimmed();
+        this, QCoreApplication::translate("OpenAutoPath", "新建刀库"), QCoreApplication::translate("OpenAutoPath", "刀库名称"),
+        QLineEdit::Normal, QCoreApplication::translate("OpenAutoPath", "新刀库"), &ok).trimmed();
     if (!ok || name.isEmpty()) return;
     const QString id = QUuid::createUuid().toString(QUuid::WithoutBraces);
     QString error;
     if (!m_catalog.addLibrary(ToolLibrary(id, name), &error)) {
-        QMessageBox::critical(this, QStringLiteral("新建刀库"), error);
+        QMessageBox::critical(this, QCoreApplication::translate("OpenAutoPath", "新建刀库"), error);
         return;
     }
     refreshLibraryList(id);
@@ -1385,7 +1383,7 @@ void ToolLibraryDialog::renameLibrary()
         return;
     bool ok = false;
     const QString name = QInputDialog::getText(
-        this, QStringLiteral("重命名刀库"), QStringLiteral("刀库名称"),
+        this, QCoreApplication::translate("OpenAutoPath", "重命名刀库"), QCoreApplication::translate("OpenAutoPath", "刀库名称"),
         QLineEdit::Normal, library->name(), &ok).trimmed();
     if (!ok || name.isEmpty() || name == library->name())
         return;
@@ -1400,17 +1398,17 @@ void ToolLibraryDialog::deleteLibrary()
     if (!library) return;
     if (m_catalog.libraries().size() <= 1) {
         QMessageBox::information(
-            this, QStringLiteral("删除刀库"),
-            QStringLiteral("当前项目至少需要保留一个刀库。"));
+            this, QCoreApplication::translate("OpenAutoPath", "删除刀库"),
+            QCoreApplication::translate("OpenAutoPath", "当前项目至少需要保留一个刀库。"));
         return;
     }
-    if (QMessageBox::question(this, QStringLiteral("删除刀库"),
-                              QStringLiteral("确定删除刀库“%1”吗？").arg(library->name()))
+    if (QMessageBox::question(this, QCoreApplication::translate("OpenAutoPath", "删除刀库"),
+                              QCoreApplication::translate("OpenAutoPath", "确定删除刀库“%1”吗？").arg(library->name()))
         != QMessageBox::Yes) return;
     const QString id = library->id();
     QString error;
     if (!m_catalog.removeLibrary(id, &error)) {
-        QMessageBox::critical(this, QStringLiteral("删除刀库"), error);
+        QMessageBox::critical(this, QCoreApplication::translate("OpenAutoPath", "删除刀库"), error);
         return;
     }
     refreshLibraryList();
@@ -1420,28 +1418,28 @@ void ToolLibraryDialog::importLibrary()
 {
     // 同 ID 导入采用显式替换，避免目录中出现两个逻辑上相同的刀库。
     const QString path = QFileDialog::getOpenFileName(
-        this, QStringLiteral("导入刀库"), QString(),
-        QStringLiteral("刀库文件 (*.oaptl *.fftl *.fctl);;所有文件 (*.*)"));
+        this, QCoreApplication::translate("OpenAutoPath", "导入刀库"), QString(),
+        QCoreApplication::translate("OpenAutoPath", "刀库文件 (*.oaptl *.fftl *.fctl);;所有文件 (*.*)"));
     if (path.isEmpty()) return;
     ToolLibrary imported;
     QString error;
     if (!oap::tooling::ToolLibraryStorage::loadLibrary(path, imported, &error)) {
-        QMessageBox::critical(this, QStringLiteral("导入刀库"), error);
+        QMessageBox::critical(this, QCoreApplication::translate("OpenAutoPath", "导入刀库"), error);
         return;
     }
     if (m_catalog.libraryById(imported.id())) {
-        if (QMessageBox::question(this, QStringLiteral("导入刀库"),
-                                  QStringLiteral("同 ID 刀库已存在，是否替换？"))
+        if (QMessageBox::question(this, QCoreApplication::translate("OpenAutoPath", "导入刀库"),
+                                  QCoreApplication::translate("OpenAutoPath", "同 ID 刀库已存在，是否替换？"))
             != QMessageBox::Yes) return;
         if (!m_catalog.replaceLibrary(imported, &error)) {
-            QMessageBox::critical(this, QStringLiteral("导入刀库"), error);
+            QMessageBox::critical(this, QCoreApplication::translate("OpenAutoPath", "导入刀库"), error);
             return;
         }
         refreshLibraryList(imported.id());
         return;
     }
     if (!m_catalog.addLibrary(imported, &error)) {
-        QMessageBox::critical(this, QStringLiteral("导入刀库"), error);
+        QMessageBox::critical(this, QCoreApplication::translate("OpenAutoPath", "导入刀库"), error);
         return;
     }
     refreshLibraryList(imported.id());
@@ -1452,13 +1450,13 @@ void ToolLibraryDialog::exportLibrary()
     const ToolLibrary* library = currentLibrary();
     if (!library) return;
     QString path = QFileDialog::getSaveFileName(
-        this, QStringLiteral("导出刀库"), library->name() + QStringLiteral(".oaptl"),
-        QStringLiteral("OpenAutoPath 刀库 (*.oaptl);;JSON 文件 (*.json)"));
+        this, QCoreApplication::translate("OpenAutoPath", "导出刀库"), library->name() + QStringLiteral(".oaptl"),
+        QCoreApplication::translate("OpenAutoPath", "OpenAutoPath 刀库 (*.oaptl);;JSON 文件 (*.json)"));
     if (path.isEmpty()) return;
     if (QFileInfo(path).suffix().isEmpty()) path += QStringLiteral(".oaptl");
     QString error;
     if (!oap::tooling::ToolLibraryStorage::saveLibrary(path, *library, &error))
-        QMessageBox::critical(this, QStringLiteral("导出刀库"), error);
+        QMessageBox::critical(this, QCoreApplication::translate("OpenAutoPath", "导出刀库"), error);
 }
 
 void ToolLibraryDialog::addTool()
@@ -1467,7 +1465,7 @@ void ToolLibraryDialog::addTool()
     const QString libraryId = library ? library->id() : QString();
     ToolBit tool;
     tool.id = QUuid::createUuid().toString(QUuid::WithoutBraces);
-    tool.name = QStringLiteral("新刀具");
+    tool.name = QCoreApplication::translate("OpenAutoPath", "新刀具");
     tool.type = ToolType::Drill;
     tool.geometry.diameter = 6.0;
     LibraryToolSlot slot;
@@ -1480,13 +1478,13 @@ void ToolLibraryDialog::addTool()
     if (!m_catalog.upsertAsset(tool, &error) ||
         (!libraryId.isEmpty() &&
          !m_catalog.attachAsset(libraryId, tool.id, &error))) {
-        QMessageBox::critical(this, QStringLiteral("新增刀具"), error);
+        QMessageBox::critical(this, QCoreApplication::translate("OpenAutoPath", "新增刀具"), error);
         return;
     }
     library = m_catalog.libraryById(libraryId);
     if (library && assigned && !library->assignToolToSlot(slot, &error)) {
         m_catalog.detachAsset(libraryId, tool.id);
-        QMessageBox::critical(this, QStringLiteral("新增刀具"), error);
+        QMessageBox::critical(this, QCoreApplication::translate("OpenAutoPath", "新增刀具"), error);
         return;
     }
     refreshTable(tool.id);
@@ -1504,12 +1502,12 @@ void ToolLibraryDialog::duplicateTool()
 
     ToolBit duplicate = *source;
     duplicate.id = QUuid::createUuid().toString(QUuid::WithoutBraces);
-    duplicate.name += QStringLiteral("（副本）");
+    duplicate.name += QCoreApplication::translate("OpenAutoPath", "（副本）");
     QString error;
     if (!m_catalog.upsertAsset(duplicate, &error) ||
         (!libraryId.isEmpty() && !m_catalog.attachAsset(
              libraryId, duplicate.id, &error))) {
-        QMessageBox::critical(this, QStringLiteral("复制刀具"), error);
+        QMessageBox::critical(this, QCoreApplication::translate("OpenAutoPath", "复制刀具"), error);
         return;
     }
 
@@ -1523,7 +1521,7 @@ void ToolLibraryDialog::duplicateTool()
             if (!library->assignToolToSlot(duplicateSlot, &error)) {
                 library->removeTool(duplicate.id);
                 m_catalog.removeAsset(duplicate.id);
-                QMessageBox::critical(this, QStringLiteral("复制刀具"), error);
+                QMessageBox::critical(this, QCoreApplication::translate("OpenAutoPath", "复制刀具"), error);
                 return;
             }
         }
@@ -1575,9 +1573,9 @@ void ToolLibraryDialog::transferToolToLibrary(bool removeSource)
     bool ok = false;
     const QString selectedLabel = QInputDialog::getItem(
         this,
-        removeSource ? QStringLiteral("移动刀具")
-                     : QStringLiteral("复制刀具"),
-        QStringLiteral("目标刀库"), labels, 0, false, &ok);
+        removeSource ? QCoreApplication::translate("OpenAutoPath", "移动刀具")
+                     : QCoreApplication::translate("OpenAutoPath", "复制刀具"),
+        QCoreApplication::translate("OpenAutoPath", "目标刀库"), labels, 0, false, &ok);
     if (!ok || selectedLabel.isEmpty())
         return;
     const int selectedIndex = labels.indexOf(selectedLabel);
@@ -1600,7 +1598,7 @@ void ToolLibraryDialog::transferToolToLibrary(bool removeSource)
         for (const QString& toolId : toolIds) {
             if (!m_catalog.attachAsset(targetLibraryId, toolId, &error)) {
                 QMessageBox::critical(
-                    this, QStringLiteral("加入刀库"), error);
+                    this, QCoreApplication::translate("OpenAutoPath", "加入刀库"), error);
                 return;
             }
         }
@@ -1619,9 +1617,8 @@ void ToolLibraryDialog::transferToolToLibrary(bool removeSource)
     }
     if (!conflicts.isEmpty() &&
         QMessageBox::question(
-            this, QStringLiteral("目标刀库已有刀具"),
-            QStringLiteral(
-                "目标刀库已包含以下同 ID 刀具：\n%1\n"
+            this, QCoreApplication::translate("OpenAutoPath", "目标刀库已有刀具"),
+            QCoreApplication::translate("OpenAutoPath", "目标刀库已包含以下同 ID 刀具：\n%1\n"
                 "是否用当前定义更新它们？目标刀号保持不变。")
                 .arg(conflicts.join(QStringLiteral("、"))))
             != QMessageBox::Yes) {
@@ -1652,7 +1649,7 @@ void ToolLibraryDialog::transferToolToLibrary(bool removeSource)
             ? std::optional<LibraryToolSlot>(*sourceSlot)
             : std::nullopt;
         if (!candidateTarget->upsertTool(toolCopy, &error)) {
-            QMessageBox::critical(this, QStringLiteral("跨刀库操作"), error);
+            QMessageBox::critical(this, QCoreApplication::translate("OpenAutoPath", "跨刀库操作"), error);
             return;
         }
         if (!candidateTarget->slotForTool(toolId) && slotCopy) {
@@ -1660,13 +1657,13 @@ void ToolLibraryDialog::transferToolToLibrary(bool removeSource)
             targetSlot.toolNumber = candidateTarget->nextAvailableToolNumber();
             if (!candidateTarget->assignToolToSlot(targetSlot, &error)) {
                 QMessageBox::critical(
-                    this, QStringLiteral("跨刀库操作"), error);
+                    this, QCoreApplication::translate("OpenAutoPath", "跨刀库操作"), error);
                 return;
             }
         }
         if (removeSource &&
             !candidateSource->removeTool(toolId, &error)) {
-            QMessageBox::critical(this, QStringLiteral("移动刀具"), error);
+            QMessageBox::critical(this, QCoreApplication::translate("OpenAutoPath", "移动刀具"), error);
             return;
         }
     }
@@ -1699,14 +1696,14 @@ void ToolLibraryDialog::editTool()
                         library != nullptr)) return;
     QString error;
     if (!m_catalog.upsertAsset(tool, &error)) {
-        QMessageBox::critical(this, QStringLiteral("编辑刀具"), error);
+        QMessageBox::critical(this, QCoreApplication::translate("OpenAutoPath", "编辑刀具"), error);
         return;
     }
     library = m_catalog.libraryById(libraryId);
     if (library)
         library->unassignToolSlot(id);
     if (library && assigned && !library->assignToolToSlot(slot, &error)) {
-        QMessageBox::critical(this, QStringLiteral("编辑刀具"), error);
+        QMessageBox::critical(this, QCoreApplication::translate("OpenAutoPath", "编辑刀具"), error);
         return;
     }
     refreshTable(id);
@@ -1727,14 +1724,12 @@ void ToolLibraryDialog::removeTool()
     }
     if (names.isEmpty())
         return;
-    if (QMessageBox::question(this, QStringLiteral("删除刀具"),
+    if (QMessageBox::question(this, QCoreApplication::translate("OpenAutoPath", "删除刀具"),
                               library
-                                  ? QStringLiteral(
-                                        "确定从当前刀库移除 %1 把刀具吗？全局资产仍会保留。\n%2")
+                                  ? QCoreApplication::translate("OpenAutoPath", "确定从当前刀库移除 %1 把刀具吗？全局资产仍会保留。\n%2")
                                         .arg(names.size())
                                         .arg(names.join(QStringLiteral("、")))
-                                  : QStringLiteral(
-                                        "确定永久删除 %1 个全局刀具资产吗？所有刀库引用和 T 刀位也会解除。\n%2")
+                                  : QCoreApplication::translate("OpenAutoPath", "确定永久删除 %1 个全局刀具资产吗？所有刀库引用和 T 刀位也会解除。\n%2")
                                         .arg(names.size())
                                         .arg(names.join(QStringLiteral("、"))))
         != QMessageBox::Yes) return;
@@ -1745,7 +1740,7 @@ void ToolLibraryDialog::removeTool()
             ? candidate.detachAsset(library->id(), id, &error)
             : candidate.removeAsset(id, &error);
         if (!removed) {
-            QMessageBox::critical(this, QStringLiteral("删除刀具"), error);
+            QMessageBox::critical(this, QCoreApplication::translate("OpenAutoPath", "删除刀具"), error);
             return;
         }
     }
@@ -1757,7 +1752,7 @@ void ToolLibraryDialog::accept()
 {
     QString error;
     if (!m_catalog.synchronize(&error)) {
-        QMessageBox::critical(this, QStringLiteral("保存刀具资产目录"), error);
+        QMessageBox::critical(this, QCoreApplication::translate("OpenAutoPath", "保存刀具资产目录"), error);
         return;
     }
     QDialog::accept();
@@ -1769,12 +1764,12 @@ ToolLibrarySelectionDialog::ToolLibrarySelectionDialog(
     QWidget* parent)
     : QDialog(parent)
 {
-    setWindowTitle(QStringLiteral("选择 CAM 活动刀库"));
+    setWindowTitle(QCoreApplication::translate("OpenAutoPath", "选择 CAM 活动刀库"));
     setMinimumSize(520, 380);
     resize(640, 500);
     auto* layout = new QVBoxLayout(this);
     layout->addWidget(new QLabel(
-        QStringLiteral("选择参与自动选刀的刀库。已生成的 Job 仍保留自己的不可变刀具快照。"),
+        QCoreApplication::translate("OpenAutoPath", "选择参与自动选刀的刀库。已生成的 Job 仍保留自己的不可变刀具快照。"),
         this));
 
     m_list = new QListWidget(this);
@@ -1783,7 +1778,7 @@ ToolLibrarySelectionDialog::ToolLibrarySelectionDialog(
     for (const ToolLibrary& library : libraries) {
         const int assignedCount = library.assignedTools().size();
         auto* item = new QListWidgetItem(
-            QStringLiteral("%1\n%2 把已分配 T 刀具%3")
+            QCoreApplication::translate("OpenAutoPath", "%1\n%2 把已分配 T 刀具%3")
                 .arg(library.name())
                 .arg(assignedCount)
                 .arg(library.machine().isEmpty()
@@ -1807,7 +1802,7 @@ ToolLibrarySelectionDialog::ToolLibrarySelectionDialog(
     auto* buttons = new QDialogButtonBox(
         QDialogButtonBox::Ok | QDialogButtonBox::Cancel, this);
     m_selectButton = buttons->button(QDialogButtonBox::Ok);
-    m_selectButton->setText(QStringLiteral("用于 CAM"));
+    m_selectButton->setText(QCoreApplication::translate("OpenAutoPath", "用于 CAM"));
     layout->addWidget(buttons);
 
     connect(m_list, &QListWidget::currentRowChanged,
@@ -1834,10 +1829,10 @@ void ToolLibrarySelectionDialog::updateSelectionState()
         ? selected->data(Qt::UserRole + 1).toInt() : 0;
     m_selectButton->setEnabled(selected && assignedCount > 0);
     m_summary->setText(!selected
-        ? QStringLiteral("没有可选刀库。")
+        ? QCoreApplication::translate("OpenAutoPath", "没有可选刀库。")
         : assignedCount > 0
             ? selected->data(Qt::UserRole + 2).toString()
-            : QStringLiteral("该刀库没有已分配 T 号的刀具，不能用于自动选刀。"));
+            : QCoreApplication::translate("OpenAutoPath", "该刀库没有已分配 T 号的刀具，不能用于自动选刀。"));
 }
 
 void ToolLibrarySelectionDialog::accept()
@@ -1845,8 +1840,8 @@ void ToolLibrarySelectionDialog::accept()
     const QListWidgetItem* selected = m_list->currentItem();
     if (!selected || selected->data(Qt::UserRole + 1).toInt() <= 0) {
         QMessageBox::information(
-            this, QStringLiteral("选择刀库"),
-            QStringLiteral("请选择至少包含一把已分配 T 刀具的刀库。"));
+            this, QCoreApplication::translate("OpenAutoPath", "选择刀库"),
+            QCoreApplication::translate("OpenAutoPath", "请选择至少包含一把已分配 T 刀具的刀库。"));
         return;
     }
     QDialog::accept();

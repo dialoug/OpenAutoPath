@@ -1,5 +1,6 @@
 // HoleToolTreePanel 实现 — 参见 HoleToolTreePanel.h。
 #include "app/ui/panels/HoleToolTreePanel.h"
+#include <QCoreApplication>
 
 #include <QAbstractItemView>
 #include <QApplication>
@@ -78,17 +79,17 @@ HoleToolTreePanel::HoleToolTreePanel(QWidget* parent)
     auto* visibilityRow = new QHBoxLayout;
     visibilityRow->setContentsMargins(4, 0, 4, 2);
     m_operationVisibilitySummary =
-        new QLabel(QStringLiteral("可见工序 0/0"), this);
+        new QLabel(QCoreApplication::translate("OpenAutoPath", "可见工序 0/0"), this);
     m_operationVisibilitySummary->setObjectName(
         QStringLiteral("operationVisibilitySummary"));
     visibilityRow->addWidget(m_operationVisibilitySummary);
     visibilityRow->addStretch(1);
     m_showAllOperations =
-        new QPushButton(QStringLiteral("显示全部工序"), this);
+        new QPushButton(QCoreApplication::translate("OpenAutoPath", "显示全部工序"), this);
     m_showAllOperations->setObjectName(
         QStringLiteral("showAllToolpathOperationsButton"));
     m_showAllOperations->setToolTip(
-        QStringLiteral("退出单独显示并勾选当前 Job 的全部加工工序"));
+        QCoreApplication::translate("OpenAutoPath", "退出单独显示并勾选当前 Job 的全部加工工序"));
     m_showAllOperations->setEnabled(false);
     visibilityRow->addWidget(m_showAllOperations);
     layout->addLayout(visibilityRow);
@@ -99,12 +100,12 @@ HoleToolTreePanel::HoleToolTreePanel(QWidget* parent)
     m_tree->setObjectName(QStringLiteral("holeToolTree"));
     m_tree->setColumnCount(2);
     m_tree->setHeaderLabels(
-        {QStringLiteral("工序 / 刀具批次"), QStringLiteral("操作")});
+        {QCoreApplication::translate("OpenAutoPath", "工序 / 刀具批次"), QCoreApplication::translate("OpenAutoPath", "操作")});
     m_tree->header()->setSectionResizeMode(0, QHeaderView::Stretch);
     m_tree->header()->setSectionResizeMode(1, QHeaderView::Interactive);
     m_tree->header()->setStretchLastSection(false);
     const int operationColumnWidth =
-        m_tree->fontMetrics().horizontalAdvance(QStringLiteral("合并操作")) + 12;
+        m_tree->fontMetrics().horizontalAdvance(QCoreApplication::translate("OpenAutoPath", "合并操作")) + 12;
     m_tree->header()->resizeSection(1, operationColumnWidth);
     m_tree->setSelectionMode(QAbstractItemView::SingleSelection);
     m_tree->setUniformRowHeights(false);
@@ -118,13 +119,13 @@ HoleToolTreePanel::HoleToolTreePanel(QWidget* parent)
     connect(m_tree, &QTreeWidget::currentItemChanged,
             this, &HoleToolTreePanel::onCurrentItemChanged);
 
-    auto* inspector = new QGroupBox(QStringLiteral("工序属性"), this);
+    auto* inspector = new QGroupBox(QCoreApplication::translate("OpenAutoPath", "工序属性"), this);
     inspector->setObjectName(QStringLiteral("toolpathOperationInspector"));
     auto* inspectorLayout = new QVBoxLayout(inspector);
     inspectorLayout->setContentsMargins(6, 4, 6, 6);
     inspectorLayout->setSpacing(4);
     m_operationInspectorTitle =
-        new QLabel(QStringLiteral("请选择一道加工工序"), inspector);
+        new QLabel(QCoreApplication::translate("OpenAutoPath", "请选择一道加工工序"), inspector);
     QFont inspectorTitleFont = m_operationInspectorTitle->font();
     inspectorTitleFont.setBold(true);
     m_operationInspectorTitle->setFont(inspectorTitleFont);
@@ -140,7 +141,7 @@ HoleToolTreePanel::HoleToolTreePanel(QWidget* parent)
         Qt::TextSelectableByMouse);
     inspectorScroll->setWidget(m_operationInspectorDetails);
     m_operationInspectorHint = new QLabel(
-        QStringLiteral("工序勾选控制可见性；“定位”控制播放位置。"),
+        QCoreApplication::translate("OpenAutoPath", "工序勾选控制可见性；“定位”控制播放位置。"),
         inspector);
     m_operationInspectorHint->setWordWrap(true);
     QPalette hintPalette = m_operationInspectorHint->palette();
@@ -152,16 +153,16 @@ HoleToolTreePanel::HoleToolTreePanel(QWidget* parent)
     inspectorLayout->addWidget(inspectorScroll, 1);
     inspectorLayout->addWidget(m_operationInspectorHint);
     auto* inspectorActions = new QHBoxLayout;
-    m_editOperation = new QPushButton(QStringLiteral("编辑参数"), inspector);
+    m_editOperation = new QPushButton(QCoreApplication::translate("OpenAutoPath", "编辑参数"), inspector);
     m_editOperation->setObjectName(
         QStringLiteral("editToolpathOperationButton"));
     m_regenerateOperation =
-        new QPushButton(QStringLiteral("应用并重建"), inspector);
+        new QPushButton(QCoreApplication::translate("OpenAutoPath", "应用并重建"), inspector);
     m_regenerateOperation->setObjectName(
         QStringLiteral("regenerateToolpathOperationButton"));
-    m_previewOperation = new QPushButton(QStringLiteral("显示此类刀路"), inspector);
+    m_previewOperation = new QPushButton(QCoreApplication::translate("OpenAutoPath", "显示此类刀路"), inspector);
     m_previewOperation->setObjectName(QStringLiteral("previewToolpathFamilyButton"));
-    m_previewOperation->setToolTip(QStringLiteral("切换到此类已有的有效刀路；不会重新生成或修改正式工序"));
+    m_previewOperation->setToolTip(QCoreApplication::translate("OpenAutoPath", "切换到此类已有的有效刀路；不会重新生成或修改正式工序"));
     m_previewOperation->setEnabled(false);
     m_editOperation->setEnabled(false);
     m_regenerateOperation->setEnabled(false);
@@ -276,9 +277,9 @@ void HoleToolTreePanel::setProgram(
     const bool hasFinishingBatches = std::any_of(m_batches.begin(), m_batches.end(),
         [](const auto& batch) { return batch.family == oap::app::ToolpathBatchFamily::SurfaceFinishing; });
     auto* jobRoot = new QTreeWidgetItem(m_tree);
-    jobRoot->setText(0, QStringLiteral("加工 Job"));
+    jobRoot->setText(0, QCoreApplication::translate("OpenAutoPath", "加工 Job"));
     jobRoot->setToolTip(
-        0, QStringLiteral("当前内存 Job 的装夹、刀具与工序视图"));
+        0, QCoreApplication::translate("OpenAutoPath", "当前内存 Job 的装夹、刀具与工序视图"));
     QFont jobFont = jobRoot->font(0);
     jobFont.setBold(true);
     jobRoot->setFont(0, jobFont);
@@ -290,22 +291,22 @@ void HoleToolTreePanel::setProgram(
     QTreeWidgetItem* finishingRoot = nullptr;
     if (hasHoleBatches) {
         holeRoot = new QTreeWidgetItem(jobRoot);
-        holeRoot->setText(0, QStringLiteral("孔加工工序"));
+        holeRoot->setText(0, QCoreApplication::translate("OpenAutoPath", "孔加工工序"));
         holeRoot->setExpanded(true);
     }
     if (hasPocketBatches) {
         pocketRoot = new QTreeWidgetItem(jobRoot);
-        pocketRoot->setText(0, QStringLiteral("槽腔加工工序"));
+        pocketRoot->setText(0, QCoreApplication::translate("OpenAutoPath", "槽腔加工工序"));
         pocketRoot->setExpanded(true);
     }
     if (hasProfileBatches) {
         profileRoot = new QTreeWidgetItem(jobRoot);
-        profileRoot->setText(0, QStringLiteral("外轮廓加工工序"));
+        profileRoot->setText(0, QCoreApplication::translate("OpenAutoPath", "外轮廓加工工序"));
         profileRoot->setExpanded(true);
     }
     if (hasFinishingBatches) {
         finishingRoot = new QTreeWidgetItem(jobRoot);
-        finishingRoot->setText(0, QStringLiteral("雕刻加工工序"));
+        finishingRoot->setText(0, QCoreApplication::translate("OpenAutoPath", "雕刻加工工序"));
         finishingRoot->setExpanded(true);
     }
     QMap<int, SetupNode> holeSetupNodes;
@@ -350,7 +351,7 @@ void HoleToolTreePanel::setProgram(
         toolItem->setText(0, batch.toolLabel);
         toolItem->setToolTip(0, batch.detailText);
         const bool batchHasPlayback = batch.batchIndex >= 0 && batch.endMoveIndex > batch.startMoveIndex;
-        toolItem->setText(1, batchHasPlayback ? QStringLiteral("定位") : QStringLiteral("未载入预览"));
+        toolItem->setText(1, batchHasPlayback ? QCoreApplication::translate("OpenAutoPath", "定位") : QCoreApplication::translate("OpenAutoPath", "未载入预览"));
         toolItem->setData(0, kRoleHasPlayback, batchHasPlayback);
         toolItem->setData(0, kRoleBatchIndex, batch.batchIndex);
         toolItem->setData(0, kRoleNodeKind, kToolNode);
@@ -360,7 +361,7 @@ void HoleToolTreePanel::setProgram(
             operationItem->setText(0, operation.label);
             const bool hasPlayback = operation.hasPlayback && operation.startMoveIndex >= 0 &&
                 operation.endMoveIndex > operation.startMoveIndex;
-            operationItem->setText(1, hasPlayback ? QStringLiteral("定位") : QStringLiteral("未载入预览"));
+            operationItem->setText(1, hasPlayback ? QCoreApplication::translate("OpenAutoPath", "定位") : QCoreApplication::translate("OpenAutoPath", "未载入预览"));
             operationItem->setData(0, kRoleHasPlayback, hasPlayback);
             operationItem->setToolTip(0, operation.detailText);
             operationItem->setData(0, kRoleNodeKind, kOperationNode);
@@ -469,10 +470,10 @@ void HoleToolTreePanel::setPlaybackPosition(int completedMoveCount)
         item->setData(
             0, Qt::AccessibleDescriptionRole,
             completed
-                ? (current ? QStringLiteral("已完成，当前刀具")
-                           : QStringLiteral("已完成"))
-                : (current ? QStringLiteral("当前刀具")
-                           : QStringLiteral("未执行")));
+                ? (current ? QCoreApplication::translate("OpenAutoPath", "已完成，当前刀具")
+                           : QCoreApplication::translate("OpenAutoPath", "已完成"))
+                : (current ? QCoreApplication::translate("OpenAutoPath", "当前刀具")
+                           : QCoreApplication::translate("OpenAutoPath", "未执行")));
         QFont font = item->font(0);
         font.setBold(current);
         item->setFont(0, font);
@@ -628,13 +629,13 @@ void HoleToolTreePanel::updateOperationVisibilitySummary()
     if (m_operationVisibilitySummary) {
         m_operationVisibilitySummary->setText(
             soloMode
-                ? QStringLiteral("单独显示 1/%1 工序").arg(totalCount)
-                : QStringLiteral("可见工序 %1/%2")
+                ? QCoreApplication::translate("OpenAutoPath", "单独显示 1/%1 工序").arg(totalCount)
+                : QCoreApplication::translate("OpenAutoPath", "可见工序 %1/%2")
                       .arg(visibleCount).arg(totalCount));
         m_operationVisibilitySummary->setToolTip(
             visibleCount == 0 && totalCount > 0
-                ? QStringLiteral("全部刀路已由工序树隐藏")
-                : QStringLiteral("工序勾选状态独立于刀路段起始/数量范围"));
+                ? QCoreApplication::translate("OpenAutoPath", "全部刀路已由工序树隐藏")
+                : QCoreApplication::translate("OpenAutoPath", "工序勾选状态独立于刀路段起始/数量范围"));
     }
     if (m_showAllOperations)
         m_showAllOperations->setEnabled(
@@ -657,8 +658,8 @@ void HoleToolTreePanel::updateOperationPresentation()
             font.setBold(solo);
             item->setFont(0, font);
             item->setText(
-                1, !item->data(0, kRoleHasPlayback).toBool() ? QStringLiteral("未载入预览")
-                        : solo ? QStringLiteral("定位 · 单独") : QStringLiteral("定位"));
+                1, !item->data(0, kRoleHasPlayback).toBool() ? QCoreApplication::translate("OpenAutoPath", "未载入预览")
+                        : solo ? QCoreApplication::translate("OpenAutoPath", "定位 · 单独") : QCoreApplication::translate("OpenAutoPath", "定位"));
         }
     }
     updateOperationHierarchy();
@@ -672,13 +673,13 @@ void HoleToolTreePanel::updateOperationInspector(QTreeWidgetItem* item)
     if (!item ||
         item->data(0, kRoleNodeKind).toInt() != kOperationNode) {
         m_operationInspectorTitle->setText(
-            QStringLiteral("请选择一道加工工序"));
+            QCoreApplication::translate("OpenAutoPath", "请选择一道加工工序"));
         m_operationInspectorDetails->clear();
         m_operationInspectorDetails->setToolTip({});
         m_operationInspectorHint->setText(
-            QStringLiteral("工序勾选控制可见性；“定位”控制播放位置。"));
-        m_editOperation->setText(QStringLiteral("编辑参数"));
-        m_regenerateOperation->setText(QStringLiteral("应用并重建"));
+            QCoreApplication::translate("OpenAutoPath", "工序勾选控制可见性；“定位”控制播放位置。"));
+        m_editOperation->setText(QCoreApplication::translate("OpenAutoPath", "编辑参数"));
+        m_regenerateOperation->setText(QCoreApplication::translate("OpenAutoPath", "应用并重建"));
         m_editOperation->setEnabled(false);
         m_regenerateOperation->setEnabled(false);
         m_previewOperation->setEnabled(false);
@@ -704,47 +705,45 @@ void HoleToolTreePanel::updateOperationInspector(QTreeWidgetItem* item)
     m_operationInspectorDetails->setText(operation.detailText);
     m_operationInspectorDetails->setToolTip(operation.detailText);
     if (operation.family == oap::app::ToolpathBatchFamily::Hole) {
-        m_operationInspectorHint->setText(QStringLiteral("孔加工使用项目孔参数配置的刀库或单刀；修改和重新生成作用于整个孔工序组。"));
-        m_editOperation->setText(QStringLiteral("编辑项目孔参数"));
-        m_regenerateOperation->setText(QStringLiteral("重建全部孔工序"));
+        m_operationInspectorHint->setText(QCoreApplication::translate("OpenAutoPath", "孔加工使用项目孔参数配置的刀库或单刀；修改和重新生成作用于整个孔工序组。"));
+        m_editOperation->setText(QCoreApplication::translate("OpenAutoPath", "编辑项目孔参数"));
+        m_regenerateOperation->setText(QCoreApplication::translate("OpenAutoPath", "重建全部孔工序"));
         m_editOperation->setEnabled(true);
         m_regenerateOperation->setEnabled(m_holeGenerationAvailable);
-        m_editOperation->setToolTip(QStringLiteral("打开统一参数页的孔参数，包括刀库或单刀来源"));
-        m_regenerateOperation->setToolTip(QStringLiteral("按当前孔参数与刀具来源重建整个孔工序组"));
+        m_editOperation->setToolTip(QCoreApplication::translate("OpenAutoPath", "打开统一参数页的孔参数，包括刀库或单刀来源"));
+        m_regenerateOperation->setToolTip(QCoreApplication::translate("OpenAutoPath", "按当前孔参数与刀具来源重建整个孔工序组"));
     } else if (operation.family ==
                oap::app::ToolpathBatchFamily::Pocket) {
         m_operationInspectorHint->setText(
-            QStringLiteral(
-                "槽腔使用项目槽腔参数配置的刀库或单刀；修改和重新生成作用于整个槽腔工序组。"));
-        m_editOperation->setText(QStringLiteral("编辑槽腔参数"));
-        m_regenerateOperation->setText(QStringLiteral("重建全部槽腔工序"));
+            QCoreApplication::translate("OpenAutoPath", "槽腔使用项目槽腔参数配置的刀库或单刀；修改和重新生成作用于整个槽腔工序组。"));
+        m_editOperation->setText(QCoreApplication::translate("OpenAutoPath", "编辑槽腔参数"));
+        m_regenerateOperation->setText(QCoreApplication::translate("OpenAutoPath", "重建全部槽腔工序"));
         m_editOperation->setEnabled(true);
         m_regenerateOperation->setEnabled(m_pocketGenerationAvailable);
         m_editOperation->setToolTip(
-            QStringLiteral("打开统一参数页的槽腔参数，包括刀库或单刀来源"));
+            QCoreApplication::translate("OpenAutoPath", "打开统一参数页的槽腔参数，包括刀库或单刀来源"));
         m_regenerateOperation->setToolTip(
-            QStringLiteral("按当前槽腔参数与刀具来源重建整个槽腔工序组"));
+            QCoreApplication::translate("OpenAutoPath", "按当前槽腔参数与刀具来源重建整个槽腔工序组"));
     } else if (operation.family ==
                oap::app::ToolpathBatchFamily::Profile) {
         m_operationInspectorHint->setText(
-            QStringLiteral(
-                "外轮廓工序使用当前项目参数快照；保存候选参数后必须重新生成并验证其下游 IPW。"));
-        m_editOperation->setText(QStringLiteral("编辑外轮廓参数"));
-        m_regenerateOperation->setText(QStringLiteral("重建全部外轮廓工序"));
+            QCoreApplication::translate("OpenAutoPath", "外轮廓工序使用当前项目参数快照；保存候选参数后必须重新生成并验证其下游 IPW。"));
+        m_editOperation->setText(QCoreApplication::translate("OpenAutoPath", "编辑外轮廓参数"));
+        m_regenerateOperation->setText(QCoreApplication::translate("OpenAutoPath", "重建全部外轮廓工序"));
         m_editOperation->setEnabled(true);
         m_regenerateOperation->setEnabled(m_profileGenerationAvailable);
         m_editOperation->setToolTip(
-            QStringLiteral("打开项目刀路参数编辑器并定位外轮廓参数"));
+            QCoreApplication::translate("OpenAutoPath", "打开项目刀路参数编辑器并定位外轮廓参数"));
         m_regenerateOperation->setToolTip(
-            QStringLiteral("按当前外轮廓参数与刀具来源重建整个外轮廓工序组"));
+            QCoreApplication::translate("OpenAutoPath", "按当前外轮廓参数与刀具来源重建整个外轮廓工序组"));
     } else if (operation.family == oap::app::ToolpathBatchFamily::SurfaceFinishing) {
-        m_operationInspectorHint->setText(QStringLiteral("在统一刀路参数页配置雕刻刀库或单刀及加工面；重新生成整个雕刻工序组，并使变化后的 IPW 失效。"));
-        m_editOperation->setText(QStringLiteral("编辑雕刻参数"));
-        m_regenerateOperation->setText(QStringLiteral("重建全部雕刻工序"));
+        m_operationInspectorHint->setText(QCoreApplication::translate("OpenAutoPath", "在统一刀路参数页配置雕刻刀库或单刀及加工面；重新生成整个雕刻工序组，并使变化后的 IPW 失效。"));
+        m_editOperation->setText(QCoreApplication::translate("OpenAutoPath", "编辑雕刻参数"));
+        m_regenerateOperation->setText(QCoreApplication::translate("OpenAutoPath", "重建全部雕刻工序"));
         m_editOperation->setEnabled(true);
         m_regenerateOperation->setEnabled(m_engravingGenerationAvailable);
-        m_editOperation->setToolTip(QStringLiteral("打开统一刀路参数的雕刻页"));
-        m_regenerateOperation->setToolTip(QStringLiteral("按当前雕刻配置重新生成整个雕刻工序组"));
+        m_editOperation->setToolTip(QCoreApplication::translate("OpenAutoPath", "打开统一刀路参数的雕刻页"));
+        m_regenerateOperation->setToolTip(QCoreApplication::translate("OpenAutoPath", "按当前雕刻配置重新生成整个雕刻工序组"));
     }
 }
 

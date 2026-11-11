@@ -1,6 +1,7 @@
 // RecognitionWorkspaceCoordinator 实现（oap_app_recognition）。
 // 识别状态、任务与 OCCT 呈现的应用边界，见 RecognitionWorkspaceCoordinator.h。
 #include "app/recognition/RecognitionWorkspaceCoordinator.h"
+#include <QCoreApplication>
 
 #include "analysis/MoldCoordinateFrame.h"
 #include "analysis/Model.h"
@@ -97,8 +98,7 @@ QString buildSuccessMessage(
     int visibleTraceFaceCount,
     qint64 elapsedMillis)
 {
-    QString message = QStringLiteral(
-        "内外环结构识别完成：识别孔 %1 个、孔面 %2 个，通结构面 %3 个；"
+    QString message = QCoreApplication::translate("OpenAutoPath", "内外环结构识别完成：识别孔 %1 个、孔面 %2 个，通结构面 %3 个；"
         "三向执行顺序 Z→Y→X，孔、通结构及前序方向的根平面和路径"
         "均在后续追踪入口排除。")
         .arg(session.result().holeCount)
@@ -117,8 +117,7 @@ QString buildSuccessMessage(
     }
     for (const ThreeAxisTraceStats& stats : useCaseResult.axisStats) {
         skippedInvalidFaceCount += stats.skippedInvalidFaceCount;
-        message += QStringLiteral(
-            " %1向：内部平面 %2 个、追踪根平面 %3 个、有效分支 %4 个"
+        message += QCoreApplication::translate("OpenAutoPath", " %1向：内部平面 %2 个、追踪根平面 %3 个、有效分支 %4 个"
             "（盲槽 %5、盲腔 %6），唯一特征面 %7 个，终止平面 %8 个。")
             .arg(QString::fromStdString(stats.axisLabel))
             .arg(stats.planeFaceIds.size())
@@ -129,8 +128,7 @@ QString buildSuccessMessage(
             .arg(stats.traceFaceIds.size())
             .arg(stats.terminalFaceCount);
     }
-    message += QStringLiteral(
-        " 三向内部平面共 %1 个（X 红、Y 绿、Z 蓝，当前显示 %2 个）；"
+    message += QCoreApplication::translate("OpenAutoPath", " 三向内部平面共 %1 个（X 红、Y 绿、Z 蓝，当前显示 %2 个）；"
         "内外环共形成 %3 个最终连通结构，唯一走过 %4 个面"
         "（盲槽深红 %5 个、盲腔深青 %6 个；"
         "盲腔连通合并吸收 %7 个原始子集，当前显示 %8 个面），"
@@ -151,15 +149,14 @@ QString buildSuccessMessage(
         .arg(recognizedHoleFaceCount)
         .arg(session.throughStructureFaces().size());
     if (skippedInvalidFaceCount > 0) {
-        message += QStringLiteral(" 跳过 %1 个几何无效面。")
+        message += QCoreApplication::translate("OpenAutoPath", " 跳过 %1 个几何无效面。")
             .arg(skippedInvalidFaceCount);
     }
     if (useCaseResult.failedUnitCount > 0) {
-        message += QStringLiteral(" 另有 %1 个单元因拓扑异常跳过。")
+        message += QCoreApplication::translate("OpenAutoPath", " 另有 %1 个单元因拓扑异常跳过。")
             .arg(useCaseResult.failedUnitCount);
     }
-    message += QStringLiteral(
-        " 通结构筛选检查法向垂直 Z 的面 %1 个，排除孔面 %2 个、"
+    message += QCoreApplication::translate("OpenAutoPath", " 通结构筛选检查法向垂直 Z 的面 %1 个，排除孔面 %2 个、"
         "主外表面 %3 个；无非 Z 向共享边 %4 个，"
         "存在非凸非 Z 向边 %5 个。"
         " 通结构与 XYZ 追踪共享逐体拓扑缓存，本阶段耗时 %6 ms。")
@@ -311,19 +308,18 @@ RecognitionWorkspaceCoordinator::installThreeAxisResult(
     // 安装门禁:无模型 / 已取消 / 失败均直接返回,不动会话。
     if (model.faces.empty() || model.units.empty()) {
         result.status = RecognitionInstallStatus::NoModel;
-        result.message = QStringLiteral("请先打开并分析一个 STEP 文件。");
+        result.message = QCoreApplication::translate("OpenAutoPath", "请先打开并分析一个 STEP 文件。");
         return result;
     }
     if (useCaseResult.cancelled) {
         result.status = RecognitionInstallStatus::Cancelled;
-        result.message = QStringLiteral(
-            "结构识别已取消，上一次有效结果保持不变。");
+        result.message = QCoreApplication::translate("OpenAutoPath", "结构识别已取消，上一次有效结果保持不变。");
         return result;
     }
     if (!useCaseResult.error.empty()) {
         result.status = RecognitionInstallStatus::Failed;
-        result.message = QStringLiteral("结构识别失败：%1")
-            .arg(QString::fromStdString(useCaseResult.error));
+        result.message = QCoreApplication::translate("OpenAutoPath", "结构识别失败：%1")
+            .arg(QCoreApplication::translate("OpenAutoPathDiagnostic", QString::fromStdString(useCaseResult.error).toUtf8().constData()));
         return result;
     }
 
@@ -510,8 +506,9 @@ RecognitionWorkspaceCoordinator::applyManualFeatureEdit(
                     ManualRecognitionWarningKind::FloorExpansionFailed,
                     seedFaceId, {},
                     diagnostic.message.empty()
-                        ? toolpath::toolpathDiagnosticDefaultMessageZh(
-                              diagnostic.code)
+                        ? QCoreApplication::translate("OpenAutoPath",
+                              toolpath::toolpathDiagnosticDefaultMessageZh(
+                                  diagnostic.code)).toStdString()
                         : diagnostic.message});
             }
             if (!createdKeys.insert(instanceKey(expanded)).second)

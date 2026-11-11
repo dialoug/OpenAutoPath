@@ -20,6 +20,11 @@ if($line.Count -ne 1 -or (Get-FileHash $archivePath).Hash -ne $line[0].Substring
 Expand-Archive -LiteralPath $archivePath -DestinationPath $output
 $package = Join-Path $output ([IO.Path]::GetFileNameWithoutExtension($archivePath))
 $bin = Join-Path $package 'bin'
+foreach($file in @('qtbase_zh_CN.ts', 'README.md', 'licenseRule.json', 'LGPL-3.0-only.txt', 'GPL-3.0-only.txt')) {
+    if(-not (Test-Path -LiteralPath (Join-Path $package "share/licenses/OpenAutoPath/qttranslations/$file") -PathType Leaf)) {
+        throw "Qt translation source or notice missing: $file"
+    }
+}
 $info = Get-Content (Join-Path $package 'build-info.json') -Raw -Encoding UTF8 | ConvertFrom-Json
 if($ExpectedCommit -and $info.commit -ne $ExpectedCommit){throw 'Package commit mismatch'}
 $inventory = Get-Content (Join-Path $package 'share/licenses/OpenAutoPath/runtime-inventory.json') -Raw -Encoding UTF8 | ConvertFrom-Json

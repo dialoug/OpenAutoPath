@@ -1,4 +1,5 @@
 #include "app/ui/dialogs/detail/PocketCamOpenGLWidget.h"
+#include <QCoreApplication>
 
 #include <algorithm>
 #include <array>
@@ -143,7 +144,7 @@ bool PocketCamOpenGLWidget::dispatchGpuDexelMotion(
         return true;
 
     beginOpenGlStage(
-        QStringLiteral("GPU Multi-Dexel 减料"));
+        QCoreApplication::translate("OpenAutoPath", "GPU Multi-Dexel 减料"));
     m_dexelComputeProgram.bind();
     if (m_dexelComputeUniformsDirty) {
         m_gl43->glUniform2i(m_dexelComputeProgram.uniformLocation("uGridSize"), m_dexelNx, m_dexelNy);
@@ -192,7 +193,7 @@ bool PocketCamOpenGLWidget::dispatchGpuDexelMotion(
         GL_SHADER_STORAGE_BUFFER, 6u,
         m_dexelStockDomainBuffer);
     if (!checkOpenGlStage(
-            QStringLiteral("GPU Multi-Dexel 减料参数上传"))) {
+            QCoreApplication::translate("OpenAutoPath", "GPU Multi-Dexel 减料参数上传"))) {
         return false;
     }
     m_gl43->glDispatchCompute(
@@ -200,13 +201,13 @@ bool PocketCamOpenGLWidget::dispatchGpuDexelMotion(
         static_cast<GLuint>((jMax - jMin + 15) / 16),
         1u);
     if (!checkOpenGlStage(
-            QStringLiteral("GPU Multi-Dexel Compute 派发"))) {
+            QCoreApplication::translate("OpenAutoPath", "GPU Multi-Dexel Compute 派发"))) {
         return false;
     }
     m_gl43->glMemoryBarrier(
         GL_SHADER_STORAGE_BARRIER_BIT);
     if (!checkOpenGlStage(
-            QStringLiteral("GPU Multi-Dexel 减料同步"))) {
+            QCoreApplication::translate("OpenAutoPath", "GPU Multi-Dexel 减料同步"))) {
         return false;
     }
     m_gpuDexelSurfaceDirty = true;
@@ -225,7 +226,7 @@ bool PocketCamOpenGLWidget::prepareGpuDexelSurface()
     }
 
     beginOpenGlStage(
-        QStringLiteral("GPU Multi-Dexel 自适应表面分类"));
+        QCoreApplication::translate("OpenAutoPath", "GPU Multi-Dexel 自适应表面分类"));
     const std::array<std::uint32_t, 10> drawCommand{
         150u, 0u, 0u, 0u, 0u, 0u, 12u, 0u, 0u, 0u};
     m_gl43->glMemoryBarrier(GL_BUFFER_UPDATE_BARRIER_BIT);
@@ -236,14 +237,12 @@ bool PocketCamOpenGLWidget::prepareGpuDexelSurface()
         GL_SHADER_STORAGE_BUFFER, 0,
         static_cast<GLsizeiptr>(sizeof(drawCommand)),
         drawCommand.data());
-    if (!checkOpenGlStage(QStringLiteral(
-            "GPU Multi-Dexel 表面分类命令缓冲重置"))) {
+    if (!checkOpenGlStage(QCoreApplication::translate("OpenAutoPath", "GPU Multi-Dexel 表面分类命令缓冲重置"))) {
         return false;
     }
     if (!m_dexelSurfaceProgram.bind()) {
         if (m_error.isEmpty()) {
-            m_error = QStringLiteral(
-                "GPU Multi-Dexel 表面分类程序绑定失败：%1")
+            m_error = QCoreApplication::translate("OpenAutoPath", "GPU Multi-Dexel 表面分类程序绑定失败：%1")
                           .arg(m_dexelSurfaceProgram.log());
         }
         return false;
@@ -256,8 +255,7 @@ bool PocketCamOpenGLWidget::prepareGpuDexelSurface()
         m_gl43->glUniform1ui(m_dexelSurfaceProgram.uniformLocation("uFineCapacity"), m_dexelFineCapacity);
         m_dexelSurfaceUniformsDirty = false;
     }
-    if (!checkOpenGlStage(QStringLiteral(
-            "GPU Multi-Dexel 表面分类 uniform 上传"))) {
+    if (!checkOpenGlStage(QCoreApplication::translate("OpenAutoPath", "GPU Multi-Dexel 表面分类 uniform 上传"))) {
         return false;
     }
     m_gl43->glBindBufferBase(
@@ -282,7 +280,7 @@ bool PocketCamOpenGLWidget::prepareGpuDexelSurface()
         GL_SHADER_STORAGE_BUFFER, 7u,
         m_dexelCoarseEntriesBuffer);
     if (!checkOpenGlStage(
-            QStringLiteral("GPU Multi-Dexel 表面分类 SSBO 绑定"))) {
+            QCoreApplication::translate("OpenAutoPath", "GPU Multi-Dexel 表面分类 SSBO 绑定"))) {
         return false;
     }
     m_gl43->glDispatchCompute(
@@ -290,14 +288,14 @@ bool PocketCamOpenGLWidget::prepareGpuDexelSurface()
         static_cast<GLuint>((m_dexelRenderNy + 7) / 8),
         static_cast<GLuint>(m_dexelMaximumIntervals));
     if (!checkOpenGlStage(
-            QStringLiteral("GPU Multi-Dexel 表面分类派发"))) {
+            QCoreApplication::translate("OpenAutoPath", "GPU Multi-Dexel 表面分类派发"))) {
         return false;
     }
     m_gl43->glMemoryBarrier(
         GL_SHADER_STORAGE_BARRIER_BIT |
         GL_COMMAND_BARRIER_BIT);
     if (!checkOpenGlStage(
-            QStringLiteral("GPU Multi-Dexel 表面分类同步"))) {
+            QCoreApplication::translate("OpenAutoPath", "GPU Multi-Dexel 表面分类同步"))) {
         return false;
     }
     m_gpuDexelSurfaceDirty = false;
@@ -310,13 +308,12 @@ void PocketCamOpenGLWidget::renderGpuDexel(const QMatrix4x4& viewProjection)
         return;
     if (!prepareGpuDexelSurface()) {
         if (m_error.isEmpty()) {
-            m_error = QStringLiteral(
-                "GPU Multi-Dexel 自适应表面无法生成。");
+            m_error = QCoreApplication::translate("OpenAutoPath", "GPU Multi-Dexel 自适应表面无法生成。");
         }
         return;
     }
     beginOpenGlStage(
-        QStringLiteral("GPU Multi-Dexel 绘制"));
+        QCoreApplication::translate("OpenAutoPath", "GPU Multi-Dexel 绘制"));
     glDisable(GL_BLEND);
     glEnable(GL_DEPTH_TEST);
     glDepthFunc(GL_LESS);
@@ -377,7 +374,7 @@ void PocketCamOpenGLWidget::renderGpuDexel(const QMatrix4x4& viewProjection)
     m_gl43->glBindVertexArray(m_dexelVao);
     m_gl43->glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 7u, m_dexelCoarseEntriesBuffer);
     if (!checkOpenGlStage(
-            QStringLiteral("GPU Multi-Dexel 绘制参数上传"))) {
+            QCoreApplication::translate("OpenAutoPath", "GPU Multi-Dexel 绘制参数上传"))) {
         m_gl43->glBindVertexArray(0u);
         glEnable(GL_CULL_FACE);
         return;
@@ -395,7 +392,7 @@ void PocketCamOpenGLWidget::renderGpuDexel(const QMatrix4x4& viewProjection)
         GL_TRIANGLES, nullptr);
     m_gl43->glBindBuffer(GL_DRAW_INDIRECT_BUFFER, 0u);
     checkOpenGlStage(
-        QStringLiteral("GPU Multi-Dexel 实例绘制"));
+        QCoreApplication::translate("OpenAutoPath", "GPU Multi-Dexel 实例绘制"));
     m_gl43->glBindVertexArray(0u);
     glEnable(GL_CULL_FACE);
 }

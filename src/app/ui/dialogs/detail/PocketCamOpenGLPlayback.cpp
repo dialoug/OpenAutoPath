@@ -1,4 +1,5 @@
 #include "app/ui/dialogs/detail/PocketCamOpenGLWidget.h"
+#include <QCoreApplication>
 
 #include <algorithm>
 #include <array>
@@ -14,24 +15,23 @@ namespace oap::app::pocket_cam_detail {
 QString PocketCamOpenGLWidget::materialStatusString() const
 {
     if (m_scene.authoritativeIpwPlayback) {
-        QString status = QStringLiteral("IPW 动画｜工序 %1｜%2｜刀具与装夹方向随工序切换")
+        QString status = QCoreApplication::translate("OpenAutoPath", "IPW 动画｜工序 %1｜%2｜刀具与装夹方向随工序切换")
             .arg(m_currentOperationIndex + 1)
-            .arg(!m_error.isEmpty() ? QStringLiteral("材料帧显示失败") :
-                 m_waitingForOperationBaseline ? QStringLiteral("正在更新材料帧") :
-                 m_gpuDexelReady || m_usePlaybackMesh ? QStringLiteral("材料帧已就绪") : QStringLiteral("材料帧未就绪"));
+            .arg(!m_error.isEmpty() ? QCoreApplication::translate("OpenAutoPath", "材料帧显示失败") :
+                 m_waitingForOperationBaseline ? QCoreApplication::translate("OpenAutoPath", "正在更新材料帧") :
+                 m_gpuDexelReady || m_usePlaybackMesh ? QCoreApplication::translate("OpenAutoPath", "材料帧已就绪") : QCoreApplication::translate("OpenAutoPath", "材料帧未就绪"));
         if (m_usePlaybackMesh)
-            status += QStringLiteral("\n材料采用兼容网格显示（IPW 计算精度不变）：") + m_playbackDisplayWarning;
+            status += QCoreApplication::translate("OpenAutoPath", "\n材料采用兼容网格显示（IPW 计算精度不变）：") + m_playbackDisplayWarning;
         return status;
     }
     if (!m_gpuDexelReady) {
-        QString status = QStringLiteral("GPU 材料状态：未就绪");
+        QString status = QCoreApplication::translate("OpenAutoPath", "GPU 材料状态：未就绪");
         if (!m_preexistingOpenGlWarning.isEmpty())
-            status += QStringLiteral("\nOpenGL 提示：") +
+            status += QCoreApplication::translate("OpenAutoPath", "\nOpenGL 提示：") +
                 m_preexistingOpenGlWarning;
         return status;
     }
-    QString status = QStringLiteral(
-        "GPU 材料状态：%1 × %2 网格，%3 个占用单元，%4 个材料区间，"
+    QString status = QCoreApplication::translate("OpenAutoPath", "GPU 材料状态：%1 × %2 网格，%3 个占用单元，%4 个材料区间，"
         "分辨率 %5 mm，TSDF 亚单元轮廓，显示步长 %6")
         .arg(m_dexelNx)
         .arg(m_dexelNy)
@@ -43,8 +43,7 @@ QString PocketCamOpenGLWidget::materialStatusString() const
         .arg(m_dexelRenderStride);
     if (m_scene.analyticLinearMotionCount > 0u ||
         m_scene.analyticArcMotionCount > 0u) {
-        status += QStringLiteral(
-            "\n解析边界缓存：G1 %1 段，G2/G3 %2 段"
+        status += QCoreApplication::translate("OpenAutoPath", "\n解析边界缓存：G1 %1 段，G2/G3 %2 段"
             "（可信播放 %3，折线恢复 %4），平面回退 %5 段，"
             "工序检查点 %6/3")
             .arg(static_cast<qulonglong>(
@@ -61,7 +60,7 @@ QString PocketCamOpenGLWidget::materialStatusString() const
                 m_analyticBoundarySnapshots.size()));
     }
     if (!m_preexistingOpenGlWarning.isEmpty())
-        status += QStringLiteral("\nOpenGL 提示：") +
+        status += QCoreApplication::translate("OpenAutoPath", "\nOpenGL 提示：") +
             m_preexistingOpenGlWarning;
     return status;
 }
@@ -252,8 +251,7 @@ void PocketCamOpenGLWidget::acceptOperationBaseline(
     doneCurrent();
     m_waitingForOperationBaseline = false;
     if (!uploaded && m_error.isEmpty()) {
-        m_error = QStringLiteral(
-            "工序级 IPW 检查点无法上传到 GPU Multi-Dexel。");
+        m_error = QCoreApplication::translate("OpenAutoPath", "工序级 IPW 检查点无法上传到 GPU Multi-Dexel。");
     }
     update();
 }
@@ -379,7 +377,7 @@ void PocketCamOpenGLWidget::setAuthoritativeStep(std::size_t step)
         step = *end;
         const auto operation = static_cast<std::size_t>(motion.operationIndex);
         if (operation >= m_operationInitialIpwSources.size() || !m_operationInitialIpwSources[operation]) {
-            m_error = QStringLiteral("项目动画缺少工序起始 IPW，已停止播放。");
+            m_error = QCoreApplication::translate("OpenAutoPath", "项目动画缺少工序起始 IPW，已停止播放。");
             return;
         }
         auto source = std::make_shared<IpwTransientFrameSource>(*m_operationInitialIpwSources[operation]);
@@ -405,7 +403,7 @@ void PocketCamOpenGLWidget::setAuthoritativeStep(std::size_t step)
     m_waitingForOperationBaseline = true;
     if (!m_baselineController->submit(std::move(request))) {
         m_waitingForOperationBaseline = false;
-        m_error = QStringLiteral("无法启动项目 IPW 动画帧更新。");
+        m_error = QCoreApplication::translate("OpenAutoPath", "无法启动项目 IPW 动画帧更新。");
     }
 }
 
@@ -417,7 +415,7 @@ void PocketCamOpenGLWidget::acceptAuthoritativeFrame(const IpwDisplayMeshResult&
     const bool emptyMaterial = result.materialStock && result.materialStock->valid() &&
         result.materialStock->intervalCount() == 0;
     if ((!result.ok() && !emptyMaterial) || !result.materialStock || !result.materialStock->valid()) {
-        m_error = QStringLiteral("项目 IPW 动画帧更新失败：%1").arg(QString::fromStdString(result.error));
+        m_error = QCoreApplication::translate("OpenAutoPath", "项目 IPW 动画帧更新失败：%1").arg(QCoreApplication::translate("OpenAutoPathDiagnostic", QString::fromStdString(result.error).toUtf8().constData()));
         update();
         return;
     }
@@ -426,8 +424,8 @@ void PocketCamOpenGLWidget::acceptAuthoritativeFrame(const IpwDisplayMeshResult&
         uploadPlaybackStock(*result.materialStock, m_requestedPlaybackStep, result.mesh);
     doneCurrent();
     if (!uploaded) {
-        m_error = QStringLiteral("项目 IPW 材料帧无法上传到 OpenGL：%1")
-            .arg(m_error.isEmpty() ? QStringLiteral("无有效上下文或材料网格超过上传预算") : m_error);
+        m_error = QCoreApplication::translate("OpenAutoPath", "项目 IPW 材料帧无法上传到 OpenGL：%1")
+            .arg(m_error.isEmpty() ? QCoreApplication::translate("OpenAutoPath", "无有效上下文或材料网格超过上传预算") : m_error);
         update();
         return;
     }

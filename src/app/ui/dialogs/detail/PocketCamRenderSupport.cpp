@@ -1,4 +1,5 @@
 #include "app/ui/dialogs/detail/PocketCamRenderSupport.h"
+#include <QCoreApplication>
 
 #include <algorithm>
 #include <cmath>
@@ -20,19 +21,19 @@ QString mouseButtonText(Qt::MouseButton button)
 {
     switch (button) {
         case Qt::LeftButton:
-            return QStringLiteral("左键");
+            return QCoreApplication::translate("OpenAutoPath", "左键");
         case Qt::RightButton:
-            return QStringLiteral("右键");
+            return QCoreApplication::translate("OpenAutoPath", "右键");
         case Qt::MiddleButton:
-            return QStringLiteral("中键");
+            return QCoreApplication::translate("OpenAutoPath", "中键");
         case Qt::BackButton:
-            return QStringLiteral("后退键");
+            return QCoreApplication::translate("OpenAutoPath", "后退键");
         case Qt::ForwardButton:
-            return QStringLiteral("前进键");
+            return QCoreApplication::translate("OpenAutoPath", "前进键");
         case Qt::NoButton:
-            return QStringLiteral("未绑定");
+            return QCoreApplication::translate("OpenAutoPath", "未绑定");
         default:
-            return QStringLiteral("鼠标键 %1")
+            return QCoreApplication::translate("OpenAutoPath", "鼠标键 %1")
                 .arg(static_cast<int>(button));
     }
 }
@@ -40,8 +41,8 @@ QString mouseButtonText(Qt::MouseButton button)
 QString rotationModeText(PocketCamRotationMode mode)
 {
     return mode == PocketCamRotationMode::Model
-        ? QStringLiteral("固定相机，旋转模型")
-        : QStringLiteral("相机环绕");
+        ? QCoreApplication::translate("OpenAutoPath", "固定相机，旋转模型")
+        : QCoreApplication::translate("OpenAutoPath", "相机环绕");
 }
 
 static void addTriangle(
@@ -90,7 +91,7 @@ RenderMesh meshShape(
 {
     RenderMesh mesh;
     if (shape.IsNull()) {
-        error = QStringLiteral("OpenGL CAM 仿真的毛坯为空。");
+        error = QCoreApplication::translate("OpenAutoPath", "OpenGL CAM 仿真的毛坯为空。");
         return mesh;
     }
     try {
@@ -99,7 +100,7 @@ RenderMesh meshShape(
             Standard_False, 0.35, Standard_True);
         triangulator.Perform();
         if (!triangulator.IsDone()) {
-            error = QStringLiteral("无法为 OpenGL CAM 仿真生成毛坯三角网格。");
+            error = QCoreApplication::translate("OpenAutoPath", "无法为 OpenGL CAM 仿真生成毛坯三角网格。");
             return mesh;
         }
         for (TopExp_Explorer explorer(shape, TopAbs_FACE);
@@ -132,12 +133,12 @@ RenderMesh meshShape(
             }
         }
     } catch (...) {
-        error = QStringLiteral("生成 OpenGL CAM 毛坯网格时发生 OCCT 异常。");
+        error = QCoreApplication::translate("OpenAutoPath", "生成 OpenGL CAM 毛坯网格时发生 OCCT 异常。");
         mesh = {};
         return mesh;
     }
     if (mesh.empty())
-        error = QStringLiteral("OpenGL CAM 毛坯网格不包含有效三角形。");
+        error = QCoreApplication::translate("OpenAutoPath", "OpenGL CAM 毛坯网格不包含有效三角形。");
     return mesh;
 }
 
@@ -147,8 +148,7 @@ RenderMesh meshTriangulation(
 {
     RenderMesh mesh;
     if (triangulation.IsNull()) {
-        error = QStringLiteral(
-            "统一 IPW 最终显示网格为空。");
+        error = QCoreApplication::translate("OpenAutoPath", "统一 IPW 最终显示网格为空。");
         return mesh;
     }
     try {
@@ -176,13 +176,11 @@ RenderMesh meshTriangulation(
                 vector3(triangulation->Node(n3)));
         }
     } catch (...) {
-        error = QStringLiteral(
-            "转换统一 IPW 最终显示网格时发生异常。");
+        error = QCoreApplication::translate("OpenAutoPath", "转换统一 IPW 最终显示网格时发生异常。");
         return {};
     }
     if (mesh.empty()) {
-        error = QStringLiteral(
-            "统一 IPW 最终显示网格不包含有效三角形。");
+        error = QCoreApplication::translate("OpenAutoPath", "统一 IPW 最终显示网格不包含有效三角形。");
     }
     return mesh;
 }

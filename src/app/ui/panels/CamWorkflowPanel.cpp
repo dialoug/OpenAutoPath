@@ -2,6 +2,7 @@
 // CAM 工作流面板：把分散的加工入口整理为项目→装夹→刀具→工序→验证→输出
 // 的 UI 投影，见 CamWorkflowPanel.h。
 #include "app/ui/panels/CamWorkflowPanel.h"
+#include <QCoreApplication>
 
 #include "app/ui/panels/FeatureAllowancePanel.h"
 #include "app/ui/panels/HoleCoverageAuditPanel.h"
@@ -115,10 +116,10 @@ CamWorkflowPanel::CamWorkflowPanel(QWidget* parent)
     auto* headerLayout = new QVBoxLayout(header);
     headerLayout->setContentsMargins(12, 7, 12, 7);
     headerLayout->setSpacing(0);
-    auto* title = new QLabel(QStringLiteral("加工项目"), header);
+    auto* title = new QLabel(QCoreApplication::translate("OpenAutoPath", "加工项目"), header);
     title->setObjectName(QStringLiteral("camWorkflowTitle"));
     headerLayout->addWidget(title);
-    m_jobLabel = new QLabel(QStringLiteral("尚未加载零件"), header);
+    m_jobLabel = new QLabel(QCoreApplication::translate("OpenAutoPath", "尚未加载零件"), header);
     m_jobLabel->setObjectName(QStringLiteral("camWorkflowJob"));
     m_jobLabel->setWordWrap(true);
     m_jobLabel->setSizePolicy(QSizePolicy::Ignored, QSizePolicy::Preferred);
@@ -168,12 +169,12 @@ CamWorkflowPanel::CamWorkflowPanel(QWidget* parent)
     m_modelStatus = makeStatusLabel(projectPage);
     pageLayout->addWidget(m_modelStatus);
     m_openPart = makeAction(
-        QStringLiteral("打开 STEP 零件…"), projectPage, true);
+        QCoreApplication::translate("OpenAutoPath", "打开 STEP 零件…"), projectPage, true);
     m_openPart->setIcon(style()->standardIcon(QStyle::SP_DialogOpenButton));
     pageLayout->addWidget(m_openPart);
     auto* projectActions = new QHBoxLayout;
-    m_openProject = makeAction(QStringLiteral("打开 Job…"), projectPage);
-    m_saveProject = makeAction(QStringLiteral("保存 Job…"), projectPage);
+    m_openProject = makeAction(QCoreApplication::translate("OpenAutoPath", "打开 Job…"), projectPage);
+    m_saveProject = makeAction(QCoreApplication::translate("OpenAutoPath", "保存 Job…"), projectPage);
     m_saveProject->setObjectName(QStringLiteral("saveMachiningProjectAction"));
     m_openProject->setIcon(style()->standardIcon(QStyle::SP_DialogOpenButton));
     m_saveProject->setIcon(style()->standardIcon(QStyle::SP_DialogSaveButton));
@@ -181,9 +182,9 @@ CamWorkflowPanel::CamWorkflowPanel(QWidget* parent)
     projectActions->addWidget(m_saveProject);
     pageLayout->addLayout(projectActions);
     m_recognizeFeatures = makeAction(
-        QStringLiteral("识别加工特征"), projectPage, true);
+        QCoreApplication::translate("OpenAutoPath", "识别加工特征"), projectPage, true);
     m_recognizeFeatures->setToolTip(
-        QStringLiteral("识别孔、通结构及主外表面内环槽腔来源"));
+        QCoreApplication::translate("OpenAutoPath", "识别孔、通结构及主外表面内环槽腔来源"));
     pageLayout->addWidget(m_recognizeFeatures);
     pageLayout->addStretch(1);
     addStepPage(m_pages, projectPage);
@@ -192,10 +193,10 @@ CamWorkflowPanel::CamWorkflowPanel(QWidget* parent)
     m_setupStatus = makeStatusLabel(setupPage);
     pageLayout->addWidget(m_setupStatus);
     m_configureSetup = makeAction(
-        QStringLiteral("加工参数与装夹确认…"), setupPage, true);
+        QCoreApplication::translate("OpenAutoPath", "加工参数与装夹确认…"), setupPage, true);
     pageLayout->addWidget(m_configureSetup);
     pageLayout->addWidget(makeHint(
-        QStringLiteral("集中设置孔/腔参数、G54–G59、六面工作坐标确认和参考 NC 输出选项。"),
+        QCoreApplication::translate("OpenAutoPath", "集中设置孔/腔参数、G54–G59、六面工作坐标确认和参考 NC 输出选项。"),
         setupPage));
     pageLayout->addStretch(1);
     addStepPage(m_pages, setupPage);
@@ -204,13 +205,13 @@ CamWorkflowPanel::CamWorkflowPanel(QWidget* parent)
     m_toolStatus = makeStatusLabel(toolingPage);
     pageLayout->addWidget(m_toolStatus);
     m_selectTools = makeAction(
-        QStringLiteral("选择活动刀库…"), toolingPage, true);
+        QCoreApplication::translate("OpenAutoPath", "选择活动刀库…"), toolingPage, true);
     pageLayout->addWidget(m_selectTools);
     m_manageTools = makeAction(
-        QStringLiteral("管理刀具资产…"), toolingPage);
+        QCoreApplication::translate("OpenAutoPath", "管理刀具资产…"), toolingPage);
     pageLayout->addWidget(m_manageTools);
     pageLayout->addWidget(makeHint(
-        QStringLiteral("管理器维护刀具资产；只有显式选择的活动刀库参与自动选刀。工序创建后保存不可变刀具快照。"),
+        QCoreApplication::translate("OpenAutoPath", "管理器维护刀具资产；只有显式选择的活动刀库参与自动选刀。工序创建后保存不可变刀具快照。"),
         toolingPage));
     pageLayout->addStretch(1);
     addStepPage(m_pages, toolingPage);
@@ -234,29 +235,29 @@ CamWorkflowPanel::CamWorkflowPanel(QWidget* parent)
     generationActions->setHorizontalSpacing(7);
     generationActions->setVerticalSpacing(7);
     m_generateHole = makeAction(
-        QStringLiteral("生成孔刀路"), operationControls, true);
+        QCoreApplication::translate("OpenAutoPath", "生成孔刀路"), operationControls, true);
     m_generateHole->setObjectName(
         QStringLiteral("generateHoleToolpathAction"));
     m_generateHole->setToolTip(
-        QStringLiteral("从当前识别结果生成孔刀路；已有孔程序时重新规划并替换"));
+        QCoreApplication::translate("OpenAutoPath", "从当前识别结果生成孔刀路；已有孔程序时重新规划并替换"));
     m_generatePocket = makeAction(
-        QStringLiteral("生成槽腔刀路"), operationControls, true);
+        QCoreApplication::translate("OpenAutoPath", "生成槽腔刀路"), operationControls, true);
     m_generatePocket->setObjectName(
         QStringLiteral("generatePocketToolpathAction"));
     m_generatePocket->setToolTip(
-        QStringLiteral("从已识别的主外表面内环生成槽腔清腔工序"));
+        QCoreApplication::translate("OpenAutoPath", "从已识别的主外表面内环生成槽腔清腔工序"));
     m_generateProfile = makeAction(
-        QStringLiteral("生成外轮廓刀路"), operationControls, true);
+        QCoreApplication::translate("OpenAutoPath", "生成外轮廓刀路"), operationControls, true);
     m_generateProfile->setObjectName(
         QStringLiteral("generateProfileToolpathAction"));
     m_generateProfile->setToolTip(
-        QStringLiteral("从已识别的主外表面外环生成分层外轮廓工序"));
+        QCoreApplication::translate("OpenAutoPath", "从已识别的主外表面外环生成分层外轮廓工序"));
     generationActions->addWidget(m_generateHole, 0, 0);
     generationActions->addWidget(m_generatePocket, 0, 1);
     generationActions->addWidget(m_generateProfile, 1, 0);
-    m_generateFinishing = makeAction(QStringLiteral("生成雕刻刀路"), operationControls, true);
+    m_generateFinishing = makeAction(QCoreApplication::translate("OpenAutoPath", "生成雕刻刀路"), operationControls, true);
     m_generateFinishing->setObjectName(QStringLiteral("generateEngravingAction"));
-    m_generateFinishing->setToolTip(QStringLiteral("按雕刻参数直接生成完整模型刀路；默认六面，也可选择任一单面"));
+    m_generateFinishing->setToolTip(QCoreApplication::translate("OpenAutoPath", "按雕刻参数直接生成完整模型刀路；默认六面，也可选择任一单面"));
     generationActions->addWidget(m_generateFinishing, 1, 1);
     operationControlsLayout->addLayout(generationActions);
     operationControlsLayout->addStretch(1);
@@ -288,25 +289,24 @@ CamWorkflowPanel::CamWorkflowPanel(QWidget* parent)
     m_verificationStatus = makeStatusLabel(verificationControls);
     verificationControlsLayout->addWidget(m_verificationStatus);
     auto* simulationActions = new QGridLayout;
-    m_simulateHole = makeAction(QStringLiteral("孔 IPW"), verificationControls);
-    m_simulatePocket = makeAction(QStringLiteral("槽腔 IPW"), verificationControls);
+    m_simulateHole = makeAction(QCoreApplication::translate("OpenAutoPath", "孔 IPW"), verificationControls);
+    m_simulatePocket = makeAction(QCoreApplication::translate("OpenAutoPath", "槽腔 IPW"), verificationControls);
     m_simulateProfile = makeAction(
-        QStringLiteral("外轮廓 IPW"), verificationControls);
+        QCoreApplication::translate("OpenAutoPath", "外轮廓 IPW"), verificationControls);
     simulationActions->addWidget(m_simulateHole, 0, 0);
     simulationActions->addWidget(m_simulatePocket, 0, 1);
     simulationActions->addWidget(m_simulateProfile, 1, 0);
-    m_simulateEngraving = makeAction(QStringLiteral("雕刻 IPW"), verificationControls);
+    m_simulateEngraving = makeAction(QCoreApplication::translate("OpenAutoPath", "雕刻 IPW"), verificationControls);
     m_simulateEngraving->setObjectName(QStringLiteral("simulateEngravingIpwAction"));
-    m_simulateEngraving->setToolTip(QStringLiteral("选择雕刻装夹方向，沿用前序工序剩余毛坯进行材料仿真和刀具动画"));
+    m_simulateEngraving->setToolTip(QCoreApplication::translate("OpenAutoPath", "选择雕刻装夹方向，沿用前序工序剩余毛坯进行材料仿真和刀具动画"));
     simulationActions->addWidget(m_simulateEngraving, 1, 1);
     verificationControlsLayout->addLayout(simulationActions);
-    m_simulateProject = makeAction(QStringLiteral("加工项目 IPW（按全局工序顺序）"), verificationControls);
-    m_simulateProject->setToolTip(QStringLiteral(
-        "从所选毛坯开始，按项目全局顺序连续模拟全部启用工序的材料去除。请先生成有效刀路。"));
+    m_simulateProject = makeAction(QCoreApplication::translate("OpenAutoPath", "加工项目 IPW（按全局工序顺序）"), verificationControls);
+    m_simulateProject->setToolTip(QCoreApplication::translate("OpenAutoPath", "从所选毛坯开始，按项目全局顺序连续模拟全部启用工序的材料去除。请先生成有效刀路。"));
     m_simulateProject->setObjectName(QStringLiteral("simulateProjectIpwAction"));
     verificationControlsLayout->addWidget(m_simulateProject);
     m_showAllowance = makeAction(
-        QStringLiteral("查看逐特征余量"), verificationControls);
+        QCoreApplication::translate("OpenAutoPath", "查看逐特征余量"), verificationControls);
     verificationControlsLayout->addWidget(m_showAllowance);
     verificationControlsLayout->addStretch(1);
     m_verificationSplitter->addWidget(verificationControls);
@@ -317,8 +317,8 @@ CamWorkflowPanel::CamWorkflowPanel(QWidget* parent)
         QSizePolicy::Preferred, QSizePolicy::Ignored);
     m_coverageAudit = new HoleCoverageAuditPanel(validationTabs);
     m_featureAllowance = new FeatureAllowancePanel(validationTabs);
-    validationTabs->addTab(m_coverageAudit, QStringLiteral("覆盖审计"));
-    validationTabs->addTab(m_featureAllowance, QStringLiteral("余量"));
+    validationTabs->addTab(m_coverageAudit, QCoreApplication::translate("OpenAutoPath", "覆盖审计"));
+    validationTabs->addTab(m_featureAllowance, QCoreApplication::translate("OpenAutoPath", "余量"));
     m_verificationSplitter->addWidget(validationTabs);
     m_verificationSplitter->setStretchFactor(0, 0);
     m_verificationSplitter->setStretchFactor(1, 1);
@@ -331,11 +331,11 @@ CamWorkflowPanel::CamWorkflowPanel(QWidget* parent)
     m_outputStatus->setObjectName(QStringLiteral("camWorkflowOutputStatus"));
     pageLayout->addWidget(m_outputStatus);
     m_exportProgram = makeAction(
-        QStringLiteral("审查并导出当前程序…"), outputPage, true);
+        QCoreApplication::translate("OpenAutoPath", "审查并导出当前程序…"), outputPage, true);
     m_exportProgram->setObjectName(QStringLiteral("exportCurrentProgramAction"));
     pageLayout->addWidget(m_exportProgram);
     auto* warning = makeHint(
-        QStringLiteral("当前后处理输出为 Reference NC。写盘前必须通过结构审计并由操作者逐行确认；它不是可直接上机的控制器程序。"),
+        QCoreApplication::translate("OpenAutoPath", "当前后处理输出为 Reference NC。写盘前必须通过结构审计并由操作者逐行确认；它不是可直接上机的控制器程序。"),
         outputPage);
     warning->setObjectName(QStringLiteral("camWorkflowWarning"));
     pageLayout->addWidget(warning);
@@ -455,61 +455,60 @@ QString CamWorkflowPanel::stageTitle(int number, const QString& title,
 void CamWorkflowPanel::setSummary(const CamWorkflowSummary& summary)
 {
     const QString model = summary.hasModel
-        ? (summary.modelName.isEmpty() ? QStringLiteral("已加载零件")
+        ? (summary.modelName.isEmpty() ? QCoreApplication::translate("OpenAutoPath", "已加载零件")
                                        : summary.modelName)
-        : QStringLiteral("尚未加载零件");
+        : QCoreApplication::translate("OpenAutoPath", "尚未加载零件");
     const QString project = summary.projectName.isEmpty()
-        ? QStringLiteral("内存 Job") : summary.projectName;
+        ? QCoreApplication::translate("OpenAutoPath", "内存 Job") : summary.projectName;
     m_jobLabel->setText(summary.hasModel
         ? QStringLiteral("%1  ·  %2").arg(project, model)
         : model);
 
     m_modelStatus->setText(summary.hasModel
-        ? QStringLiteral("模型已就绪｜加工特征 %1 个%2")
+        ? QCoreApplication::translate("OpenAutoPath", "模型已就绪｜加工特征 %1 个%2")
               .arg(summary.recognizedFeatureCount)
               .arg(summary.recognitionReady
-                       ? QStringLiteral("，识别完成")
-                       : QStringLiteral("，雕刻可直接生成，其他工序待识别"))
-        : QStringLiteral("先打开 STEP 零件；.oapjob 不嵌入模型，需在零件加载后恢复。"));
+                       ? QCoreApplication::translate("OpenAutoPath", "，识别完成")
+                       : QCoreApplication::translate("OpenAutoPath", "，雕刻可直接生成，其他工序待识别"))
+        : QCoreApplication::translate("OpenAutoPath", "先打开 STEP 零件；.oapjob 不嵌入模型，需在零件加载后恢复。"));
     m_setupStatus->setText(summary.setupFramesValid
-        ? QStringLiteral("六面工作坐标已建立｜人工确认 %1/%2")
+        ? QCoreApplication::translate("OpenAutoPath", "六面工作坐标已建立｜人工确认 %1/%2")
               .arg(summary.confirmedSetupCount)
               .arg(summary.availableSetupCount)
-        : QStringLiteral("六面工作坐标尚未建立；加载零件后检查 WCS 与装夹方向。"));
+        : QCoreApplication::translate("OpenAutoPath", "六面工作坐标尚未建立；加载零件后检查 WCS 与装夹方向。"));
     m_toolStatus->setText(summary.activeToolLibraryName.isEmpty()
-        ? QStringLiteral("未启用刀库｜自动选刀不可用")
-        : QStringLiteral("活动刀库：%1｜已分配 T 刀具 %2 把")
+        ? QCoreApplication::translate("OpenAutoPath", "未启用刀库｜自动选刀不可用")
+        : QCoreApplication::translate("OpenAutoPath", "活动刀库：%1｜已分配 T 刀具 %2 把")
               .arg(summary.activeToolLibraryName)
               .arg(summary.assignedToolCount));
     if (!summary.engravingToolSummary.isEmpty())
         m_toolStatus->setText(m_toolStatus->text() + QStringLiteral("\n") + summary.engravingToolSummary);
     if (!summary.directToolSummary.isEmpty())
         m_toolStatus->setText(m_toolStatus->text() + QStringLiteral("\n") + summary.directToolSummary);
-    m_operationStatus->setText(QStringLiteral(
-        "已生成程序｜孔 %1 道 · 槽腔 %2 道 · 外轮廓 %3 道 · 雕刻 %4 道")
+    m_operationStatus->setText(QCoreApplication::translate("OpenAutoPath", "已生成程序｜孔 %1 道 · 槽腔 %2 道 · 外轮廓 %3 道 · 雕刻 %4 道")
         .arg(summary.holeOperationCount)
         .arg(summary.pocketOperationCount)
         .arg(summary.profileOperationCount).arg(summary.finishingOperationCount));
 
     if (summary.pendingRegeneration) {
-        m_operationStatus->setText(m_operationStatus->text() + QStringLiteral("\n有工序待重新生成"));
-        m_verificationStatus->setText(QStringLiteral("项目含待重新生成工序｜重新生成后再运行项目 IPW"));
+        m_operationStatus->setText(m_operationStatus->text() + QCoreApplication::translate("OpenAutoPath", "\n有工序待重新生成"));
+        m_verificationStatus->setText(QCoreApplication::translate("OpenAutoPath", "项目含待重新生成工序｜重新生成后再运行项目 IPW"));
     } else if (!summary.coverageAudited) {
         m_verificationStatus->setText(
             summary.allowanceAvailable
-                ? QStringLiteral("覆盖审计未运行｜已有 IPW 余量结果")
-                : QStringLiteral("等待验证｜生成工序后执行覆盖审计与 IPW"));
+                ? QCoreApplication::translate("OpenAutoPath", "覆盖审计未运行｜已有 IPW 余量结果")
+                : QCoreApplication::translate("OpenAutoPath", "等待验证｜生成工序后执行覆盖审计与 IPW"));
     } else if (!summary.coveragePassed) {
         m_verificationStatus->setText(
-            QStringLiteral("覆盖审计未通过｜请处理阻断项后再导出"));
+            QCoreApplication::translate("OpenAutoPath", "覆盖审计未通过｜请处理阻断项后再导出"));
     } else if (summary.coverageHasWarnings) {
         m_verificationStatus->setText(
-            QStringLiteral("覆盖审计通过（有警告）｜导出前必须复核"));
+            QCoreApplication::translate("OpenAutoPath", "覆盖审计通过（有警告）｜导出前必须复核"));
     } else {
         m_verificationStatus->setText(
-            QStringLiteral("覆盖审计通过%1")
+            QCoreApplication::translate("OpenAutoPath", "覆盖审计通过%1")
                 .arg(summary.allowanceAvailable
-                    ? QStringLiteral("｜IPW 余量结果可用") : QString()));
+                    ? QCoreApplication::translate("OpenAutoPath", "｜IPW 余量结果可用") : QString()));
     }
 
     const bool hasProgram = summary.holeOperationCount > 0 ||
@@ -519,37 +518,37 @@ void CamWorkflowPanel::setSummary(const CamWorkflowSummary& summary)
     const bool hasPocketProgram = summary.pocketOperationCount > 0;
     const bool hasProfileProgram = summary.profileOperationCount > 0;
     m_generateHole->setText(
-        hasHoleProgram ? QStringLiteral("重新生成孔刀路")
-                       : QStringLiteral("生成孔刀路"));
+        hasHoleProgram ? QCoreApplication::translate("OpenAutoPath", "重新生成孔刀路")
+                       : QCoreApplication::translate("OpenAutoPath", "生成孔刀路"));
     m_generateHole->setToolTip(
         hasHoleProgram
-            ? QStringLiteral("按孔参数页配置的刀具来源重新生成并替换孔程序")
-            : QStringLiteral("从当前识别结果按配置的刀具来源生成孔程序"));
+            ? QCoreApplication::translate("OpenAutoPath", "按孔参数页配置的刀具来源重新生成并替换孔程序")
+            : QCoreApplication::translate("OpenAutoPath", "从当前识别结果按配置的刀具来源生成孔程序"));
     m_generatePocket->setText(
-        hasPocketProgram ? QStringLiteral("重新生成槽腔刀路")
-                         : QStringLiteral("生成槽腔刀路"));
+        hasPocketProgram ? QCoreApplication::translate("OpenAutoPath", "重新生成槽腔刀路")
+                         : QCoreApplication::translate("OpenAutoPath", "生成槽腔刀路"));
     m_generatePocket->setToolTip(
         hasPocketProgram
-            ? QStringLiteral("按当前参数重新生成并替换槽腔程序")
-            : QStringLiteral("从已识别的主外表面内环生成槽腔清腔工序"));
+            ? QCoreApplication::translate("OpenAutoPath", "按当前参数重新生成并替换槽腔程序")
+            : QCoreApplication::translate("OpenAutoPath", "从已识别的主外表面内环生成槽腔清腔工序"));
     m_generateProfile->setText(
-        hasProfileProgram ? QStringLiteral("重新生成外轮廓刀路")
-                          : QStringLiteral("生成外轮廓刀路"));
+        hasProfileProgram ? QCoreApplication::translate("OpenAutoPath", "重新生成外轮廓刀路")
+                          : QCoreApplication::translate("OpenAutoPath", "生成外轮廓刀路"));
     m_generateProfile->setToolTip(
         hasProfileProgram
-            ? QStringLiteral("按当前参数重新生成并替换外轮廓程序")
-            : QStringLiteral("从已识别的主外表面外环生成分层外轮廓工序"));
+            ? QCoreApplication::translate("OpenAutoPath", "按当前参数重新生成并替换外轮廓程序")
+            : QCoreApplication::translate("OpenAutoPath", "从已识别的主外表面外环生成分层外轮廓工序"));
     m_generateFinishing->setText(summary.finishingOperationCount > 0
-        ? QStringLiteral("重新生成雕刻刀路") : QStringLiteral("生成雕刻刀路"));
+        ? QCoreApplication::translate("OpenAutoPath", "重新生成雕刻刀路") : QCoreApplication::translate("OpenAutoPath", "生成雕刻刀路"));
     const QString activeProgramName = summary.activeProgramName.isEmpty()
-        ? QStringLiteral("未选择") : summary.activeProgramName;
+        ? QCoreApplication::translate("OpenAutoPath", "未选择") : summary.activeProgramName;
     QString outputState = summary.activeProgramAvailable
-        ? QStringLiteral("可进入该程序的导出审查")
-        : summary.pendingRegeneration ? QStringLiteral("当前程序不可导出，请重新生成受影响工序")
-                                      : QStringLiteral("尚无可导出的活动刀路");
+        ? QCoreApplication::translate("OpenAutoPath", "可进入该程序的导出审查")
+        : summary.pendingRegeneration ? QCoreApplication::translate("OpenAutoPath", "当前程序不可导出，请重新生成受影响工序")
+                                      : QCoreApplication::translate("OpenAutoPath", "尚无可导出的活动刀路");
     if (summary.pendingRegeneration && summary.activeProgramAvailable)
-        outputState += QStringLiteral("；项目中其他待重新生成工序须先更新，才能保存或运行项目 IPW");
-    m_outputStatus->setText(QStringLiteral("当前预览：%1｜%2").arg(activeProgramName, outputState));
+        outputState += QCoreApplication::translate("OpenAutoPath", "；项目中其他待重新生成工序须先更新，才能保存或运行项目 IPW");
+    m_outputStatus->setText(QCoreApplication::translate("OpenAutoPath", "当前预览：%1｜%2").arg(activeProgramName, outputState));
 
     m_openPart->setEnabled(!summary.busy);
     m_openProject->setEnabled(summary.hasModel && !summary.busy);
@@ -604,21 +603,21 @@ void CamWorkflowPanel::updateStageTitles(
             : QStringLiteral("×");
     }
     m_stageList->item(0)->setText(stageTitle(
-        1, QStringLiteral("项目与特征"),
+        1, QCoreApplication::translate("OpenAutoPath", "项目与特征"),
         completionMark(summary.hasModel && (summary.recognitionReady || summary.finishingGenerationReady))));
     m_stageList->item(1)->setText(stageTitle(
-        2, QStringLiteral("装夹与参数"),
+        2, QCoreApplication::translate("OpenAutoPath", "装夹与参数"),
         completionMark(summary.setupFramesValid)));
     m_stageList->item(2)->setText(stageTitle(
-        3, QStringLiteral("刀具"),
+        3, QCoreApplication::translate("OpenAutoPath", "刀具"),
         completionMark(summary.assignedToolCount > 0 || summary.engravingToolReady || summary.directToolReady)));
     m_stageList->item(3)->setText(stageTitle(
-        4, QStringLiteral("加工工序"), summary.pendingRegeneration ? QStringLiteral("!")
+        4, QCoreApplication::translate("OpenAutoPath", "加工工序"), summary.pendingRegeneration ? QStringLiteral("!")
             : completionMark(summary.hasProjectContent)));
     m_stageList->item(4)->setText(stageTitle(
-        5, QStringLiteral("验证与仿真"), verificationMark));
+        5, QCoreApplication::translate("OpenAutoPath", "验证与仿真"), verificationMark));
     m_stageList->item(5)->setText(stageTitle(
-        6, QStringLiteral("输出"), completionMark(summary.activeProgramAvailable)));
+        6, QCoreApplication::translate("OpenAutoPath", "输出"), completionMark(summary.activeProgramAvailable)));
 }
 
 } // namespace oap::app

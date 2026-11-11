@@ -51,22 +51,22 @@ QString clearingPatternText(oap::toolpath::ClearingPattern pattern)
 {
     switch (pattern) {
         case oap::toolpath::ClearingPattern::Offset:
-            return QStringLiteral("回字形");
+            return QCoreApplication::translate("OpenAutoPath", "回字形");
         case oap::toolpath::ClearingPattern::ZigZag:
-            return QStringLiteral("Z字形");
+            return QCoreApplication::translate("OpenAutoPath", "Z字形");
         case oap::toolpath::ClearingPattern::Spiral:
-            return QStringLiteral("螺旋形");
+            return QCoreApplication::translate("OpenAutoPath", "螺旋形");
         case oap::toolpath::ClearingPattern::FreePath:
-            return QStringLiteral("自适应清腔（FreePath）");
+            return QCoreApplication::translate("OpenAutoPath", "自适应清腔（FreePath）");
     }
-    return QStringLiteral("回字形");
+    return QCoreApplication::translate("OpenAutoPath", "回字形");
 }
 
 QString validationMessage(
     const oap::toolpath::ToolpathValidationReport& report,
     int maxIssues = 5)
 {
-    QString message = QString::fromStdString(report.summary());
+    QString message = QCoreApplication::translate("OpenAutoPathDiagnostic", QString::fromStdString(report.summary()).toUtf8().constData());
     const int issueCount = static_cast<int>(report.issues.size());
     const int visibleCount = std::min(maxIssues, issueCount);
     int appended = 0;
@@ -91,14 +91,14 @@ QString validationMessage(
                     .arg(issue.moveIndex);
             }
             message += QStringLiteral(": ") +
-                QString::fromStdString(issue.message);
+                QCoreApplication::translate("OpenAutoPathDiagnostic", QString::fromStdString(issue.message).toUtf8().constData());
             ++appended;
         }
     };
     appendSeverity(oap::toolpath::ToolpathIssueSeverity::Error);
     appendSeverity(oap::toolpath::ToolpathIssueSeverity::Warning);
     if (issueCount > appended) {
-        message += QStringLiteral("\n... %1 more issue(s)")
+        message += QCoreApplication::translate("OpenAutoPath", "\n……另有 %1 个问题")
             .arg(issueCount - appended);
     }
     return message;
@@ -155,15 +155,15 @@ void MainWindow::showHolePaths()
             m_actHolePaths->setChecked(false);
         }
         QMessageBox::information(
-            this, QStringLiteral("显示孔刀路"),
-            QStringLiteral("请先打开并分析一个 STEP 文件。"));
+            this, QCoreApplication::translate("OpenAutoPath", "显示孔刀路"),
+            QCoreApplication::translate("OpenAutoPath", "请先打开并分析一个 STEP 文件。"));
         return;
     }
     if (m_actHolePaths && !m_actHolePaths->isChecked()) {
         clearOverlay();
         if (!m_view->view().IsNull())
             m_view->view()->Redraw();
-        statusBar()->showMessage(QStringLiteral("孔刀路已隐藏"));
+        statusBar()->showMessage(QCoreApplication::translate("OpenAutoPath", "孔刀路已隐藏"));
         return;
     }
     if (m_machiningWorkspace->hasHoleProgram() &&
@@ -176,7 +176,7 @@ void MainWindow::showHolePaths()
         if (!m_view->view().IsNull())
             m_view->view()->Redraw();
         statusBar()->showMessage(
-            QStringLiteral("已恢复当前活动孔程序显示。"));
+            QCoreApplication::translate("OpenAutoPath", "已恢复当前活动孔程序显示。"));
         return;
     }
 
@@ -192,7 +192,7 @@ void MainWindow::showHolePaths()
     if (m_recognitionWorkspace->hasResult()) {
         recognizedPaths =
             &m_recognitionWorkspace->holeToolpathInputs();
-        recognitionSource = QStringLiteral("完整特征识别缓存");
+        recognitionSource = QCoreApplication::translate("OpenAutoPath", "完整特征识别缓存");
     } else {
         if (!m_recognitionWorkspace->hasHoleToolpathInputs()) {
             std::string recognitionError;
@@ -206,16 +206,16 @@ void MainWindow::showHolePaths()
                     m_actHolePaths->setChecked(false);
                 }
                 statusBar()->showMessage(
-                    recognitionError.empty() ? QStringLiteral("孔识别已取消。")
-                                             : QString::fromStdString(recognitionError));
+                    recognitionError.empty() ? QCoreApplication::translate("OpenAutoPath", "孔识别已取消。")
+                                             : QCoreApplication::translate("OpenAutoPathDiagnostic", QString::fromStdString(recognitionError).toUtf8().constData()));
                 return;
             }
             recognizedPaths =
                 &m_recognitionWorkspace->installHoleGeometryRecognition(
                     std::move(*recognition), model(), moldFrame());
-            recognitionSource = QStringLiteral("孔专用识别");
+            recognitionSource = QCoreApplication::translate("OpenAutoPath", "孔专用识别");
         } else {
-            recognitionSource = QStringLiteral("孔专用缓存");
+            recognitionSource = QCoreApplication::translate("OpenAutoPath", "孔专用缓存");
         }
         if (!recognizedPaths) {
             recognizedPaths =
@@ -231,8 +231,8 @@ void MainWindow::showHolePaths()
         }
         m_view->view()->Redraw();
         QMessageBox::information(
-            this, QStringLiteral("显示孔刀路"),
-            QStringLiteral("此模型中未识别到孔。"));
+            this, QCoreApplication::translate("OpenAutoPath", "显示孔刀路"),
+            QCoreApplication::translate("OpenAutoPath", "此模型中未识别到孔。"));
         return;
     }
 
@@ -244,9 +244,8 @@ void MainWindow::showHolePaths()
             m_actHolePaths->setChecked(false);
         }
         QMessageBox::information(
-            this, QStringLiteral("显示孔刀路"),
-            QStringLiteral(
-                "孔刀路当前使用活动刀库自动选刀。请先选择刀库并分配至少一把适用刀具。"));
+            this, QCoreApplication::translate("OpenAutoPath", "显示孔刀路"),
+            QCoreApplication::translate("OpenAutoPath", "孔刀路当前使用活动刀库自动选刀。请先选择刀库并分配至少一把适用刀具。"));
         return;
     }
 
@@ -269,7 +268,7 @@ void MainWindow::showHolePaths()
 
     const QString rapidLogPath =
         QDir(projectRootPath()).filePath(
-            QStringLiteral("孔刀路避障日志.txt"));
+            QCoreApplication::translate("OpenAutoPath", "孔刀路避障日志.txt"));
     oap::app::HoleToolpathGenerationReportContext reportContext;
     reportContext.logPath = rapidLogPath;
     reportContext.recognitionSource = recognitionSource;
@@ -283,7 +282,7 @@ void MainWindow::showHolePaths()
     reportContext.geometryBuildMilliseconds =
         m_recognitionWorkspace->holeGeometryProfile().geometryBuildMs;
     if (!writeProjectLog(
-            QStringLiteral("孔刀路避障日志.txt"),
+            QCoreApplication::translate("OpenAutoPath", "孔刀路避障日志.txt"),
             oap::app::HoleToolpathGenerationUseCase::buildReport(
                 generated, reportContext))) {
         qWarning().noquote()
@@ -295,7 +294,7 @@ void MainWindow::showHolePaths()
          generated.batch.machining.warnings) {
         qDebug().noquote()
             << "[OpenAutoPath] hole machining:"
-            << QString::fromStdString(warning);
+            << QCoreApplication::translate("OpenAutoPathDiagnostic", QString::fromStdString(warning).toUtf8().constData());
     }
     using Failure = oap::app::HoleToolpathGenerationFailure;
     if (generated.failure == Failure::Cancelled) {
@@ -305,8 +304,8 @@ void MainWindow::showHolePaths()
         }
         statusBar()->showMessage(
             hadInstalledHoleProgram
-                ? QStringLiteral("孔刀路生成已取消，保留原孔程序。")
-                : QStringLiteral("孔刀路生成已取消。"));
+                ? QCoreApplication::translate("OpenAutoPath", "孔刀路生成已取消，保留原孔程序。")
+                : QCoreApplication::translate("OpenAutoPath", "孔刀路生成已取消。"));
         return;
     }
     if (!generated.ok()) {
@@ -323,12 +322,12 @@ void MainWindow::showHolePaths()
             generated.failure == Failure::CommitFailed ||
             generated.failure == Failure::InvalidRequest) {
             QMessageBox::warning(
-                this, QStringLiteral("显示孔刀路"),
+                this, QCoreApplication::translate("OpenAutoPath", "显示孔刀路"),
                 generated.error);
         } else {
             statusBar()->showMessage(generated.error);
             QMessageBox::information(
-                this, QStringLiteral("显示孔刀路"),
+                this, QCoreApplication::translate("OpenAutoPath", "显示孔刀路"),
                 generated.error);
         }
         return;
@@ -348,8 +347,7 @@ void MainWindow::showHolePaths()
             QIODevice::WriteOnly | QIODevice::Append |
                 QIODevice::Text)) {
         previewLog.write(
-            QStringLiteral(
-                "孔预览批量构建与显示耗时: %1 ms\n")
+            QCoreApplication::translate("OpenAutoPath", "孔预览批量构建与显示耗时: %1 ms\n")
                 .arg(m_lastHolePreviewBuildMs).toUtf8());
     }
 
@@ -360,10 +358,10 @@ void MainWindow::showHolePaths()
         qDebug().noquote()
             << "[OpenAutoPath] hole toolpath validation:"
             << validationMessage(validation);
-        status += QStringLiteral(" 验证警告 %1。")
+        status += QCoreApplication::translate("OpenAutoPath", " 验证警告 %1。")
                       .arg(validation.warningCount);
     } else if (!machining.warnings.empty()) {
-        status += QStringLiteral(" 生成警告 %1。")
+        status += QCoreApplication::translate("OpenAutoPath", " 生成警告 %1。")
                       .arg(machining.warnings.size());
     }
     statusBar()->showMessage(status);
@@ -371,7 +369,7 @@ void MainWindow::showHolePaths()
          m_machiningWorkspace->validationErrors()) {
         qWarning().noquote()
             << "[OpenAutoPath] machining job:"
-            << QString::fromStdString(error);
+            << QCoreApplication::translate("OpenAutoPathDiagnostic", QString::fromStdString(error).toUtf8().constData());
     }
     rebuildHolePlaybackMoves();
 }
@@ -408,13 +406,13 @@ void MainWindow::openToolLibrary()
         m_machiningWorkspace->applyToolLibraries(
             dialog.catalog(), activeId);
     if (!applied.ok) {
-        QMessageBox::warning(this, QStringLiteral("刀库"),
+        QMessageBox::warning(this, QCoreApplication::translate("OpenAutoPath", "刀库"),
                              applied.error);
         return;
     }
     if (!applied.warning.isEmpty()) {
-        QMessageBox::warning(this, QStringLiteral("保存刀库"),
-                             QStringLiteral("刀库目录保存失败：\n%1")
+        QMessageBox::warning(this, QCoreApplication::translate("OpenAutoPath", "保存刀库"),
+                             QCoreApplication::translate("OpenAutoPath", "刀库目录保存失败：\n%1")
                                  .arg(applied.warning));
     }
 
@@ -423,12 +421,11 @@ void MainWindow::openToolLibrary()
     if (!selectedLibrary)
         return;
     statusBar()->showMessage(
-        QStringLiteral("刀库目录已保存；活动刀库保持为“%1”（%2 把已分配 T 刀具）。%3")
+        QCoreApplication::translate("OpenAutoPath", "刀库目录已保存；活动刀库保持为“%1”（%2 把已分配 T 刀具）。%3")
             .arg(selectedLibrary->name())
             .arg(selectedLibrary->assignedTools().size())
             .arg(m_machiningWorkspace->hasPendingRegeneration()
-                ? QStringLiteral(
-                      "依赖变更刀库的工序已标记为待重新生成。")
+                ? QCoreApplication::translate("OpenAutoPath", "依赖变更刀库的工序已标记为待重新生成。")
                 : QString()));
     refreshCamWorkflowPanel();
 }
@@ -449,24 +446,24 @@ void MainWindow::selectToolLibrary()
             dialog.selectedLibraryId());
     if (!applied.ok) {
         QMessageBox::warning(
-            this, QStringLiteral("选择活动刀库"), applied.error);
+            this, QCoreApplication::translate("OpenAutoPath", "选择活动刀库"), applied.error);
         return;
     }
     if (!applied.warning.isEmpty()) {
         QMessageBox::warning(
-            this, QStringLiteral("保存活动刀库"), applied.warning);
+            this, QCoreApplication::translate("OpenAutoPath", "保存活动刀库"), applied.warning);
     }
     synchronizeInvalidatedToolpathPreview();
     const oap::tooling::ToolLibrary* selectedLibrary = activeToolLibrary();
     if (!selectedLibrary)
         return;
     statusBar()->showMessage(
-        QStringLiteral("已选择 CAM 活动刀库“%1”：%2 把已分配 T 刀具。%3")
+        QCoreApplication::translate("OpenAutoPath", "已选择 CAM 活动刀库“%1”：%2 把已分配 T 刀具。%3")
             .arg(selectedLibrary->name())
             .arg(selectedLibrary->assignedTools().size())
             .arg(m_machiningWorkspace->hasPendingRegeneration()
-                ? QStringLiteral("依赖变更刀库的工序已标记为待重新生成。")
-                : QStringLiteral("后续自动选刀将使用该刀库。")));
+                ? QCoreApplication::translate("OpenAutoPath", "依赖变更刀库的工序已标记为待重新生成。")
+                : QCoreApplication::translate("OpenAutoPath", "后续自动选刀将使用该刀库。")));
     refreshCamWorkflowPanel();
 }
 
@@ -528,14 +525,13 @@ void MainWindow::configureToolpathParamsForPage(oap::app::ToolpathParameterEdito
         synchronizeInvalidatedToolpathPreview();
     if (!applied.persistenceError.isEmpty()) {
         QMessageBox::warning(
-            this, QStringLiteral("保存刀路参数"),
-            QStringLiteral("当前参数已应用，但无法保存到本地：\n%1")
+            this, QCoreApplication::translate("OpenAutoPath", "保存刀路参数"),
+            QCoreApplication::translate("OpenAutoPath", "当前参数已应用，但无法保存到本地：\n%1")
                 .arg(applied.persistenceError));
     }
 
     refreshCamWorkflowPanel();
-    statusBar()->showMessage(QStringLiteral(
-        "刀路参数已更新，请重新生成受影响的加工工序。"));
+    statusBar()->showMessage(QCoreApplication::translate("OpenAutoPath", "刀路参数已更新，请重新生成受影响的加工工序。"));
 }
 
 oap::app::MachiningProjectLoadRequest
@@ -584,8 +580,8 @@ void MainWindow::showPocketClearing()
         return;
     if (model().faces.empty()) {
         QMessageBox::information(
-            this, QStringLiteral("显示腔清腔"),
-            QStringLiteral("请先打开并分析一个 STEP 文件。"));
+            this, QCoreApplication::translate("OpenAutoPath", "显示腔清腔"),
+            QCoreApplication::translate("OpenAutoPath", "请先打开并分析一个 STEP 文件。"));
         return;
     }
     if (m_view->context().IsNull())
@@ -593,8 +589,8 @@ void MainWindow::showPocketClearing()
 
     if (!m_recognitionWorkspace->hasResult()) {
         QMessageBox::information(
-            this, QStringLiteral("显示腔清腔"),
-            QStringLiteral("请先执行内外环结构识别。"));
+            this, QCoreApplication::translate("OpenAutoPath", "显示腔清腔"),
+            QCoreApplication::translate("OpenAutoPath", "请先执行内外环结构识别。"));
         return;
     }
 
@@ -685,7 +681,7 @@ void MainWindow::showPocketClearing()
 
     QString logPath;
     if (!writeProjectLog(
-            QStringLiteral("腔清腔日志.txt"),
+            QCoreApplication::translate("OpenAutoPath", "腔清腔日志.txt"),
             generated.reportLines, &logPath)) {
         qWarning().noquote()
             << "[OpenAutoPath] cannot write pocket clearing log:"
@@ -704,10 +700,10 @@ void MainWindow::showPocketClearing()
         if (generated.failure == Failure::ValidationFailed ||
             generated.failure == Failure::CommitFailed) {
             QMessageBox::warning(
-                this, QStringLiteral("显示腔清腔"), generated.error);
+                this, QCoreApplication::translate("OpenAutoPath", "显示腔清腔"), generated.error);
         } else {
             QMessageBox::information(
-                this, QStringLiteral("显示腔清腔"), generated.error);
+                this, QCoreApplication::translate("OpenAutoPath", "显示腔清腔"), generated.error);
         }
         return;
     }
@@ -748,25 +744,24 @@ void MainWindow::showPocketClearing()
 
 void MainWindow::showProfileContour()
 {
-    const QString title = QStringLiteral("外轮廓刀路");
+    const QString title = QCoreApplication::translate("OpenAutoPath", "外轮廓刀路");
     if (m_uiBusy)
         return;
     if (model().faces.empty()) {
         QMessageBox::information(
-            this, title, QStringLiteral("请先打开并分析一个 STEP 文件。"));
+            this, title, QCoreApplication::translate("OpenAutoPath", "请先打开并分析一个 STEP 文件。"));
         return;
     }
     if (!m_recognitionWorkspace->hasResult()) {
         QMessageBox::information(
             this, title,
-            QStringLiteral("请先执行“识别 CAM 特征”。"));
+            QCoreApplication::translate("OpenAutoPath", "请先执行“识别 CAM 特征”。"));
         return;
     }
     if (m_recognitionWorkspace->profileSources().empty()) {
         QMessageBox::information(
             this, title,
-            QStringLiteral(
-                "未识别到可加工的闭合外轮廓。当前版本仅接受主外平面的真实 outer wire。"));
+            QCoreApplication::translate("OpenAutoPath", "未识别到可加工的闭合外轮廓。当前版本仅接受主外平面的真实 outer wire。"));
         return;
     }
 
@@ -775,8 +770,7 @@ void MainWindow::showProfileContour()
     if (recognizedRegions.empty()) {
         QMessageBox::information(
             this, title,
-            QStringLiteral(
-                "外轮廓来源未能构建为可加工区域；请检查侧壁是否为直壁，且不存在锥面、自由曲面或倒扣。"));
+            QCoreApplication::translate("OpenAutoPath", "外轮廓来源未能构建为可加工区域；请检查侧壁是否为直壁，且不存在锥面、自由曲面或倒扣。"));
         return;
     }
 
@@ -786,8 +780,8 @@ void MainWindow::showProfileContour()
         const auto face = oap::classifyMoldSetupFace(moldFrame(), gp_Vec(region.openDir));
         if (face != oap::MoldSetupFace::Unresolved) profileFaces.insert(face);
     }
-    QStringList scopeLabels{QStringLiteral("自动规划方向（仅合并已证明覆盖的重复方向）"),
-                            QStringLiteral("全部方向（所选范围须全部生成成功）")};
+    QStringList scopeLabels{QCoreApplication::translate("OpenAutoPath", "自动规划方向（仅合并已证明覆盖的重复方向）"),
+                            QCoreApplication::translate("OpenAutoPath", "全部方向（所选范围须全部生成成功）")};
     std::vector<oap::MoldSetupFace> scopeFaces(profileFaces.begin(), profileFaces.end());
     for (const auto face : scopeFaces) {
         int count = 0;
@@ -797,12 +791,12 @@ void MainWindow::showProfileContour()
             ++count;
             maximumDepth = std::max(maximumDepth, region.depth);
         }
-        scopeLabels.push_back(QStringLiteral("%1 · %2 个区域 · 最大深度 %3 mm")
+        scopeLabels.push_back(QCoreApplication::translate("OpenAutoPath", "%1 · %2 个区域 · 最大深度 %3 mm")
             .arg(QString::fromLatin1(oap::moldSetupFaceName(face))).arg(count).arg(maximumDepth, 0, 'f', 2));
     }
     bool scopeAccepted = false;
-    const QString scope = QInputDialog::getItem(this, QStringLiteral("外轮廓加工方向"),
-        QStringLiteral("选择本次生成方向（按装夹坐标系）。\n成功后替换现有外轮廓工序；其他类型工序保留。"),
+    const QString scope = QInputDialog::getItem(this, QCoreApplication::translate("OpenAutoPath", "外轮廓加工方向"),
+        QCoreApplication::translate("OpenAutoPath", "选择本次生成方向（按装夹坐标系）。\n成功后替换现有外轮廓工序；其他类型工序保留。"),
         scopeLabels, 0, false, &scopeAccepted);
     if (!scopeAccepted) return;
     const int selectedScope = scopeLabels.indexOf(scope);
@@ -811,8 +805,7 @@ void MainWindow::showProfileContour()
         if (!singleTool && (!library || library->assignedTools().empty())) {
             QMessageBox::information(
                 this, title,
-                QStringLiteral(
-                    "外轮廓当前使用活动刀库自动选刀。请先选择刀库并分配至少一把平底铣刀、球刀或圆鼻刀。"));
+                QCoreApplication::translate("OpenAutoPath", "外轮廓当前使用活动刀库自动选刀。请先选择刀库并分配至少一把平底铣刀、球刀或圆鼻刀。"));
             return;
         }
     }
@@ -882,7 +875,7 @@ void MainWindow::showProfileContour()
 
     QString logPath;
     if (!writeProjectLog(
-            QStringLiteral("外轮廓刀路日志.txt"),
+            QCoreApplication::translate("OpenAutoPath", "外轮廓刀路日志.txt"),
             oap::app::ProfileToolpathGenerationUseCase::buildReport(
                 generated),
             &logPath)) {
@@ -927,12 +920,12 @@ void MainWindow::showProfileContour()
 
 void MainWindow::saveMachiningJob()
 {
-    const QString title = QStringLiteral("保存加工项目");
+    const QString title = QCoreApplication::translate("OpenAutoPath", "保存加工项目");
     if (m_uiBusy)
         return;
     if (m_machiningWorkspace->hasPendingRegeneration()) {
         QMessageBox::information(this, title,
-            QStringLiteral("参数或刀具来源已变化，请先成功重新生成受影响工序，再保存加工项目。"));
+            QCoreApplication::translate("OpenAutoPath", "参数或刀具来源已变化，请先成功重新生成受影响工序，再保存加工项目。"));
         return;
     }
     QString initializationError;
@@ -942,7 +935,7 @@ void MainWindow::saveMachiningJob()
             initializationError)) {
         QMessageBox::warning(
             this, title,
-            QStringLiteral("槽腔 Job 捕获失败：\n%1")
+            QCoreApplication::translate("OpenAutoPath", "槽腔 Job 捕获失败：\n%1")
                 .arg(initializationError));
         return;
     }
@@ -957,14 +950,14 @@ void MainWindow::saveMachiningJob()
                 request, &initializationError)) {
             QMessageBox::warning(
                 this, title,
-                QStringLiteral("外轮廓 Job 捕获失败：\n%1")
+                QCoreApplication::translate("OpenAutoPath", "外轮廓 Job 捕获失败：\n%1")
                     .arg(initializationError));
             return;
         }
     }
     if (!m_machiningWorkspace->hasProjectContent()) {
         QMessageBox::information(this, title,
-            QStringLiteral("当前没有可保存的加工工序，请先生成所需工序。"));
+            QCoreApplication::translate("OpenAutoPath", "当前没有可保存的加工工序，请先生成所需工序。"));
         return;
     }
     oap::app::MachiningProjectSaveRequest synchronization;
@@ -975,7 +968,7 @@ void MainWindow::saveMachiningJob()
             synchronization, &synchronizationError)) {
         QMessageBox::warning(
             this, title,
-            QStringLiteral("加工项目结构无效：\n%1")
+            QCoreApplication::translate("OpenAutoPath", "加工项目结构无效：\n%1")
                 .arg(synchronizationError));
         return;
     }
@@ -987,7 +980,7 @@ void MainWindow::saveMachiningJob()
     }
     QString path = QFileDialog::getSaveFileName(
         this, title, suggested,
-        QStringLiteral("OpenAutoPath 加工项目 (*.oapjob);;JSON 文件 (*.json);;所有文件 (*.*)"));
+        QCoreApplication::translate("OpenAutoPath", "OpenAutoPath 加工项目 (*.oapjob);;JSON 文件 (*.json);;所有文件 (*.*)"));
     if (path.isEmpty())
         return;
     if (QFileInfo(path).suffix().isEmpty())
@@ -995,18 +988,18 @@ void MainWindow::saveMachiningJob()
     QString error;
     if (!m_machiningWorkspace->saveProject(path, &error)) {
         QMessageBox::warning(
-            this, title, QStringLiteral("保存失败：\n%1").arg(error));
+            this, title, QCoreApplication::translate("OpenAutoPath", "保存失败：\n%1").arg(error));
         return;
     }
     statusBar()->showMessage(
-        QStringLiteral("加工项目已保存：%1").arg(path));
+        QCoreApplication::translate("OpenAutoPath", "加工项目已保存：%1").arg(path));
     m_currentMachiningJobPath = path;
     refreshCamWorkflowPanel();
 }
 
 void MainWindow::openMachiningJob()
 {
-    const QString title = QStringLiteral("打开加工项目");
+    const QString title = QCoreApplication::translate("OpenAutoPath", "打开加工项目");
     if (m_uiBusy)
         return;
     const QString path = QFileDialog::getOpenFileName(
@@ -1014,7 +1007,7 @@ void MainWindow::openMachiningJob()
         currentPath().isEmpty()
             ? QString()
             : QFileInfo(currentPath()).absolutePath(),
-        QStringLiteral("OpenAutoPath 加工项目 (*.oapjob *.ffjob *.json);;所有文件 (*.*)"));
+        QCoreApplication::translate("OpenAutoPath", "OpenAutoPath 加工项目 (*.oapjob *.ffjob *.json);;所有文件 (*.*)"));
     if (path.isEmpty())
         return;
 
@@ -1036,7 +1029,7 @@ void MainWindow::openMachiningJob()
                 this, title,
                 loaded.failure ==
                         oap::app::MachiningProjectLoadFailure::File
-                    ? QStringLiteral("加载失败：\n%1").arg(loaded.error)
+                    ? QCoreApplication::translate("OpenAutoPath", "加载失败：\n%1").arg(loaded.error)
                     : loaded.error);
         }
         return;
@@ -1047,7 +1040,7 @@ void MainWindow::openMachiningJob()
     for (const std::string& warning : installed.warnings) {
         qWarning().noquote()
             << "[OpenAutoPath] project restore:"
-            << QString::fromStdString(warning);
+            << QCoreApplication::translate("OpenAutoPathDiagnostic", QString::fromStdString(warning).toUtf8().constData());
     }
     const auto activePreview = m_machiningWorkspace->activePreview();
     if (activePreview == ActiveToolpathPreview::SurfaceFinishing) {
@@ -1067,7 +1060,7 @@ void MainWindow::openMachiningJob()
         if (preview.objectCount <= 0) {
             QMessageBox::warning(
                 this, title,
-                QStringLiteral("外轮廓刀路已重建，但无法创建显示对象。"));
+                QCoreApplication::translate("OpenAutoPath", "外轮廓刀路已重建，但无法创建显示对象。"));
             return;
         }
         if (m_actHolePaths) {
@@ -1084,8 +1077,7 @@ void MainWindow::openMachiningJob()
         if (displayedEntryCount == 0) {
             QMessageBox::warning(
                 this, title,
-                QStringLiteral(
-                    "槽腔刀路已重建，但无法创建显示对象。"));
+                QCoreApplication::translate("OpenAutoPath", "槽腔刀路已重建，但无法创建显示对象。"));
             return;
         }
         if (m_actHolePaths) {
@@ -1111,8 +1103,7 @@ void MainWindow::openMachiningJob()
     m_undoHistory.clear();
     m_currentMachiningJobPath = path;
     statusBar()->showMessage(
-        QStringLiteral(
-            "加工项目已加载并重建：孔 %1 道，槽腔 %2 道，外轮廓 %3 道，雕刻 %4 道，%5 个装夹")
+        QCoreApplication::translate("OpenAutoPath", "加工项目已加载并重建：孔 %1 道，槽腔 %2 道，外轮廓 %3 道，雕刻 %4 道，%5 个装夹")
             .arg(installed.holeOperationCount)
             .arg(installed.pocketOperationCount)
             .arg(installed.profileOperationCount)
@@ -1123,13 +1114,13 @@ void MainWindow::openMachiningJob()
 
 void MainWindow::exportCurrentToolpathPreview()
 {
-    const QString title = QStringLiteral("导出当前刀路");
+    const QString title = QCoreApplication::translate("OpenAutoPath", "导出当前刀路");
     if (m_uiBusy)
         return;
 
     if (m_machiningWorkspace->activePreview() == ActiveToolpathPreview::None) {
         QMessageBox::information(this, title,
-            QStringLiteral("当前没有活动刀路，请先生成或显示需要导出的工序。"));
+            QCoreApplication::translate("OpenAutoPath", "当前没有活动刀路，请先生成或显示需要导出的工序。"));
         return;
     }
 
@@ -1139,7 +1130,7 @@ void MainWindow::exportCurrentToolpathPreview()
         if (prepared.validation.errorCount > 0) {
             QMessageBox::warning(
                 this, title,
-                QStringLiteral("当前刀路程序验证失败:\n") +
+                QCoreApplication::translate("OpenAutoPath", "当前刀路程序验证失败:\n") +
                     validationMessage(prepared.validation));
         } else {
             QMessageBox::information(this, title, prepared.error);
@@ -1164,8 +1155,8 @@ void MainWindow::exportCurrentToolpathPreview()
 
     QString selectedFilter;
     const QString filters = prepared.supportsJsonl
-        ? QStringLiteral("G 代码 (*.nc *.gcode *.tap);;刀路 JSONL (*.jsonl);;所有文件 (*.*)")
-        : QStringLiteral("G 代码 (*.nc *.gcode *.tap);;所有文件 (*.*)");
+        ? QCoreApplication::translate("OpenAutoPath", "G 代码 (*.nc *.gcode *.tap);;刀路 JSONL (*.jsonl);;所有文件 (*.*)")
+        : QCoreApplication::translate("OpenAutoPath", "G 代码 (*.nc *.gcode *.tap);;所有文件 (*.*)");
     QString outPath = QFileDialog::getSaveFileName(
         this, title, suggested, filters, &selectedFilter);
     if (outPath.isEmpty())
@@ -1219,7 +1210,7 @@ void MainWindow::exportCurrentToolpathPreview()
         }
         if (ok && !oap::app::confirmGCodeReview(this, reviewDocuments)) {
             statusBar()->showMessage(
-                QStringLiteral("NC 导出已取消，未写入文件。"));
+                QCoreApplication::translate("OpenAutoPath", "NC 导出已取消，未写入文件。"));
             return;
         }
         if (ok) {
@@ -1234,36 +1225,34 @@ void MainWindow::exportCurrentToolpathPreview()
     }
     if (!ok) {
         QMessageBox::critical(this, title,
-                              QStringLiteral("导出失败:\n") +
-                                  QString::fromStdString(error));
+                              QCoreApplication::translate("OpenAutoPath", "导出失败:\n") +
+                                  QCoreApplication::translate("OpenAutoPathDiagnostic", QString::fromStdString(error).toUtf8().constData()));
         return;
     }
 
     QString message =
-        QStringLiteral("已导出当前%1刀路 %2：%3 个工序，%4 条移动。")
+        QCoreApplication::translate("OpenAutoPath", "已导出当前%1刀路 %2：%3 个工序，%4 条移动。")
             .arg(prepared.programKind)
             .arg(wantsJsonl ? QStringLiteral("JSONL")
-                            : QStringLiteral("G 代码"))
+                            : QCoreApplication::translate("OpenAutoPath", "G 代码"))
             .arg(static_cast<int>(program.operations.size()))
             .arg(static_cast<qulonglong>(program.moveCount()));
     if (prepared.setupCount > 0) {
-        message += QStringLiteral(" 装夹组 %1。").arg(
+        message += QCoreApplication::translate("OpenAutoPath", " 装夹组 %1。").arg(
             prepared.setupCount);
     }
     if (validation.warningCount > 0)
-        message += QStringLiteral(" 验证警告 %1。").arg(validation.warningCount);
+        message += QCoreApplication::translate("OpenAutoPath", " 验证警告 %1。").arg(validation.warningCount);
     if (!wantsJsonl) {
-        message += QStringLiteral(
-            " 当前为参考 NC 文件，未包含现场投产参数，不可直接上机执行。");
+        message += QCoreApplication::translate("OpenAutoPath", " 当前为参考 NC 文件，未包含现场投产参数，不可直接上机执行。");
     }
     if (!prepared.referenceWarnings.isEmpty()) {
-        message += QStringLiteral(" 参考格式已移除非必要生产门禁：%1")
+        message += QCoreApplication::translate("OpenAutoPath", " 参考格式已移除非必要生产门禁：%1")
             .arg(prepared.referenceWarnings.join(QStringLiteral("；")));
     }
     statusBar()->showMessage(message);
     if (exportedPaths.size() > 1) {
-        message += QStringLiteral(
-            " 已按装夹面、刀具和加工阶段拆分为 %1 个独立文件。")
+        message += QCoreApplication::translate("OpenAutoPath", " 已按装夹面、刀具和加工阶段拆分为 %1 个独立文件。")
                        .arg(exportedPaths.size());
     }
     QMessageBox::information(

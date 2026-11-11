@@ -1,5 +1,6 @@
 // Formal finishing installation is transactional across definition and runtime.
 #include "app/machining/MachiningWorkspaceCoordinator.h"
+#include <QCoreApplication>
 #include "app/simulation/StockSimulationWorkspaceCoordinator.h"
 
 namespace oap::app {
@@ -52,7 +53,7 @@ ProjectStockSimulationUseCaseResult MachiningWorkspaceCoordinator::executeProjec
 {
     if (!request.engravingOnly && m_session.hasPendingRegeneration(true)) {
         ProjectStockSimulationUseCaseResult rejected;
-        rejected.error = QStringLiteral("启用工序有尚未成功重新生成的参数变更，不能执行完整项目 IPW。");
+        rejected.error = QCoreApplication::translate("OpenAutoPath", "启用工序有尚未成功重新生成的参数变更，不能执行完整项目 IPW。");
         return rejected;
     }
     return stockWorkspace.executeProjectSimulation(std::move(request), m_session.job());
@@ -86,7 +87,7 @@ bool MachiningWorkspaceCoordinator::installSurfaceFinishing(
     std::string detail;
     if (!manufacturing::SurfaceFinishingMachiningJobService().capture(candidate, request, &detail)) {
         if (error)
-            *error = QString::fromStdString(detail);
+            *error = QCoreApplication::translate("OpenAutoPathDiagnostic", QString::fromStdString(detail).toUtf8().constData());
         return false;
     }
     m_session.job() = std::move(candidate);

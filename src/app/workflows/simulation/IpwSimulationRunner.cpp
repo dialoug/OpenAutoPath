@@ -1,4 +1,5 @@
 #include "toolpath/core/HeavyJobScheduler.h"
+#include <QCoreApplication>
 // 统一 IPW 桌面运行器实现：执行 Multi-Dexel IPW，并从同一检查点链派生
 // 时间线（StockSimulationResult）、余量/缺料/过切比较与逐工序过切归因。
 #include "app/workflows/simulation/detail/IpwSimulationRunner.h"
@@ -462,7 +463,7 @@ bool buildCheckpointTimeline(
         store.find(session.initialStateKey());
     if (!root || !root->dexelStock) {
         error =
-            "统一 IPW 根检查点缺失或没有 Multi-Dexel 材料状态";
+            QCoreApplication::translate("OpenAutoPath", "统一 IPW 根检查点缺失或没有 Multi-Dexel 材料状态").toStdString();
         return false;
     }
 
@@ -485,7 +486,7 @@ bool buildCheckpointTimeline(
         const auto checkpoint = store.find(node.stateKey);
         if (!checkpoint || !checkpoint->dexelStock) {
             error =
-                "统一 IPW 工序检查点缺失：" +
+                QCoreApplication::translate("OpenAutoPath", "统一 IPW 工序检查点缺失：").toStdString() +
                 node.operation.id;
             return false;
         }
@@ -512,7 +513,7 @@ bool buildCheckpointTimeline(
     simulation.complete = session.complete();
     if (!simulation.complete) {
         error =
-            "统一 IPW 检查点链未完整执行";
+            QCoreApplication::translate("OpenAutoPath", "统一 IPW 检查点链未完整执行").toStdString();
         return false;
     }
     return true;
@@ -760,12 +761,12 @@ IpwSimulationRunResult runIpwSimulation(
     IpwSimulationRunResult result;
     if (request.initialStock.IsNull()) {
         result.errorMessage =
-            "统一 IPW 需要非空初始毛坯";
+            QCoreApplication::translate("OpenAutoPath", "统一 IPW 需要非空初始毛坯").toStdString();
         return result;
     }
     if (request.initialStockFingerprint.empty()) {
         result.errorMessage =
-            "统一 IPW 需要稳定的初始毛坯指纹";
+            QCoreApplication::translate("OpenAutoPath", "统一 IPW 需要稳定的初始毛坯指纹").toStdString();
         return result;
     }
 
@@ -836,7 +837,7 @@ IpwSimulationRunResult runIpwSimulation(
     } else {
         result.failed = true;
         result.errorMessage =
-            "统一 IPW 无法建立原生 Multi-Dexel 审计时间线";
+            QCoreApplication::translate("OpenAutoPath", "统一 IPW 无法建立原生 Multi-Dexel 审计时间线").toStdString();
         return result;
     }
     result.cancelled = result.comparison.cancelled;
@@ -846,7 +847,7 @@ IpwSimulationRunResult runIpwSimulation(
         result.failed = true;
         result.errorMessage = diagnosticFailure(
             result.comparison.diagnostics,
-            "统一 IPW 余量、缺料和过切检查失败");
+            QCoreApplication::translate("OpenAutoPath", "统一 IPW 余量、缺料和过切检查失败").toStdString());
         return result;
     }
 
@@ -887,7 +888,7 @@ IpwSimulationRunResult runIpwSimulation(
         result.failed = true;
         result.errorMessage = diagnosticFailure(
             result.overcutAttribution.diagnostics,
-            "统一 IPW 逐工序过切归因失败");
+            QCoreApplication::translate("OpenAutoPath", "统一 IPW 逐工序过切归因失败").toStdString());
     }
     return result;
 }
@@ -927,7 +928,7 @@ IpwSimulationRunResult simulateIpwWithProgress(
             const char* detail =
                 failure.GetMessageString();
             result.errorMessage =
-                "OCCT 执行统一 IPW 时发生异常";
+                QCoreApplication::translate("OpenAutoPath", "OCCT 执行统一 IPW 时发生异常").toStdString();
             if (detail && *detail) {
                 result.errorMessage +=
                     std::string("：") + detail;
@@ -937,14 +938,14 @@ IpwSimulationRunResult simulateIpwWithProgress(
             IpwSimulationRunResult result;
             result.failed = true;
             result.errorMessage =
-                std::string("统一 IPW 执行失败：") +
+                std::string(QCoreApplication::translate("OpenAutoPath", "统一 IPW 执行失败：").toStdString()) +
                 failure.what();
             return result;
           } catch (...) {
             IpwSimulationRunResult result;
             result.failed = true;
             result.errorMessage =
-                "统一 IPW 后台任务发生未知异常";
+                QCoreApplication::translate("OpenAutoPath", "统一 IPW 后台任务发生未知异常").toStdString();
             return result;
           }
         }, [](toolpath::HeavyJobRejection reason) {
@@ -961,11 +962,9 @@ IpwSimulationRunResult simulateIpwWithProgress(
 
     WorkflowProgressRequest progressRequest;
     progressRequest.title =
-        QStringLiteral("统一 IPW 腔加工仿真");
-    progressRequest.label = QStringLiteral(
-        "正在执行统一 Multi-Dexel IPW，并从检查点派生余量结果…");
-    progressRequest.cancellingLabel = QStringLiteral(
-        "正在取消，等待当前 Dexel/OCCT 批次安全结束…");
+        QCoreApplication::translate("OpenAutoPath", "统一 IPW 腔加工仿真");
+    progressRequest.label = QCoreApplication::translate("OpenAutoPath", "正在执行统一 Multi-Dexel IPW，并从检查点派生余量结果…");
+    progressRequest.cancellingLabel = QCoreApplication::translate("OpenAutoPath", "正在取消，等待当前 Dexel/OCCT 批次安全结束…");
     progressRequest.indeterminate = true;
     progressRequest.queued = [cancellation] { return toolpath::heavyJobScheduler().isPending(cancellation); };
     progressRequest.ready = [&future] {
@@ -986,7 +985,7 @@ IpwSimulationRunResult simulateIpwWithProgress(
         IpwSimulationRunResult result;
         result.failed = true;
         result.errorMessage =
-            "统一 IPW 后台任务无法返回结果";
+            QCoreApplication::translate("OpenAutoPath", "统一 IPW 后台任务无法返回结果").toStdString();
         return result;
     }
 }

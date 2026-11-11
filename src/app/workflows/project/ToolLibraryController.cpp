@@ -1,6 +1,7 @@
 // ToolLibraryController 实现（oap_app_workflow_cam）。
 // 桌面刀具库目录生命周期，独立于 MainWindow/对话框，见 ToolLibraryController.h。
 #include "ToolLibraryController.h"
+#include <QCoreApplication>
 
 #include <algorithm>
 #include <utility>
@@ -108,7 +109,7 @@ ToolLibraryApplyResult ToolLibraryController::apply(
             return library.id() == activeLibraryId;
         });
     if (selected == libraries.cend()) {
-        result.error = QStringLiteral("所选刀库已不存在。");
+        result.error = QCoreApplication::translate("OpenAutoPath", "所选刀库已不存在。");
         return result;
     }
 

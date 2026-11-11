@@ -1,6 +1,7 @@
 // MachiningWorkspaceCoordinator 实现（oap_app_machining）。
 // 每模型加工状态、参数与刀具库的应用门面，见 MachiningWorkspaceCoordinator.h。
 #include "MachiningWorkspaceCoordinator.h"
+#include <QCoreApplication>
 
 #include <algorithm>
 #include <unordered_set>
@@ -61,20 +62,20 @@ const toolpath::ProfileToolpathBatch* MachiningWorkspaceCoordinator::currentProf
         return nullptr;
     };
     if (m_session.toolpathNeedsRegeneration(ActiveToolpathPreview::Profile))
-        return reject(QStringLiteral("外轮廓参数已变更，请先重新生成刀路。"));
+        return reject(QCoreApplication::translate("OpenAutoPath", "外轮廓参数已变更，请先重新生成刀路。"));
     if (!batch || batch->cancelled || batch->operations.empty())
-        return reject(QStringLiteral("外轮廓没有已完成的刀路，请先生成。"));
+        return reject(QCoreApplication::translate("OpenAutoPath", "外轮廓没有已完成的刀路，请先生成。"));
     if (!batch->safetyValidation.ok())
-        return reject(QStringLiteral("外轮廓刀路有验证错误，不能显示为当前结果。"));
+        return reject(QCoreApplication::translate("OpenAutoPath", "外轮廓刀路有验证错误，不能显示为当前结果。"));
     for (const auto& operation : job.definition().profileOperations) {
         if (!operation.enabled) continue;
         using State = manufacturing::JobOperationState;
         if (operation.state != State::Generated && operation.state != State::Warning && operation.state != State::NeedsReview)
-            return reject(QStringLiteral("外轮廓工序尚未生成或已失效，请重新生成。"));
+            return reject(QCoreApplication::translate("OpenAutoPath", "外轮廓工序尚未生成或已失效，请重新生成。"));
     }
     if (job.runtime().profileExecutionFingerprint.empty() ||
         job.runtime().profileExecutionFingerprint != manufacturing::MachiningJobStorage::profileExecutionFingerprint(job.definition()).toStdString())
-        return reject(QStringLiteral("外轮廓刀路与当前项目定义不一致，请重新生成。"));
+        return reject(QCoreApplication::translate("OpenAutoPath", "外轮廓刀路与当前项目定义不一致，请重新生成。"));
     return batch;
 }
 
@@ -90,8 +91,8 @@ bool MachiningWorkspaceCoordinator::activateOperationPreview(
     const auto definitions = manufacturing::MachiningOperationService::operations(job.definition());
     const auto selected = std::find_if(definitions.begin(), definitions.end(),
         [&](const auto& operation) { return operation.id == formalOperationId; });
-    if (selected == definitions.end()) return reject(QStringLiteral("所选正式工序已不存在。"));
-    if (!selected->enabled) return reject(QStringLiteral("所选工序已禁用，不能显示其刀路。"));
+    if (selected == definitions.end()) return reject(QCoreApplication::translate("OpenAutoPath", "所选正式工序已不存在。"));
+    if (!selected->enabled) return reject(QCoreApplication::translate("OpenAutoPath", "所选工序已禁用，不能显示其刀路。"));
     ActiveToolpathPreview family = ActiveToolpathPreview::None;
     using Kind = manufacturing::JobOperationKind;
     switch (selected->kind) {
@@ -101,47 +102,47 @@ bool MachiningWorkspaceCoordinator::activateOperationPreview(
     case Kind::SurfaceFinishing: family = ActiveToolpathPreview::SurfaceFinishing; break;
     }
     if (m_session.toolpathNeedsRegeneration(family))
-        return reject(QStringLiteral("此类加工参数已变更，请先成功重新生成刀路。"));
+        return reject(QCoreApplication::translate("OpenAutoPath", "此类加工参数已变更，请先成功重新生成刀路。"));
     for (const auto& operation : definitions) {
         if (!operation.enabled || operation.kind != selected->kind) continue;
         using State = manufacturing::JobOperationState;
         if (operation.state != State::Generated && operation.state != State::Warning && operation.state != State::NeedsReview)
-            return reject(QStringLiteral("此类加工包含尚未生成或已失效的工序，请先重新生成。"));
+            return reject(QCoreApplication::translate("OpenAutoPath", "此类加工包含尚未生成或已失效的工序，请先重新生成。"));
     }
     toolpath::ToolpathProgram candidate;
     if (family == ActiveToolpathPreview::Hole) {
         const auto* batch = job.holeResult();
         if (!batch || batch->cancelled || !batch->validation.ok())
-            return reject(QStringLiteral("孔加工没有已完成且有效的刀路，请先生成。"));
+            return reject(QCoreApplication::translate("OpenAutoPath", "孔加工没有已完成且有效的刀路，请先生成。"));
         if (job.runtime().holeExecutionFingerprint.empty() || job.runtime().holeExecutionFingerprint !=
             manufacturing::MachiningJobStorage::holeExecutionFingerprint(job.definition()).toStdString())
-            return reject(QStringLiteral("孔刀路与当前项目定义不一致，请重新生成。"));
+            return reject(QCoreApplication::translate("OpenAutoPath", "孔刀路与当前项目定义不一致，请重新生成。"));
         candidate = batch->toProgram();
     } else if (family == ActiveToolpathPreview::Pocket) {
         if (const auto* batch = job.currentPocketResult()) candidate = batch->toProgram();
-        else return reject(QStringLiteral("槽腔刀路不存在、未完成或已失效，请重新生成。"));
+        else return reject(QCoreApplication::translate("OpenAutoPath", "槽腔刀路不存在、未完成或已失效，请重新生成。"));
     } else if (family == ActiveToolpathPreview::Profile) {
         if (const auto* batch = currentProfileResult(error)) candidate = batch->toProgram();
         else return false;
     } else {
         if (const auto* batch = job.currentFinishingResult()) candidate = batch->toProgram();
-        else return reject(QStringLiteral("雕刻刀路不存在、未完成或已失效，请重新生成。"));
+        else return reject(QCoreApplication::translate("OpenAutoPath", "雕刻刀路不存在、未完成或已失效，请重新生成。"));
     }
     if (candidate.empty() || candidate.moveCount() == 0)
-        return reject(QStringLiteral("此类加工没有可显示的移动。"));
+        return reject(QCoreApplication::translate("OpenAutoPath", "此类加工没有可显示的移动。"));
     std::unordered_set<std::string> represented;
     for (const auto& operation : candidate.operations) {
         const auto formal = manufacturing::MachiningOperationService::operationForRuntimeId(job.definition(), operation.operationId);
         if (!formal || !formal->enabled || formal->kind != selected->kind || operation.moves.empty())
-            return reject(QStringLiteral("运行期刀路与正式工序的对应关系不完整，请重新生成。"));
+            return reject(QCoreApplication::translate("OpenAutoPath", "运行期刀路与正式工序的对应关系不完整，请重新生成。"));
         represented.insert(formal->id);
     }
     for (const auto& operation : definitions)
         if (operation.enabled && operation.kind == selected->kind && !represented.contains(operation.id))
-            return reject(QStringLiteral("此类加工的刀路不完整，请重新生成全部启用工序。"));
+            return reject(QCoreApplication::translate("OpenAutoPath", "此类加工的刀路不完整，请重新生成全部启用工序。"));
     // Update derived preview state only after every freshness/mapping check.
     if (family == ActiveToolpathPreview::Hole) {
-        if (!activateInstalledHoleProgram()) return reject(QStringLiteral("孔刀路已失效，请重新生成。"));
+        if (!activateInstalledHoleProgram()) return reject(QCoreApplication::translate("OpenAutoPath", "孔刀路已失效，请重新生成。"));
         m_session.rebuildHolePreviewEntriesFromJob();
     } else if (family == ActiveToolpathPreview::Profile) {
         const auto* batch = currentProfileResult();
@@ -340,7 +341,7 @@ bool MachiningWorkspaceCoordinator::capturePocketProjectOperations(
     std::string resultError;
     const auto* batch = m_session.job().currentPocketResult(&resultError);
     if (!batch) {
-        if (error) *error = QString::fromStdString(resultError);
+        if (error) *error = QCoreApplication::translate("OpenAutoPathDiagnostic", QString::fromStdString(resultError).toUtf8().constData());
         return false;
     }
     resolved.operations = &batch->operations;
@@ -375,7 +376,7 @@ MachiningWorkspaceCoordinator::regenerateProject(
     if (hasPendingRegeneration()) {
         MachiningProjectLoadResult rejected;
         rejected.failure = MachiningProjectLoadFailure::PendingConfiguration;
-        rejected.error = QStringLiteral("存在未应用到正式工序的参数变更，请先通过对应加工入口重新生成。");
+        rejected.error = QCoreApplication::translate("OpenAutoPath", "存在未应用到正式工序的参数变更，请先通过对应加工入口重新生成。");
         return rejected;
     }
     return MachiningProjectController::regenerateJob(
@@ -400,7 +401,7 @@ bool MachiningWorkspaceCoordinator::synchronizeProjectForSave(
     QString* error)
 {
     if (hasPendingRegeneration()) {
-        if (error) *error = QStringLiteral("加工参数已修改但尚未成功重新生成，请先重新生成受影响工序再保存项目。");
+        if (error) *error = QCoreApplication::translate("OpenAutoPath", "加工参数已修改但尚未成功重新生成，请先重新生成受影响工序再保存项目。");
         return false;
     }
     return MachiningProjectController::synchronizeForSave(
@@ -412,7 +413,7 @@ bool MachiningWorkspaceCoordinator::saveProject(
     QString* error) const
 {
     if (hasPendingRegeneration()) {
-        if (error) *error = QStringLiteral("存在待重新生成的工序；旧工序不能作为当前参数保存，请先重新生成。");
+        if (error) *error = QCoreApplication::translate("OpenAutoPath", "存在待重新生成的工序；旧工序不能作为当前参数保存，请先重新生成。");
         return false;
     }
     return manufacturing::MachiningJobStorage::save(

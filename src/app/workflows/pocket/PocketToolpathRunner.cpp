@@ -1,5 +1,6 @@
 // 槽腔刀路运行器：把识别选择转换为请求并协调进度和取消。
 #include "app/workflows/pocket/detail/PocketToolpathRunner.h"
+#include <QCoreApplication>
 
 #include <atomic>
 #include <chrono>
@@ -74,11 +75,9 @@ generateAutomaticPocketsWithProgress(
     toolpath::HeavyJobWaitGuard waitGuard(future, cancellation);
 
     WorkflowProgressRequest progressRequest;
-    progressRequest.title = QStringLiteral("槽/腔自动选刀");
-    progressRequest.label = QStringLiteral(
-        "正在比较铣刀组合并生成余料刀路…");
-    progressRequest.cancellingLabel = QStringLiteral(
-        "正在取消，等待当前组合计算结束…");
+    progressRequest.title = QCoreApplication::translate("OpenAutoPath", "槽/腔自动选刀");
+    progressRequest.label = QCoreApplication::translate("OpenAutoPath", "正在比较铣刀组合并生成余料刀路…");
+    progressRequest.cancellingLabel = QCoreApplication::translate("OpenAutoPath", "正在取消，等待当前组合计算结束…");
     progressRequest.initialTotal = 1u;
     progressRequest.snapshot = [] {
         return WorkflowProgressSnapshot{0u, 1u, {}};

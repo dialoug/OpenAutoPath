@@ -1,6 +1,7 @@
 // ProfileToolpathWorkflowController 实现（oap_app_workflow_cam）。
 // 对已验证外轮廓生成候选的原子 Job 提交，见 ProfileToolpathWorkflowController.h。
 #include "app/workflows/profile/ProfileToolpathWorkflowController.h"
+#include <QCoreApplication>
 
 namespace oap::app {
 
@@ -10,7 +11,7 @@ ProfileToolpathCommitResult ProfileToolpathWorkflowController::commit(
   if (!request.currentJob || !request.operations ||
       request.operations->empty() || !request.effectiveParams ||
       !request.setupFrames) {
-    result.error = QStringLiteral("外轮廓加工提交请求不完整。");
+    result.error = QCoreApplication::translate("OpenAutoPath", "外轮廓加工提交请求不完整。");
     return result;
   }
 

@@ -1,5 +1,6 @@
 // StockSimulationWorkflowController 实现：来源校验、结果安装与摘要报告。
 #include "app/workflows/simulation/StockSimulationWorkflowController.h"
+#include <QCoreApplication>
 
 #include <algorithm>
 #include <cmath>
@@ -23,21 +24,21 @@ QString removalStatusText(toolpath::StockRemovalStatus status)
 {
     switch (status) {
         case toolpath::StockRemovalStatus::Applied:
-            return QStringLiteral("已减料");
+            return QCoreApplication::translate("OpenAutoPath", "已减料");
         case toolpath::StockRemovalStatus::NoMaterialRemoved:
-            return QStringLiteral("未接触当前毛坯");
+            return QCoreApplication::translate("OpenAutoPath", "未接触当前毛坯");
         case toolpath::StockRemovalStatus::InvalidStock:
-            return QStringLiteral("毛坯无效");
+            return QCoreApplication::translate("OpenAutoPath", "毛坯无效");
         case toolpath::StockRemovalStatus::InvalidRemovalVolume:
-            return QStringLiteral("切削体无效");
+            return QCoreApplication::translate("OpenAutoPath", "切削体无效");
         case toolpath::StockRemovalStatus::BooleanFailed:
-            return QStringLiteral("布尔减料失败");
+            return QCoreApplication::translate("OpenAutoPath", "布尔减料失败");
         case toolpath::StockRemovalStatus::InvalidResult:
-            return QStringLiteral("减料结果无效");
+            return QCoreApplication::translate("OpenAutoPath", "减料结果无效");
         case toolpath::StockRemovalStatus::Cancelled:
-            return QStringLiteral("已取消");
+            return QCoreApplication::translate("OpenAutoPath", "已取消");
     }
-    return QStringLiteral("未知");
+    return QCoreApplication::translate("OpenAutoPath", "未知");
 }
 
 // 累计诊断中的警告/错误计数。
@@ -65,7 +66,7 @@ QString holeToolLabel(const toolpath::HoleMachiningOperation& operation)
             .arg(operation.tool.toolNumber)
             .arg(QString::fromStdString(operation.tool.toolName));
     }
-    return QStringLiteral("未绑定刀具 Ø%1")
+    return QCoreApplication::translate("OpenAutoPath", "未绑定刀具 Ø%1")
         .arg(operation.tool.diameter, 0, 'f', 3);
 }
 
@@ -84,11 +85,11 @@ QString featureAllowanceSummary(
             allowances[static_cast<std::size_t>(index)];
         QString label;
         if (item.sourceIndex >= 0) {
-            label = QStringLiteral("孔 %1").arg(item.sourceIndex + 1);
+            label = QCoreApplication::translate("OpenAutoPath", "孔 %1").arg(item.sourceIndex + 1);
         } else {
             const QString kind = item.featureKind == "slot"
-                ? QStringLiteral("槽")
-                : QStringLiteral("腔");
+                ? QCoreApplication::translate("OpenAutoPath", "槽")
+                : QCoreApplication::translate("OpenAutoPath", "腔");
             QString identity = QString::fromStdString(
                 item.operationId.empty()
                     ? item.featureId : item.operationId);
@@ -98,14 +99,14 @@ QString featureAllowanceSummary(
         }
         items.push_back(QStringLiteral("%1：%2%3 mm³（%4%）")
             .arg(label)
-            .arg(item.approximateBoundary ? QStringLiteral("约 ") : QString{})
+            .arg(item.approximateBoundary ? QCoreApplication::translate("OpenAutoPath", "约 ") : QString{})
             .arg(item.remainingAllowanceVolume, 0, 'f', 3)
             .arg(100.0 * item.completionRatio, 0, 'f', 1));
     }
-    QString text = QStringLiteral("\n逐特征余量：") +
+    QString text = QCoreApplication::translate("OpenAutoPath", "\n逐特征余量：") +
         items.join(QStringLiteral("；"));
     if (count < static_cast<int>(allowances.size())) {
-        text += QStringLiteral("；另有 %1 项")
+        text += QCoreApplication::translate("OpenAutoPath", "；另有 %1 项")
             .arg(static_cast<int>(allowances.size()) - count);
     }
     return text;
@@ -136,8 +137,7 @@ bool selectPocketSimulationOperations(
                 continue;
             if (consumed[index] || operation.setupIndex != selectedSetup ||
                 !runtimeIds.insert(operation.operationId).second) {
-                result.error = QStringLiteral(
-                    "槽腔工序 %1 的运行期工序 %2 重复匹配或装夹不一致（预期 %3，实际 %4）。")
+                result.error = QCoreApplication::translate("OpenAutoPath", "槽腔工序 %1 的运行期工序 %2 重复匹配或装夹不一致（预期 %3，实际 %4）。")
                     .arg(QString::fromStdString(definition->id))
                     .arg(QString::fromStdString(operation.operationId))
                     .arg(selectedSetup).arg(operation.setupIndex);
@@ -147,14 +147,14 @@ bool selectPocketSimulationOperations(
             result.operations.push_back(operation);
         }
         if (before == result.operations.size()) {
-            result.error = QStringLiteral("槽腔工序 %1 在装夹 %2 中没有对应的运行期刀路。")
+            result.error = QCoreApplication::translate("OpenAutoPath", "槽腔工序 %1 在装夹 %2 中没有对应的运行期刀路。")
                 .arg(QString::fromStdString(definition->id)).arg(selectedSetup);
             return false;
         }
         pocketOperationIds.push_back(definition->id);
     }
     if (result.operations.empty()) {
-        result.error = QStringLiteral("装夹 %1 没有已启用的槽腔工序。")
+        result.error = QCoreApplication::translate("OpenAutoPath", "装夹 %1 没有已启用的槽腔工序。")
             .arg(selectedSetup);
         return false;
     }
@@ -189,7 +189,7 @@ bool preparePocketStockSource(
     result.stockDefinition.marginZ = source.marginZ;
     if (source.sourceMode == 2) {
         if (importedSourceFingerprint.isEmpty()) {
-            result.error = QStringLiteral("无法计算毛坯 STEP 指纹。");
+            result.error = QCoreApplication::translate("OpenAutoPath", "无法计算毛坯 STEP 指纹。");
             return false;
         }
         result.stockFingerprint =
@@ -263,13 +263,13 @@ bool StockSimulationWorkflowController::validateSource(
 {
     error.clear();
     if (settings.sourceMode < 0 || settings.sourceMode > 2) {
-        error = QStringLiteral("未知的毛坯来源。");
+        error = QCoreApplication::translate("OpenAutoPath", "未知的毛坯来源。");
         return false;
     }
     if (settings.sourceMode == 2) {
         if (settings.stepPath.trimmed().isEmpty() ||
             !QFileInfo::exists(settings.stepPath.trimmed())) {
-            error = QStringLiteral("请选择存在的加工前毛坯 STEP 文件。");
+            error = QCoreApplication::translate("OpenAutoPath", "请选择存在的加工前毛坯 STEP 文件。");
             return false;
         }
         return true;
@@ -279,7 +279,7 @@ bool StockSimulationWorkflowController::validateSource(
         !std::isfinite(settings.marginZ) ||
         settings.marginX < 0.0 || settings.marginY < 0.0 ||
         settings.marginZ < 0.0) {
-        error = QStringLiteral("毛坯余量必须是有限的非负数。");
+        error = QCoreApplication::translate("OpenAutoPath", "毛坯余量必须是有限的非负数。");
         return false;
     }
     return true;
@@ -335,8 +335,8 @@ StockSimulationWorkflowController::holeOvercutChoices(
          ++index) {
         const toolpath::StockOperationOvercut& attribution =
             attributions[static_cast<std::size_t>(index)];
-        QString hole = QStringLiteral("未知孔");
-        QString tool = QStringLiteral("未绑定刀具");
+        QString hole = QCoreApplication::translate("OpenAutoPath", "未知孔");
+        QString tool = QCoreApplication::translate("OpenAutoPath", "未绑定刀具");
         if (attribution.sequenceIndex >= 0 &&
             attribution.sequenceIndex <
                 static_cast<int>(previewEntries.size())) {
@@ -344,9 +344,9 @@ StockSimulationWorkflowController::holeOvercutChoices(
                 previewEntries[static_cast<std::size_t>(
                     attribution.sequenceIndex)].operation;
             hole = operation.sourceHoleIndex >= 0
-                ? QStringLiteral("孔 %1")
+                ? QCoreApplication::translate("OpenAutoPath", "孔 %1")
                       .arg(operation.sourceHoleIndex + 1)
-                : QStringLiteral("未知孔");
+                : QCoreApplication::translate("OpenAutoPath", "未知孔");
             tool = holeToolLabel(operation);
         }
         result.push_back({
@@ -366,7 +366,7 @@ QString StockSimulationWorkflowController::holeSummary(
     const HoleStockDisplaySelection& selection)
 {
     if (!session.hasHoleSimulation())
-        return QStringLiteral("尚未执行仿真。");
+        return QCoreApplication::translate("OpenAutoPath", "尚未执行仿真。");
 
     const auto& simulation = session.holeSimulation();
     const auto& comparison = session.holeComparison();
@@ -375,14 +375,13 @@ QString StockSimulationWorkflowController::holeSummary(
     const int step = std::clamp(selection.stepIndex, 0, total);
     QString detail;
     if (step == 0 || total == 0) {
-        detail = QStringLiteral("快照 0/%1：初始毛坯，体积 %2 mm³。")
+        detail = QCoreApplication::translate("OpenAutoPath", "快照 0/%1：初始毛坯，体积 %2 mm³。")
                      .arg(total)
                      .arg(simulation.initialVolume, 0, 'f', 3);
     } else {
         const toolpath::StockRemovalRecord& record =
             simulation.steps[static_cast<std::size_t>(step - 1)];
-        detail = QStringLiteral(
-                     "快照 %1/%2：工序 %3，%4。\n"
+        detail = QCoreApplication::translate("OpenAutoPath", "快照 %1/%2：工序 %3，%4。\n"
                      "体积 %5 → %6 mm³，本工序去除 %7 mm³。")
                      .arg(step)
                      .arg(total)
@@ -393,8 +392,8 @@ QString StockSimulationWorkflowController::holeSummary(
                      .arg(record.removedVolume, 0, 'f', 3);
         if (record.status != toolpath::StockRemovalStatus::Applied &&
             !record.message.empty()) {
-            detail += QStringLiteral("\n原因：%1")
-                          .arg(QString::fromStdString(record.message));
+            detail += QCoreApplication::translate("OpenAutoPath", "\n原因：%1")
+                          .arg(QCoreApplication::translate("OpenAutoPathDiagnostic", QString::fromStdString(record.message).toUtf8().constData()));
         }
     }
 
@@ -407,11 +406,10 @@ QString StockSimulationWorkflowController::holeSummary(
     accumulateDiagnostics(
         overcut.diagnostics, warningCount, errorCount);
     const QString completionState = simulation.cancelled
-        ? QStringLiteral("仿真已取消，已保留完成快照")
-        : (simulation.complete ? QStringLiteral("仿真完成")
-                               : QStringLiteral("仿真未完整完成"));
-    detail += QStringLiteral(
-                  "\n总计：初始 %1，最终 %2，去除 %3 mm³；"
+        ? QCoreApplication::translate("OpenAutoPath", "仿真已取消，已保留完成快照")
+        : (simulation.complete ? QCoreApplication::translate("OpenAutoPath", "仿真完成")
+                               : QCoreApplication::translate("OpenAutoPath", "仿真未完整完成"));
+    detail += QCoreApplication::translate("OpenAutoPath", "\n总计：初始 %1，最终 %2，去除 %3 mm³；"
                   "成功 %4，空切 %5，警告 %6，错误 %7，%8。")
                   .arg(simulation.initialVolume, 0, 'f', 3)
                   .arg(simulation.finalVolume, 0, 'f', 3)
@@ -422,8 +420,7 @@ QString StockSimulationWorkflowController::holeSummary(
                   .arg(errorCount)
                   .arg(completionState);
     if (comparison.complete) {
-        detail += QStringLiteral(
-                      "\n差异检查：目标包含率 %1%，初始缺料 %2，"
+        detail += QCoreApplication::translate("OpenAutoPath", "\n差异检查：目标包含率 %1%，初始缺料 %2，"
                       "剩余加工余量 %3，过切 %4 mm³。")
                       .arg(100.0 * comparison.targetContainmentRatio,
                            0, 'f', 4)
@@ -433,43 +430,37 @@ QString StockSimulationWorkflowController::holeSummary(
         detail += featureAllowanceSummary(
             comparison.featureAllowances, 12);
         if (comparison.hasBounds) {
-            detail += QStringLiteral(
-                          "\nAABB 中心偏移：X=%1，Y=%2，Z=%3 mm；"
+            detail += QCoreApplication::translate("OpenAutoPath", "\nAABB 中心偏移：X=%1，Y=%2，Z=%3 mm；"
                           "目标包络%4初始毛坯包络。")
                           .arg(comparison.boundsCenterOffset[0], 0, 'f', 3)
                           .arg(comparison.boundsCenterOffset[1], 0, 'f', 3)
                           .arg(comparison.boundsCenterOffset[2], 0, 'f', 3)
                           .arg(comparison.targetBoundsInsideInitialBounds
-                                   ? QStringLiteral("位于")
-                                   : QStringLiteral("超出"));
+                                   ? QCoreApplication::translate("OpenAutoPath", "位于")
+                                   : QCoreApplication::translate("OpenAutoPath", "超出"));
         }
     } else if (comparison.cancelled) {
-        detail += QStringLiteral(
-            "\n毛坯差异检查已取消；孔工序快照仍然有效。");
+        detail += QCoreApplication::translate("OpenAutoPath", "\n毛坯差异检查已取消；孔工序快照仍然有效。");
     } else if (!comparison.diagnostics.empty()) {
-        detail += QStringLiteral(
-            "\n毛坯差异检查未完成，请查看错误计数。");
+        detail += QCoreApplication::translate("OpenAutoPath", "\n毛坯差异检查未完成，请查看错误计数。");
     }
     if (overcut.complete) {
-        detail += QStringLiteral("\n过切归因：%1 道工序，合计 %2 mm³。")
+        detail += QCoreApplication::translate("OpenAutoPath", "\n过切归因：%1 道工序，合计 %2 mm³。")
                       .arg(static_cast<int>(overcut.operations.size()))
                       .arg(overcut.attributedVolume, 0, 'f', 3);
     } else if (overcut.cancelled) {
-        detail += QStringLiteral("\n逐工序过切归因已取消。");
+        detail += QCoreApplication::translate("OpenAutoPath", "\n逐工序过切归因已取消。");
     }
 
     switch (selection.viewMode) {
         case 1:
-            detail += QStringLiteral(
-                "\n当前显示：初始毛坯缺失的目标材料。");
+            detail += QCoreApplication::translate("OpenAutoPath", "\n当前显示：初始毛坯缺失的目标材料。");
             break;
         case 2:
-            detail += QStringLiteral(
-                "\n当前显示：当前孔工序后仍在成品目标外的加工余量。");
+            detail += QCoreApplication::translate("OpenAutoPath", "\n当前显示：当前孔工序后仍在成品目标外的加工余量。");
             break;
         case 3:
-            detail += QStringLiteral(
-                "\n当前显示：当前孔刀路误删的目标材料。");
+            detail += QCoreApplication::translate("OpenAutoPath", "\n当前显示：当前孔刀路误删的目标材料。");
             break;
         case 4: {
             const int index = selection.overcutAttributionIndex;
@@ -477,8 +468,7 @@ QString StockSimulationWorkflowController::holeSummary(
                 break;
             const toolpath::StockOperationOvercut& attribution =
                 overcut.operations[static_cast<std::size_t>(index)];
-            QString operationDetail = QStringLiteral(
-                "\n当前显示：工序 %1，新增过切 %2 mm³。")
+            QString operationDetail = QCoreApplication::translate("OpenAutoPath", "\n当前显示：工序 %1，新增过切 %2 mm³。")
                 .arg(QString::fromStdString(attribution.operationId))
                 .arg(attribution.volume, 0, 'f', 3);
             if (attribution.sequenceIndex >= 0 &&
@@ -489,11 +479,10 @@ QString StockSimulationWorkflowController::holeSummary(
                         attribution.sequenceIndex)].operation;
                 const QString holeSource = operation.sourceHoleIndex >= 0
                     ? QString::number(operation.sourceHoleIndex + 1)
-                    : QStringLiteral("未关联");
-                operationDetail += QStringLiteral(
-                    " 孔源=%1，策略=%2，刀具=%3，直径=%4 mm。")
+                    : QCoreApplication::translate("OpenAutoPath", "未关联");
+                operationDetail += QCoreApplication::translate("OpenAutoPath", " 孔源=%1，策略=%2，刀具=%3，直径=%4 mm。")
                     .arg(holeSource)
-                    .arg(QString::fromUtf8(
+                    .arg(QCoreApplication::translate("OpenAutoPath",
                         toolpath::holeMachiningStrategyZh(
                             operation.strategy)))
                     .arg(holeToolLabel(operation))
@@ -515,11 +504,10 @@ QString StockSimulationWorkflowController::holeCompletionStatus(
     const auto& simulation = session.holeSimulation();
     const auto& comparison = session.holeComparison();
     const auto& attribution = session.holeOvercutAttribution();
-    QString summary = QStringLiteral(
-        "%1：%2/%3 个操作成功减料，去除 %4 mm³，"
+    QString summary = QCoreApplication::translate("OpenAutoPath", "%1：%2/%3 个操作成功减料，去除 %4 mm³，"
         "初始缺料 %5 mm³，过切 %6 mm³（%7 道工序）")
-        .arg(cancelled ? QStringLiteral("孔毛胚仿真已取消")
-                       : QStringLiteral("孔毛胚仿真完成"))
+        .arg(cancelled ? QCoreApplication::translate("OpenAutoPath", "孔毛胚仿真已取消")
+                       : QCoreApplication::translate("OpenAutoPath", "孔毛胚仿真完成"))
         .arg(simulation.appliedOperationCount)
         .arg(simulation.processedOperationCount)
         .arg(simulation.removedVolume, 0, 'f', 3)
@@ -547,12 +535,12 @@ ProjectSimulationPreparation StockSimulationWorkflowController::prepareProject(
     if (!validateSource(source, result.error))
         return result;
     if (initialStock.IsNull() || targetShape.IsNull()) {
-        result.error = QStringLiteral("毛坯或目标实体为空。");
+        result.error = QCoreApplication::translate("OpenAutoPath", "毛坯或目标实体为空。");
         return result;
     }
     const auto definitionErrors = job.validationErrors();
     if (!definitionErrors.empty()) {
-        result.error = QString::fromStdString(definitionErrors.front());
+        result.error = QCoreApplication::translate("OpenAutoPathDiagnostic", QString::fromStdString(definitionErrors.front()).toUtf8().constData());
         return result;
     }
     auto definitions = manufacturing::MachiningOperationService::operations(job.definition());
@@ -563,7 +551,7 @@ ProjectSimulationPreparation StockSimulationWorkflowController::prepareProject(
                 setup && (selectedSetup < 0 || setup->setupIndex == selectedSetup);
         });
         if (last == definitions.rend()) {
-            result.error = QStringLiteral("所选装夹范围没有启用的雕刻工序，请先生成雕刻刀路。");
+            result.error = QCoreApplication::translate("OpenAutoPath", "所选装夹范围没有启用的雕刻工序，请先生成雕刻刀路。");
             return result;
         }
         definitions.erase(last.base(), definitions.end());
@@ -577,24 +565,24 @@ ProjectSimulationPreparation StockSimulationWorkflowController::prepareProject(
         using State = manufacturing::JobOperationState;
         switch (definition.state) {
         case State::Planned:
-            result.error = QStringLiteral("工序 %1 尚未生成刀路，请先生成对应工序刀路。").arg(operationId);
+            result.error = QCoreApplication::translate("OpenAutoPath", "工序 %1 尚未生成刀路，请先生成对应工序刀路。").arg(operationId);
             break;
         case State::Dirty:
         case State::Stale:
-            result.error = QStringLiteral("工序 %1 的刀路已失效，请按当前模型和参数重新生成。").arg(operationId);
+            result.error = QCoreApplication::translate("OpenAutoPath", "工序 %1 的刀路已失效，请按当前模型和参数重新生成。").arg(operationId);
             break;
         case State::Error:
-            result.error = QStringLiteral("工序 %1 的刀路生成或校验失败，请查看工序诊断，修正后重新生成。").arg(operationId);
+            result.error = QCoreApplication::translate("OpenAutoPath", "工序 %1 的刀路生成或校验失败，请查看工序诊断，修正后重新生成。").arg(operationId);
             break;
         case State::NeedsReview: {
             const auto* setup = job.setupById(definition.setupId);
             if (!setup || !setup->valid) {
-                result.error = QStringLiteral("工序 %1 的装夹无效，请在“加工参数与装夹确认…”中修正装夹后重新生成刀路。").arg(operationId);
+                result.error = QCoreApplication::translate("OpenAutoPath", "工序 %1 的装夹无效，请在“加工参数与装夹确认…”中修正装夹后重新生成刀路。").arg(operationId);
             } else if (!setup->confirmation.confirmed) {
-                result.error = QStringLiteral("工序 %1 的 %2 方向装夹待确认，请在“加工参数与装夹确认…”→“装夹”中核对该方向并勾选“已确认”，应用后重试。")
+                result.error = QCoreApplication::translate("OpenAutoPath", "工序 %1 的 %2 方向装夹待确认，请在“加工参数与装夹确认…”→“装夹”中核对该方向并勾选“已确认”，应用后重试。")
                     .arg(operationId, QString::fromLatin1(moldSetupFaceName(setup->face)));
             } else {
-                result.error = QStringLiteral("工序 %1 需要复核，请检查工序的稳定引用和装夹状态，必要时重新生成刀路。").arg(operationId);
+                result.error = QCoreApplication::translate("OpenAutoPath", "工序 %1 需要复核，请检查工序的稳定引用和装夹状态，必要时重新生成刀路。").arg(operationId);
             }
             break;
         }
@@ -644,14 +632,14 @@ ProjectSimulationPreparation StockSimulationWorkflowController::prepareProject(
                 minimumDiameter = std::min(minimumDiameter, operation.tool.diameter);
         }
         if (!found || stored.empty() || stored != expected) {
-            result.error = QStringLiteral("工序 %1 缺少当前有效刀路，请重新生成。").arg(
+            result.error = QCoreApplication::translate("OpenAutoPath", "工序 %1 缺少当前有效刀路，请重新生成。").arg(
                 QString::fromStdString(definition.id));
             return result;
         }
         result.includedOperationIds.push_back(definition.id);
     }
     if (result.includedOperationIds.empty()) {
-        result.error = QStringLiteral("加工项目没有启用的正式工序。");
+        result.error = QCoreApplication::translate("OpenAutoPath", "加工项目没有启用的正式工序。");
         return result;
     }
     if (!preparePocketStockSource(job, source, importedSourceFingerprint, result))
@@ -700,7 +688,7 @@ QString StockSimulationWorkflowController::projectSummary(
     const ProjectSimulationPreparation&,
     const IpwSimulationRunResult& result)
 {
-    return QStringLiteral("加工项目 IPW：%1 道工序，执行 %2，道路检查点复用 %3，去除 %4 mm³，剩余余量 %5 mm³，过切 %6 mm³。")
+    return QCoreApplication::translate("OpenAutoPath", "加工项目 IPW：%1 道工序，执行 %2，道路检查点复用 %3，去除 %4 mm³，剩余余量 %5 mm³，过切 %6 mm³。")
         .arg(job.ipwSession().nodes().size())
         .arg(result.execution.executedNodeCount)
         .arg(result.execution.reusedCheckpointCount)
@@ -724,14 +712,14 @@ StockSimulationWorkflowController::preparePocket(
     if (!validateSource(source, result.error))
         return result;
     if (initialStock.IsNull() || targetShape.IsNull()) {
-        result.error = QStringLiteral("毛坯或目标实体为空。");
+        result.error = QCoreApplication::translate("OpenAutoPath", "毛坯或目标实体为空。");
         return result;
     }
 
     std::string runtimeError;
     const auto* batch = job.currentPocketResult(&runtimeError);
     if (!batch) {
-        result.error = QString::fromStdString(runtimeError);
+        result.error = QCoreApplication::translate("OpenAutoPathDiagnostic", QString::fromStdString(runtimeError).toUtf8().constData());
         return result;
     }
     result.effectiveParams = batch->effectiveParams;
@@ -763,7 +751,7 @@ StockSimulationWorkflowController::prepareProfile(
     if (!validateSource(source, result.error))
         return result;
     if (initialStock.IsNull() || targetShape.IsNull()) {
-        result.error = QStringLiteral("毛坯或目标实体为空。");
+        result.error = QCoreApplication::translate("OpenAutoPath", "毛坯或目标实体为空。");
         return result;
     }
     for (const toolpath::ProfileToolpathOperation& operation :
@@ -772,8 +760,7 @@ StockSimulationWorkflowController::prepareProfile(
             result.operations.push_back(operation);
     }
     if (result.operations.empty()) {
-        result.error = QStringLiteral(
-            "所选装夹面没有可仿真的外轮廓刀路工序。");
+        result.error = QCoreApplication::translate("OpenAutoPath", "所选装夹面没有可仿真的外轮廓刀路工序。");
         return result;
     }
 
@@ -788,8 +775,7 @@ StockSimulationWorkflowController::prepareProfile(
         }
     }
     if (profileOperationIds.size() != result.operations.size()) {
-        result.error = QStringLiteral(
-            "所选 Setup 的 Job 外轮廓工序与当前预览不一致"
+        result.error = QCoreApplication::translate("OpenAutoPath", "所选 Setup 的 Job 外轮廓工序与当前预览不一致"
             "（Job %1，道路 %2）。请重新生成外轮廓刀路。")
             .arg(profileOperationIds.size())
             .arg(result.operations.size());
@@ -834,7 +820,7 @@ StockSimulationWorkflowController::prepareProfile(
     result.stockDefinition.marginZ = source.marginZ;
     if (source.sourceMode == 2) {
         if (importedSourceFingerprint.isEmpty()) {
-            result.error = QStringLiteral("无法计算毛坯 STEP 指纹。");
+            result.error = QCoreApplication::translate("OpenAutoPath", "无法计算毛坯 STEP 指纹。");
             return result;
         }
         result.stockFingerprint =
@@ -960,8 +946,7 @@ QString StockSimulationWorkflowController::profileSummary(
 {
     const double actualResolution =
         session.pocketSimulation().zMapResolution;
-    return QStringLiteral(
-        "外轮廓 IPW：Setup %1，检查点 %2，Profile 工序 %3，"
+    return QCoreApplication::translate("OpenAutoPath", "外轮廓 IPW：Setup %1，检查点 %2，Profile 工序 %3，"
         "复用 %4，去除 %5 mm³，余量 %6 mm³，过切上界 %7 mm³；"
         "XY 请求 %8 mm、实际 %9 mm。")
         .arg(preparation.selectedSetup + 1)
@@ -1030,8 +1015,7 @@ QString StockSimulationWorkflowController::pocketSummary(
         std::isfinite(actualResolution) && actualResolution > 0.0
         ? actualResolution / std::sqrt(2.0)
         : 0.0;
-    QString summary = QStringLiteral(
-        "统一 IPW：Setup %1，检查点 %2，工序 %3，"
+    QString summary = QCoreApplication::translate("OpenAutoPath", "统一 IPW：Setup %1，检查点 %2，工序 %3，"
         "复用 %4，去除 %5 mm³，余量 %6 mm³，"
         "过切上界 %7 mm³（确定 %8，边界不确定 %9）；"
         "XY 请求 %10 mm、实际 %11 mm，单元 %12，"

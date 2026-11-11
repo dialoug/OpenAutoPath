@@ -1,6 +1,7 @@
 // PlaybackWorkspaceCoordinator 实现（oap_app_playback）。
 // 应用级播放边界：拥有会话、worker 与 OCCT 播放呈现，见 PlaybackWorkspaceCoordinator.h。
 #include "app/playback/PlaybackWorkspaceCoordinator.h"
+#include <QCoreApplication>
 
 #include "analysis/StepIndexer.h"
 #include "app/presentation/HoleStageHighlightPresenter.h"
@@ -95,13 +96,13 @@ appdetail::HolePreviewSegmentKind previewSegmentKind(
 std::string previewFeatureName(FeatureKind kind)
 {
     switch (kind) {
-        case FeatureKind::ThroughHole: return "通孔";
-        case FeatureKind::BlindHole: return "盲孔";
-        case FeatureKind::CountersinkHole: return "沉孔";
-        case FeatureKind::Slot: return "槽";
-        case FeatureKind::Pocket: return "腔";
+        case FeatureKind::ThroughHole: return QCoreApplication::translate("OpenAutoPath", "通孔").toStdString();
+        case FeatureKind::BlindHole: return QCoreApplication::translate("OpenAutoPath", "盲孔").toStdString();
+        case FeatureKind::CountersinkHole: return QCoreApplication::translate("OpenAutoPath", "沉孔").toStdString();
+        case FeatureKind::Slot: return QCoreApplication::translate("OpenAutoPath", "槽").toStdString();
+        case FeatureKind::Pocket: return QCoreApplication::translate("OpenAutoPath", "腔").toStdString();
     }
-    return "特征";
+    return QCoreApplication::translate("OpenAutoPath", "特征").toStdString();
 }
 
 bool appendPreviewSegment(

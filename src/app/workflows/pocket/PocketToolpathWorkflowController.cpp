@@ -1,6 +1,7 @@
 // PocketToolpathWorkflowController 实现（oap_app_workflow_cam）。
 // 候选构造与工作区安装分离，见 PocketToolpathWorkflowController.h。
 #include "app/workflows/pocket/PocketToolpathWorkflowController.h"
+#include <QCoreApplication>
 
 namespace oap::app {
 
@@ -12,7 +13,7 @@ PocketCandidateJobResult PocketToolpathWorkflowController::prepareCandidateJob(
     if (!request.currentJob || !request.batch ||
         !request.batch->readyForPublication() ||
         !request.setupFrames) {
-        result.error = QStringLiteral("槽腔加工提交请求不完整。");
+        result.error = QCoreApplication::translate("OpenAutoPath", "槽腔加工提交请求不完整。");
         return result;
     }
     result.job = *request.currentJob;
@@ -29,7 +30,7 @@ PocketCandidateJobResult PocketToolpathWorkflowController::prepareCandidateJob(
     }
     auto* captured = result.job.pocketResult();
     if (!captured) {
-        result.error = QStringLiteral("槽腔候选没有生成运行期结果。");
+        result.error = QCoreApplication::translate("OpenAutoPath", "槽腔候选没有生成运行期结果。");
         return result;
     }
     captured->safetyValidation = request.batch->safetyValidation;
@@ -37,7 +38,7 @@ PocketCandidateJobResult PocketToolpathWorkflowController::prepareCandidateJob(
     captured->validation.append(request.batch->validation);
     result.ok = captured->readyForPublication();
     if (!result.ok)
-        result.error = QStringLiteral("槽腔候选未满足发布条件。");
+        result.error = QCoreApplication::translate("OpenAutoPath", "槽腔候选未满足发布条件。");
     return result;
 }
 

@@ -1,6 +1,7 @@
 // CamUiController 实现（oap_app_cam_ui）。
 // CAM 工作流 dock 与命令回调接线，见 CamUiController.h。
 #include "app/ui/cam/CamUiController.h"
+#include <QCoreApplication>
 
 #include "app/ui/panels/CamWorkflowPanel.h"
 #include "app/ui/panels/FeatureAllowancePanel.h"
@@ -29,7 +30,7 @@ CamUiController::CamUiController(
     : QObject(&window)
 {
     m_panel = new CamWorkflowPanel(&window);
-    m_dock = new QDockWidget(QStringLiteral("CAM 工作流"), &window);
+    m_dock = new QDockWidget(QCoreApplication::translate("OpenAutoPath", "CAM 工作流"), &window);
     m_dock->setObjectName(QStringLiteral("camWorkflowDock"));
     m_dock->setWidget(m_panel);
     m_dock->setAllowedAreas(Qt::LeftDockWidgetArea | Qt::RightDockWidgetArea);

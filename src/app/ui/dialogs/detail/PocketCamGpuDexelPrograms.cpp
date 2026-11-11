@@ -1,4 +1,5 @@
 #include "app/ui/dialogs/detail/PocketCamOpenGLWidget.h"
+#include <QCoreApplication>
 
 #include <algorithm>
 #include <array>
@@ -1051,21 +1052,20 @@ bool PocketCamOpenGLWidget::initializeGpuDexelPrograms()
         QStringList failures;
         if (!computeReady) {
             failures.push_back(
-                QStringLiteral("减料 Compute：%1")
+                QCoreApplication::translate("OpenAutoPath", "减料 Compute：%1")
                     .arg(m_dexelComputeProgram.log()));
         }
         if (!surfaceReady) {
             failures.push_back(
-                QStringLiteral("表面分类 Compute：%1")
+                QCoreApplication::translate("OpenAutoPath", "表面分类 Compute：%1")
                     .arg(m_dexelSurfaceProgram.log()));
         }
         if (!renderReady) {
             failures.push_back(
-                QStringLiteral("光顺表面 Render：%1")
+                QCoreApplication::translate("OpenAutoPath", "光顺表面 Render：%1")
                     .arg(m_dexelRenderProgram.log()));
         }
-        m_error = QStringLiteral(
-            "GPU Multi-Dexel 着色器初始化失败：\n%1")
+        m_error = QCoreApplication::translate("OpenAutoPath", "GPU Multi-Dexel 着色器初始化失败：\n%1")
                       .arg(failures.join(QStringLiteral("\n")));
     }
     return m_gpuDexelSupported;

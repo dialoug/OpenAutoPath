@@ -2,6 +2,7 @@
 // setupUiSlices() 实例化各 UI 切片 controller（识别/文档/CAM/播放/仿真）并
 // 提供回调端口；MainWindow 只保留 widget/action 指针与跨工作区的薄粘合。
 #include "MainWindow.h"
+#include <QCoreApplication>
 
 #include "app/playback/PlaybackWorkspaceCoordinator.h"
 #include "app/dialogs/ToolpathParameterDialog.h"
@@ -115,8 +116,7 @@ void MainWindow::setupUiSlices()
             }
             if (totalCount > 0 && visibleCount == 0) {
                 statusBar()->showMessage(
-                    QStringLiteral(
-                        "全部刀路已由 CAM 工序树隐藏；可通过“显示全部工序”恢复。"),
+                    QCoreApplication::translate("OpenAutoPath", "全部刀路已由 CAM 工序树隐藏；可通过“显示全部工序”恢复。"),
                     8000);
             }
         };
@@ -134,8 +134,8 @@ void MainWindow::setupUiSlices()
         QString error;
         if (!m_machiningWorkspace->activateOperationPreview(
                 formalOperationId.toStdString(), program, &error)) {
-            QMessageBox::information(this, QStringLiteral("显示此类刀路"),
-                error.isEmpty() ? QStringLiteral("此类工序没有可用的刀路，请先重新生成。") : error);
+            QMessageBox::information(this, QCoreApplication::translate("OpenAutoPath", "显示此类刀路"),
+                error.isEmpty() ? QCoreApplication::translate("OpenAutoPath", "此类工序没有可用的刀路，请先重新生成。") : error);
             return;
         }
         // Only replace presentation/playback. clearOverlay() would also discard
@@ -165,7 +165,7 @@ void MainWindow::setupUiSlices()
         refreshCamWorkflowPanel();
         if (m_view && !m_view->view().IsNull())
             m_view->view()->Redraw();
-        statusBar()->showMessage(QStringLiteral("已显示此类已有刀路，可在工序树定位并播放。"), 6000);
+        statusBar()->showMessage(QCoreApplication::translate("OpenAutoPath", "已显示此类已有刀路，可在工序树定位并播放。"), 6000);
     };
     camCallbacks.formalOperationSelected = [this](const QString& id) {
         synchronizeFormalOperationSelection(id);
@@ -208,14 +208,14 @@ void MainWindow::setupUiSlices()
 
     if (!m_panelMenu)
         return;
-    m_panelMenu->addSection(QStringLiteral("输入"));
-    addDockToggle(m_fileDock, QStringLiteral("文件"));
-    addDockToggle(m_camWorkflowDock, QStringLiteral("CAM 工作流"));
-    m_panelMenu->addSection(QStringLiteral("模型"));
-    addDockToggle(m_analysisDock, QStringLiteral("模型"));
-    addDockToggle(m_groupDock, QStringLiteral("分组"));
-    m_panelMenu->addSection(QStringLiteral("识别"));
-    addDockToggle(m_featureDock, QStringLiteral("特征"));
-    m_panelMenu->addSection(QStringLiteral("刀路"));
-    addDockToggle(&m_playbackUi->dock(), QStringLiteral("刀路播放"));
+    m_panelMenu->addSection(QCoreApplication::translate("OpenAutoPath", "输入"));
+    addDockToggle(m_fileDock, QCoreApplication::translate("OpenAutoPath", "文件"));
+    addDockToggle(m_camWorkflowDock, QCoreApplication::translate("OpenAutoPath", "CAM 工作流"));
+    m_panelMenu->addSection(QCoreApplication::translate("OpenAutoPath", "模型"));
+    addDockToggle(m_analysisDock, QCoreApplication::translate("OpenAutoPath", "模型"));
+    addDockToggle(m_groupDock, QCoreApplication::translate("OpenAutoPath", "分组"));
+    m_panelMenu->addSection(QCoreApplication::translate("OpenAutoPath", "识别"));
+    addDockToggle(m_featureDock, QCoreApplication::translate("OpenAutoPath", "特征"));
+    m_panelMenu->addSection(QCoreApplication::translate("OpenAutoPath", "刀路"));
+    addDockToggle(&m_playbackUi->dock(), QCoreApplication::translate("OpenAutoPath", "刀路播放"));
 }

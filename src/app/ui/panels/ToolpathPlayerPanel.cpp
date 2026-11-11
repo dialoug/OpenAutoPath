@@ -1,5 +1,6 @@
 // ToolpathPlayerPanel 实现 —— 参见 ToolpathPlayerPanel.h。
 #include "app/ui/panels/ToolpathPlayerPanel.h"
+#include <QCoreApplication>
 
 #include <QVBoxLayout>
 #include <QHBoxLayout>
@@ -32,41 +33,41 @@ ToolpathPlayerPanel::ToolpathPlayerPanel(QWidget* parent) : QWidget(parent)
     auto* row = new QHBoxLayout();
     row->setContentsMargins(0, 0, 0, 0);
 
-    m_playButton = new QPushButton(QStringLiteral("播放"), this);
+    m_playButton = new QPushButton(QCoreApplication::translate("OpenAutoPath", "播放"), this);
     m_playButton->setCheckable(true);
     connect(m_playButton, &QPushButton::toggled, this, &ToolpathPlayerPanel::onPlayPauseToggled);
     row->addWidget(m_playButton);
 
-    m_previousStepButton = new QPushButton(QStringLiteral("上一步"), this);
+    m_previousStepButton = new QPushButton(QCoreApplication::translate("OpenAutoPath", "上一步"), this);
     connect(m_previousStepButton, &QPushButton::clicked, this, &ToolpathPlayerPanel::onStepPrev);
     row->addWidget(m_previousStepButton);
 
-    m_nextStepButton = new QPushButton(QStringLiteral("下一步"), this);
+    m_nextStepButton = new QPushButton(QCoreApplication::translate("OpenAutoPath", "下一步"), this);
     connect(m_nextStepButton, &QPushButton::clicked, this, &ToolpathPlayerPanel::onStepNext);
     row->addWidget(m_nextStepButton);
 
-    m_previousToolButton = new QPushButton(QStringLiteral("上一把刀"), this);
+    m_previousToolButton = new QPushButton(QCoreApplication::translate("OpenAutoPath", "上一把刀"), this);
     connect(m_previousToolButton, &QPushButton::clicked,
             this, &ToolpathPlayerPanel::previousToolRequested);
     row->addWidget(m_previousToolButton);
 
-    m_nextToolButton = new QPushButton(QStringLiteral("下一把刀"), this);
+    m_nextToolButton = new QPushButton(QCoreApplication::translate("OpenAutoPath", "下一把刀"), this);
     connect(m_nextToolButton, &QPushButton::clicked,
             this, &ToolpathPlayerPanel::nextToolRequested);
     row->addWidget(m_nextToolButton);
 
     // 与“播放”按钮一致使用原生 QPushButton，保留完整外围边框；勾选时
     // 由当前 Qt/Windows 主题绘制按下高亮，不硬编码颜色。
-    m_currentToolPathButton = new QPushButton(QStringLiteral("当前刀路径"), this);
+    m_currentToolPathButton = new QPushButton(QCoreApplication::translate("OpenAutoPath", "当前刀路径"), this);
     m_currentToolPathButton->setCheckable(true);
     m_currentToolPathButton->setToolTip(
-        QStringLiteral("高亮时只显示当前刀具在当前装夹面的完整路径"));
+        QCoreApplication::translate("OpenAutoPath", "高亮时只显示当前刀具在当前装夹面的完整路径"));
     connect(m_currentToolPathButton, &QPushButton::toggled,
             this, &ToolpathPlayerPanel::currentToolPathOnlyChanged);
     row->addWidget(m_currentToolPathButton);
 
     row->addStretch(1);
-    row->addWidget(new QLabel(QStringLiteral("速度"), this));
+    row->addWidget(new QLabel(QCoreApplication::translate("OpenAutoPath", "速度"), this));
     m_speedComboBox = new QComboBox(this);
     m_speedComboBox->addItem(QStringLiteral("0.5x"), 0.5);
     m_speedComboBox->addItem(QStringLiteral("1x"), 1.0);
@@ -86,33 +87,33 @@ ToolpathPlayerPanel::ToolpathPlayerPanel(QWidget* parent) : QWidget(parent)
     auto* staticRow = new QHBoxLayout();
     staticRow->setContentsMargins(0, 0, 0, 0);
     m_staticToolpathCountLabel =
-        new QLabel(QStringLiteral("普通刀路 0 段"), this);
+        new QLabel(QCoreApplication::translate("OpenAutoPath", "普通刀路 0 段"), this);
     staticRow->addWidget(m_staticToolpathCountLabel);
     m_operationVisibilityLabel =
-        new QLabel(QStringLiteral("工序 —"), this);
+        new QLabel(QCoreApplication::translate("OpenAutoPath", "工序 —"), this);
     m_operationVisibilityLabel->setObjectName(
         QStringLiteral("operationVisibilityStatus"));
     staticRow->addWidget(m_operationVisibilityLabel);
-    staticRow->addWidget(new QLabel(QStringLiteral("起始"), this));
+    staticRow->addWidget(new QLabel(QCoreApplication::translate("OpenAutoPath", "起始"), this));
     m_staticStartSpinBox = new QSpinBox(this);
     m_staticStartSpinBox->setRange(0, 0);
     m_staticStartSpinBox->setToolTip(
-        QStringLiteral("第一条可见刀路段（从 1 开始）"));
+        QCoreApplication::translate("OpenAutoPath", "第一条可见刀路段（从 1 开始）"));
     staticRow->addWidget(m_staticStartSpinBox);
-    staticRow->addWidget(new QLabel(QStringLiteral("数量"), this));
+    staticRow->addWidget(new QLabel(QCoreApplication::translate("OpenAutoPath", "数量"), this));
     m_staticCountSpinBox = new QSpinBox(this);
     m_staticCountSpinBox->setRange(0, 0);
     m_staticCountSpinBox->setToolTip(
-        QStringLiteral("从起始段开始显示的刀路段数量"));
+        QCoreApplication::translate("OpenAutoPath", "从起始段开始显示的刀路段数量"));
     staticRow->addWidget(m_staticCountSpinBox);
-    m_staticNodesCheckBox = new QCheckBox(QStringLiteral("节点"), this);
+    m_staticNodesCheckBox = new QCheckBox(QCoreApplication::translate("OpenAutoPath", "节点"), this);
     m_staticNodesCheckBox->setToolTip(
-        QStringLiteral("显示普通刀路各线段的端点节点"));
+        QCoreApplication::translate("OpenAutoPath", "显示普通刀路各线段的端点节点"));
     staticRow->addWidget(m_staticNodesCheckBox);
     m_staticResetButton =
-        new QPushButton(QStringLiteral("显示全部刀路段"), this);
+        new QPushButton(QCoreApplication::translate("OpenAutoPath", "显示全部刀路段"), this);
     m_staticResetButton->setToolTip(
-        QStringLiteral("恢复起始段/数量范围；不会改变左侧工序树的勾选状态"));
+        QCoreApplication::translate("OpenAutoPath", "恢复起始段/数量范围；不会改变左侧工序树的勾选状态"));
     staticRow->addWidget(m_staticResetButton);
     staticRow->addStretch(1);
     layout->addLayout(staticRow);
@@ -145,15 +146,15 @@ ToolpathPlayerPanel::ToolpathPlayerPanel(QWidget* parent) : QWidget(parent)
     connect(m_progressSlider, &QSlider::valueChanged, this, &ToolpathPlayerPanel::onProgressSliderMoved);
     layout->addWidget(m_progressSlider);
 
-    m_phaseInfoLabel = new QLabel(QStringLiteral("当前阶段：—"), this);
+    m_phaseInfoLabel = new QLabel(QCoreApplication::translate("OpenAutoPath", "当前阶段：—"), this);
     m_phaseInfoLabel->setTextInteractionFlags(Qt::TextSelectableByMouse);
     layout->addWidget(m_phaseInfoLabel);
 
-    m_toolInfoLabel = new QLabel(QStringLiteral("当前刀具：—"), this);
+    m_toolInfoLabel = new QLabel(QCoreApplication::translate("OpenAutoPath", "当前刀具：—"), this);
     m_toolInfoLabel->setTextInteractionFlags(Qt::TextSelectableByMouse);
     layout->addWidget(m_toolInfoLabel);
 
-    m_infoLabel = new QLabel(QStringLiteral("尚未生成刀路"), this);
+    m_infoLabel = new QLabel(QCoreApplication::translate("OpenAutoPath", "尚未生成刀路"), this);
     m_infoLabel->setWordWrap(true);
     m_infoLabel->setAlignment(Qt::AlignLeft | Qt::AlignTop);
     m_infoLabel->setSizePolicy(QSizePolicy::Preferred, QSizePolicy::Minimum);
@@ -188,14 +189,14 @@ void ToolpathPlayerPanel::setMoveCount(int moveCount)
     if (m_moveCount <= 0) {
         setPlaybackControlsEnabled(false);
         setMachiningContext(QStringLiteral("—"), QStringLiteral("—"));
-        setInfoText(QStringLiteral("尚未生成刀路"));
+        setInfoText(QCoreApplication::translate("OpenAutoPath", "尚未生成刀路"));
         emit playbackReset();
         return;
     }
 
     setPlaybackControlsEnabled(true);
-    setMachiningContext(QStringLiteral("等待开始"), QStringLiteral("—"));
-    setInfoText(QStringLiteral("第 0/%1 步").arg(m_moveCount));
+    setMachiningContext(QCoreApplication::translate("OpenAutoPath", "等待开始"), QStringLiteral("—"));
+    setInfoText(QCoreApplication::translate("OpenAutoPath", "第 0/%1 步").arg(m_moveCount));
     emit frameChanged(0, 1.0); // 归零:清掉旧的已走过叠加
 }
 
@@ -219,8 +220,8 @@ void ToolpathPlayerPanel::setInfoText(const QString& text)
 void ToolpathPlayerPanel::setMachiningContext(const QString& phase,
                                                const QString& tool)
 {
-    const QString phaseText = QStringLiteral("当前阶段：%1").arg(phase);
-    const QString toolText = QStringLiteral("当前刀具：%1").arg(tool);
+    const QString phaseText = QCoreApplication::translate("OpenAutoPath", "当前阶段：%1").arg(phase);
+    const QString toolText = QCoreApplication::translate("OpenAutoPath", "当前刀具：%1").arg(tool);
     m_phaseInfoLabel->setText(phaseText);
     m_phaseInfoLabel->setToolTip(phaseText);
     m_toolInfoLabel->setText(toolText);
@@ -283,7 +284,7 @@ void ToolpathPlayerPanel::setStaticToolpathSegmentCount(int segmentCount)
         }
     }
     m_staticToolpathCountLabel->setText(
-        QStringLiteral("普通刀路 %1 段")
+        QCoreApplication::translate("OpenAutoPath", "普通刀路 %1 段")
             .arg(m_staticToolpathSegmentCount));
     m_staticStartSpinBox->setEnabled(enabled);
     m_staticCountSpinBox->setEnabled(enabled);
@@ -304,23 +305,21 @@ void ToolpathPlayerPanel::setOperationVisibilitySummary(
     const int visible = std::clamp(visibleCount, 0, total);
     const bool allHidden = total > 0 && visible == 0;
     if (total == 0) {
-        m_operationVisibilityLabel->setText(QStringLiteral("工序 —"));
+        m_operationVisibilityLabel->setText(QCoreApplication::translate("OpenAutoPath", "工序 —"));
     } else if (soloMode) {
         m_operationVisibilityLabel->setText(
-            QStringLiteral("单独显示 1/%1 工序").arg(total));
+            QCoreApplication::translate("OpenAutoPath", "单独显示 1/%1 工序").arg(total));
     } else if (allHidden) {
         m_operationVisibilityLabel->setText(
-            QStringLiteral("工序 0/%1（全部隐藏）").arg(total));
+            QCoreApplication::translate("OpenAutoPath", "工序 0/%1（全部隐藏）").arg(total));
     } else {
         m_operationVisibilityLabel->setText(
-            QStringLiteral("工序 %1/%2").arg(visible).arg(total));
+            QCoreApplication::translate("OpenAutoPath", "工序 %1/%2").arg(visible).arg(total));
     }
     m_operationVisibilityLabel->setToolTip(
         allHidden
-            ? QStringLiteral(
-                  "全部刀路已由 CAM 工序树隐藏；点击“显示全部工序”恢复")
-            : QStringLiteral(
-                  "左侧工序树控制工序可见性；起始段/数量只控制显示范围"));
+            ? QCoreApplication::translate("OpenAutoPath", "全部刀路已由 CAM 工序树隐藏；点击“显示全部工序”恢复")
+            : QCoreApplication::translate("OpenAutoPath", "左侧工序树控制工序可见性；起始段/数量只控制显示范围"));
     m_operationVisibilityLabel->setStyleSheet(
         allHidden ? QStringLiteral("color: #ffb74d;") : QString{});
 }
@@ -339,8 +338,8 @@ void ToolpathPlayerPanel::setPlaybackControlsEnabled(bool enabled)
 
 void ToolpathPlayerPanel::updatePlayButtonText()
 {
-    m_playButton->setText(m_playButton->isChecked() ? QStringLiteral("暂停")
-                                              : QStringLiteral("播放"));
+    m_playButton->setText(m_playButton->isChecked() ? QCoreApplication::translate("OpenAutoPath", "暂停")
+                                              : QCoreApplication::translate("OpenAutoPath", "播放"));
 }
 
 void ToolpathPlayerPanel::setCompletedMoveCount(int completedMoveCount)

@@ -39,18 +39,18 @@ bool readLimitedJson(QFile& file, QByteArray& data, QString* error)
     const qint64 size = file.size();
     if (size < 0 || size > kMaxToolLibraryBytes) {
         if (error) {
-            *error = QStringLiteral("刀库文件过大（上限 %1 MiB）")
+            *error = QCoreApplication::translate("OpenAutoPath", "刀库文件过大（上限 %1 MiB）")
                          .arg(kMaxToolLibraryBytes / (1024 * 1024));
         }
         return false;
     }
     data = file.read(kMaxToolLibraryBytes + 1);
     if (data.size() > kMaxToolLibraryBytes) {
-        if (error) *error = QStringLiteral("刀库文件超过允许大小");
+        if (error) *error = QCoreApplication::translate("OpenAutoPath", "刀库文件超过允许大小");
         return false;
     }
     if (file.error() != QFileDevice::NoError) {
-        if (error) *error = QStringLiteral("读取刀库失败：%1").arg(file.errorString());
+        if (error) *error = QCoreApplication::translate("OpenAutoPath", "读取刀库失败：%1").arg(file.errorString());
         return false;
     }
     return true;
@@ -239,7 +239,7 @@ bool libraryFromJson(const QJsonObject& object, ToolLibrary& library, QString* e
 
     const QJsonValue toolsValue = object.value(QStringLiteral("tools"));
     if (!toolsValue.isArray()) {
-        if (error) *error = QStringLiteral("刀库缺少 tools 数组");
+        if (error) *error = QCoreApplication::translate("OpenAutoPath", "刀库缺少 tools 数组");
         return false;
     }
     for (const QJsonValue& value : toolsValue.toArray()) {
@@ -258,7 +258,7 @@ bool libraryFromJson(const QJsonObject& object, ToolLibrary& library, QString* e
 
     const QJsonValue controllersValue = object.value(QStringLiteral("controllers"));
     if (!controllersValue.isArray()) {
-        if (error) *error = QStringLiteral("刀库缺少 controllers 数组");
+        if (error) *error = QCoreApplication::translate("OpenAutoPath", "刀库缺少 controllers 数组");
         return false;
     }
     for (const QJsonValue& value : controllersValue.toArray()) {
@@ -306,7 +306,7 @@ bool libraryFromReferencesJson(const QJsonObject& object,
     const QJsonValue referencesValue = object.value(QStringLiteral("tool_refs"));
     if (!referencesValue.isArray()) {
         if (error)
-            *error = QStringLiteral("刀库缺少 tool_refs 数组");
+            *error = QCoreApplication::translate("OpenAutoPath", "刀库缺少 tool_refs 数组");
         return false;
     }
     QJsonArray tools;
@@ -315,7 +315,7 @@ bool libraryFromReferencesJson(const QJsonObject& object,
         const ToolBit* asset = assets.assetById(assetId);
         if (!asset) {
             if (error) {
-                *error = QStringLiteral("刀库引用了不存在的全局刀具资产：%1")
+                *error = QCoreApplication::translate("OpenAutoPath", "刀库引用了不存在的全局刀具资产：%1")
                              .arg(assetId);
             }
             return false;
@@ -334,7 +334,7 @@ bool parseDocument(const QByteArray& data, QJsonDocument& document, QString* err
     document = QJsonDocument::fromJson(data, &parseError);
     if (parseError.error != QJsonParseError::NoError || !document.isObject()) {
         if (error) {
-            *error = QStringLiteral("JSON 解析失败：%1（偏移 %2）")
+            *error = QCoreApplication::translate("OpenAutoPath", "JSON 解析失败：%1（偏移 %2）")
                          .arg(parseError.errorString()).arg(parseError.offset);
         }
         return false;
@@ -347,16 +347,16 @@ bool writeAtomically(const QString& filePath, const QByteArray& data, QString* e
     // QSaveFile 通过临时文件提交，写入失败时保留原有刀库文件。
     const QFileInfo info(filePath);
     if (!QDir().mkpath(info.absolutePath())) {
-        if (error) *error = QStringLiteral("无法创建目录：%1").arg(info.absolutePath());
+        if (error) *error = QCoreApplication::translate("OpenAutoPath", "无法创建目录：%1").arg(info.absolutePath());
         return false;
     }
     QSaveFile file(filePath);
     if (!file.open(QIODevice::WriteOnly)) {
-        if (error) *error = QStringLiteral("无法写入文件：%1").arg(file.errorString());
+        if (error) *error = QCoreApplication::translate("OpenAutoPath", "无法写入文件：%1").arg(file.errorString());
         return false;
     }
     if (file.write(data) != data.size() || !file.commit()) {
-        if (error) *error = QStringLiteral("保存刀库失败：%1").arg(file.errorString());
+        if (error) *error = QCoreApplication::translate("OpenAutoPath", "保存刀库失败：%1").arg(file.errorString());
         return false;
     }
     return true;
@@ -397,7 +397,7 @@ bool loadFreeCadToolBit(const QString& filePath, ToolBit& tool, QString* error)
 {
     QFile file(filePath);
     if (!file.open(QIODevice::ReadOnly)) {
-        if (error) *error = QStringLiteral("无法读取 FreeCAD 刀具 %1：%2")
+        if (error) *error = QCoreApplication::translate("OpenAutoPath", "无法读取 FreeCAD 刀具 %1：%2")
                                 .arg(filePath, file.errorString());
         return false;
     }
@@ -448,7 +448,7 @@ bool loadFreeCadLibrary(const QString& filePath,
     ToolLibrary parsed(libraryFile.completeBaseName(),
                        object.value(QStringLiteral("label")).toString(
                            libraryFile.completeBaseName()));
-    parsed.setDescription(QStringLiteral("从 FreeCAD .fctl 导入"));
+    parsed.setDescription(QCoreApplication::translate("OpenAutoPath", "从 FreeCAD .fctl 导入"));
     const QJsonArray entries = object.value(QStringLiteral("tools")).toArray();
     for (const QJsonValue& value : entries) {
         const QJsonObject entry = value.toObject();
@@ -476,10 +476,10 @@ bool loadFreeCadLibrary(const QString& filePath,
         QString bitError;
         if (bitPath.isEmpty() || !loadFreeCadToolBit(bitPath, tool, &bitError)) {
             tool.id = QFileInfo(fileName).completeBaseName();
-            tool.name = QStringLiteral("缺失刀具：%1").arg(fileName);
+            tool.name = QCoreApplication::translate("OpenAutoPath", "缺失刀具：%1").arg(fileName);
             tool.type = ToolType::Unknown;
             tool.note = bitPath.isEmpty()
-                ? QStringLiteral("未找到 FreeCAD 刀具依赖")
+                ? QCoreApplication::translate("OpenAutoPath", "未找到 FreeCAD 刀具依赖")
                 : bitError;
         }
         QString itemError;
@@ -521,12 +521,12 @@ bool ToolLibraryStorage::deserializeLibrary(const QByteArray& data,
     if (!parseDocument(data, document, error)) return false;
     const QJsonObject root = document.object();
     if (!isLibrarySchema(root.value(QStringLiteral("schema")).toString())) {
-        if (error) *error = QStringLiteral("不是 OpenAutoPath 刀库文件");
+        if (error) *error = QCoreApplication::translate("OpenAutoPath", "不是 OpenAutoPath 刀库文件");
         return false;
     }
     if (root.value(QStringLiteral("version")).toInt() !=
         kLibrarySchemaVersion) {
-        if (error) *error = QStringLiteral("不支持的刀库版本：%1")
+        if (error) *error = QCoreApplication::translate("OpenAutoPath", "不支持的刀库版本：%1")
                                 .arg(root.value(QStringLiteral("version")).toInt());
         return false;
     }
@@ -554,7 +554,7 @@ bool ToolLibraryStorage::loadLibrary(const QString& filePath,
 {
     QFile file(filePath);
     if (!file.open(QIODevice::ReadOnly)) {
-        if (error) *error = QStringLiteral("无法读取刀库：%1").arg(file.errorString());
+        if (error) *error = QCoreApplication::translate("OpenAutoPath", "无法读取刀库：%1").arg(file.errorString());
         return false;
     }
     QByteArray data;
@@ -568,7 +568,7 @@ bool ToolLibraryStorage::loadLibrary(const QString& filePath,
     }
     if (root.value(QStringLiteral("tools")).isArray())
         return loadFreeCadLibrary(filePath, root, library, error);
-    if (error) *error = QStringLiteral("未知刀库格式");
+    if (error) *error = QCoreApplication::translate("OpenAutoPath", "未知刀库格式");
     return false;
 }
 
@@ -580,7 +580,7 @@ bool ToolLibraryStorage::saveCatalog(const QString& filePath,
     QString validationError;
     if (!catalog.isValid(&validationError)) {
         if (error)
-            *error = QStringLiteral("刀具资产目录无效：\n%1")
+            *error = QCoreApplication::translate("OpenAutoPath", "刀具资产目录无效：\n%1")
                          .arg(validationError);
         return false;
     }
@@ -621,7 +621,7 @@ bool ToolLibraryStorage::loadCatalog(const QString& filePath,
         *requiresCatalogRewrite = false;
     QFile file(filePath);
     if (!file.open(QIODevice::ReadOnly)) {
-        if (error) *error = QStringLiteral("无法读取刀库目录：%1").arg(file.errorString());
+        if (error) *error = QCoreApplication::translate("OpenAutoPath", "无法读取刀库目录：%1").arg(file.errorString());
         return false;
     }
     QByteArray data;
@@ -636,7 +636,7 @@ bool ToolLibraryStorage::loadCatalog(const QString& filePath,
          schema != QStringLiteral("faceface-tool-library-catalog")) ||
         version < kOldestSupportedCatalogVersion ||
         version > kCatalogSchemaVersion) {
-        if (error) *error = QStringLiteral("刀库目录格式或版本不受支持");
+        if (error) *error = QCoreApplication::translate("OpenAutoPath", "刀库目录格式或版本不受支持");
         return false;
     }
 
@@ -658,7 +658,7 @@ bool ToolLibraryStorage::loadCatalog(const QString& filePath,
             }
             if (parsed.assetById(tool.id)) {
                 if (error)
-                    *error = QStringLiteral("全局刀具资产 ID 重复：%1").arg(tool.id);
+                    *error = QCoreApplication::translate("OpenAutoPath", "全局刀具资产 ID 重复：%1").arg(tool.id);
                 return false;
             }
             if (!parsed.upsertAsset(std::move(tool), &itemError)) {

@@ -1,5 +1,6 @@
 // MainWindow 的视图导航、显示模式和模型变换同步。
 #include "MainWindow.h"
+#include <QCoreApplication>
 
 #include "app/recognition/RecognitionWorkspaceCoordinator.h"
 #include "app/playback/PlaybackWorkspaceCoordinator.h"
@@ -64,26 +65,26 @@ void MainWindow::snapToNearestStandardView()
     m_view->view()->Redraw();
     statusBar()->showMessage(
         fitted
-            ? QStringLiteral("已吸附到最近方位：%1，并适合窗口")
-                  .arg(QString::fromUtf8(nearest->label))
-            : QStringLiteral("已吸附到最近方位：%1；没有可适配的可见模型")
-                  .arg(QString::fromUtf8(nearest->label)));
+            ? QCoreApplication::translate("OpenAutoPath", "已吸附到最近方位：%1，并适合窗口")
+                  .arg(QCoreApplication::translate("OpenAutoPath", nearest->label))
+            : QCoreApplication::translate("OpenAutoPath", "已吸附到最近方位：%1；没有可适配的可见模型")
+                  .arg(QCoreApplication::translate("OpenAutoPath", nearest->label)));
 }
 
 void MainWindow::focusCurrentSelection()
 {
     const std::vector<std::string> faceIds = currentSelectedFaceIds();
     if (faceIds.empty()) {
-        statusBar()->showMessage(QStringLiteral("请先选择要定位的面或单元。"));
+        statusBar()->showMessage(QCoreApplication::translate("OpenAutoPath", "请先选择要定位的面或单元。"));
         return;
     }
     if (fitViewToFaces(faceIds))
         statusBar()->showMessage(
-            QStringLiteral("已将当前选择居中定位：%1 个面")
+            QCoreApplication::translate("OpenAutoPath", "已将当前选择居中定位：%1 个面")
                 .arg(static_cast<int>(faceIds.size())));
     else
         statusBar()->showMessage(
-            QStringLiteral("当前选择没有可用的几何范围，无法定位。"));
+            QCoreApplication::translate("OpenAutoPath", "当前选择没有可用的几何范围，无法定位。"));
 }
 
 bool MainWindow::fitModelInView()
@@ -192,7 +193,7 @@ void MainWindow::toggleShaded(bool shaded)
     sceneController().setShaded(shaded);
     if (m_actShaded)
         m_actShaded->setText(
-            shaded ? QStringLiteral("着色") : QStringLiteral("线框"));
+            shaded ? QCoreApplication::translate("OpenAutoPath", "着色") : QCoreApplication::translate("OpenAutoPath", "线框"));
 }
 
 void MainWindow::toggleEdges(bool enabled)
@@ -207,7 +208,7 @@ void MainWindow::toggleConvexityEdges(bool enabled)
         m_view->view()->Redraw();
     if (enabled) {
         statusBar()->showMessage(
-            QStringLiteral("凹凸边：凹边 %1（红），光顺边 %2（蓝），凸边 %3（绿）")
+            QCoreApplication::translate("OpenAutoPath", "凹凸边：凹边 %1（红），光顺边 %2（蓝），凸边 %3（绿）")
                 .arg(static_cast<qulonglong>(
                     sceneController().visibleConcaveEdgeCount()))
                 .arg(static_cast<qulonglong>(
@@ -215,7 +216,7 @@ void MainWindow::toggleConvexityEdges(bool enabled)
                 .arg(static_cast<qulonglong>(
                     sceneController().visibleConvexEdgeCount())));
     } else {
-        statusBar()->showMessage(QStringLiteral("已关闭凹凸边显示"));
+        statusBar()->showMessage(QCoreApplication::translate("OpenAutoPath", "已关闭凹凸边显示"));
     }
 }
 
@@ -230,6 +231,6 @@ void MainWindow::toggleFaded(bool enabled)
     if (!m_view->view().IsNull())
         m_view->view()->Redraw();
     statusBar()->showMessage(
-        enabled ? QStringLiteral("已启用褪色底色")
-                : QStringLiteral("已恢复 STEP 原始颜色"));
+        enabled ? QCoreApplication::translate("OpenAutoPath", "已启用褪色底色")
+                : QCoreApplication::translate("OpenAutoPath", "已恢复 STEP 原始颜色"));
 }

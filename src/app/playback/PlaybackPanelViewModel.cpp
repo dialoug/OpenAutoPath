@@ -1,6 +1,7 @@
 // PlaybackPanelViewModel 实现（oap_app_playback）。
 // 纯播放到面板的投影，不含 QWidget 或 OCCT 呈现所有权，见 PlaybackPanelViewModel.h。
 #include "app/playback/PlaybackPanelViewModel.h"
+#include <QCoreApplication>
 
 #include <algorithm>
 
@@ -21,13 +22,13 @@ bool isHoleKind(FeatureKind kind)
 QString featureKindText(FeatureKind kind)
 {
     switch (kind) {
-        case FeatureKind::ThroughHole: return QStringLiteral("通孔");
-        case FeatureKind::BlindHole: return QStringLiteral("盲孔");
-        case FeatureKind::CountersinkHole: return QStringLiteral("沉孔");
-        case FeatureKind::Slot: return QStringLiteral("槽");
-        case FeatureKind::Pocket: return QStringLiteral("腔");
+        case FeatureKind::ThroughHole: return QCoreApplication::translate("OpenAutoPath", "通孔");
+        case FeatureKind::BlindHole: return QCoreApplication::translate("OpenAutoPath", "盲孔");
+        case FeatureKind::CountersinkHole: return QCoreApplication::translate("OpenAutoPath", "沉孔");
+        case FeatureKind::Slot: return QCoreApplication::translate("OpenAutoPath", "槽");
+        case FeatureKind::Pocket: return QCoreApplication::translate("OpenAutoPath", "腔");
     }
-    return QStringLiteral("特征");
+    return QCoreApplication::translate("OpenAutoPath", "特征");
 }
 
 // 加工阶段 → 中文阶段名(槽/腔在标准阶段用通用名)。
@@ -35,28 +36,28 @@ QString phaseText(toolpath::HoleMachiningPhase phase, FeatureKind kind)
 {
     switch (phase) {
         case toolpath::HoleMachiningPhase::CenterSpot:
-            return QStringLiteral("定位阶段");
+            return QCoreApplication::translate("OpenAutoPath", "定位阶段");
         case toolpath::HoleMachiningPhase::Drill:
-            return QStringLiteral("钻孔阶段");
+            return QCoreApplication::translate("OpenAutoPath", "钻孔阶段");
         case toolpath::HoleMachiningPhase::FlatEndMill:
-            return QStringLiteral("平底刀阶段");
+            return QCoreApplication::translate("OpenAutoPath", "平底刀阶段");
         case toolpath::HoleMachiningPhase::Standard:
-            return isHoleKind(kind) ? QStringLiteral("单刀孔加工阶段")
-                                    : QStringLiteral("槽/腔加工阶段");
+            return isHoleKind(kind) ? QCoreApplication::translate("OpenAutoPath", "单刀孔加工阶段")
+                                    : QCoreApplication::translate("OpenAutoPath", "槽/腔加工阶段");
     }
-    return QStringLiteral("加工阶段");
+    return QCoreApplication::translate("OpenAutoPath", "加工阶段");
 }
 
 // 移动类型 → 中文显示名。
 QString moveTypeText(toolpath::ToolpathMoveType type)
 {
     switch (type) {
-        case toolpath::ToolpathMoveType::Rapid: return QStringLiteral("快速");
-        case toolpath::ToolpathMoveType::Plunge: return QStringLiteral("进刀");
-        case toolpath::ToolpathMoveType::Cut: return QStringLiteral("切削");
-        case toolpath::ToolpathMoveType::Retract: return QStringLiteral("退刀");
+        case toolpath::ToolpathMoveType::Rapid: return QCoreApplication::translate("OpenAutoPath", "快速");
+        case toolpath::ToolpathMoveType::Plunge: return QCoreApplication::translate("OpenAutoPath", "进刀");
+        case toolpath::ToolpathMoveType::Cut: return QCoreApplication::translate("OpenAutoPath", "切削");
+        case toolpath::ToolpathMoveType::Retract: return QCoreApplication::translate("OpenAutoPath", "退刀");
     }
-    return QStringLiteral("移动");
+    return QCoreApplication::translate("OpenAutoPath", "移动");
 }
 
 // 刀具显示文本:优先展示批次刀具(刀号·名称·直径·类型);
@@ -78,7 +79,7 @@ QString toolText(const PlaybackMove& move)
             tooling::toolTypeDisplayName(type));
     }
 
-    return QStringLiteral("未绑定刀具");
+    return QCoreApplication::translate("OpenAutoPath", "未绑定刀具");
 }
 
 } // namespace
@@ -125,7 +126,7 @@ PlaybackPanelViewModel PlaybackPanelViewModelBuilder::build(
         }
     }
 
-    model.infoText = QStringLiteral("第 %1/%2 步")
+    model.infoText = QCoreApplication::translate("OpenAutoPath", "第 %1/%2 步")
         .arg(displayStep).arg(total);
     if (model.informationMoveIndex < 0)
         return model;
@@ -133,7 +134,7 @@ PlaybackPanelViewModel PlaybackPanelViewModelBuilder::build(
     const PlaybackMove& move = moves[model.informationMoveIndex];
     model.phaseText = phaseText(move.phase, move.kind);
     if (move.setupFace != MoldSetupFace::Unresolved) {
-        model.phaseText += QStringLiteral(" · 装夹面 %1").arg(
+        model.phaseText += QCoreApplication::translate("OpenAutoPath", " · 装夹面 %1").arg(
             QString::fromLatin1(moldSetupFaceName(move.setupFace)));
     }
     model.toolText = toolText(move);
@@ -142,16 +143,16 @@ PlaybackPanelViewModel PlaybackPanelViewModelBuilder::build(
         moveTypeText(move.move.type));
     if (move.move.type == toolpath::ToolpathMoveType::Cut) {
         const QString label = isHoleKind(move.kind)
-            ? QString::fromUtf8(
+            ? QCoreApplication::translate("OpenAutoPath",
                   toolpath::holeMachiningStrategyZh(move.holeStrategy))
             : featureKindText(move.kind);
         model.infoText += QStringLiteral("(%1)").arg(label);
     }
     if (move.setupIndex >= 0 && move.setupCount > 0) {
-        model.infoText += QStringLiteral(" · 装夹 %1/%2")
+        model.infoText += QCoreApplication::translate("OpenAutoPath", " · 装夹 %1/%2")
             .arg(move.setupIndex + 1).arg(move.setupCount);
     }
-    model.infoText += QStringLiteral(" · 深度层 %1").arg(
+    model.infoText += QCoreApplication::translate("OpenAutoPath", " · 深度层 %1").arg(
         move.move.depthIndex);
     return model;
 }

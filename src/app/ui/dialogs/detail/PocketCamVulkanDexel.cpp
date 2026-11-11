@@ -1,4 +1,5 @@
 #include "app/ui/dialogs/detail/PocketCamVulkanDexel.h"
+#include <QCoreApplication>
 #include <rhi/qrhi.h>
 #include <rhi/qrhi_platform.h>
 #include <QVulkanFunctions>
@@ -325,7 +326,7 @@ bool PocketCamVulkanDexel::initialize(QRhi* rhi, QRhiRenderPassDescriptor* pass,
         s.staging.clear();
         s.createPipelines(static_cast<const QRhiVulkanRenderPassNativeHandles*>(pass->nativeHandles())->renderPass);
         return true;
-    } catch (const std::exception& e) { error = QString::fromUtf8(e.what()); m.reset(); return false; }
+    } catch (const std::exception& e) { error = QCoreApplication::translate("OpenAutoPathDiagnostic", QString::fromUtf8(e.what()).toUtf8().constData()); m.reset(); return false; }
 }
 
 bool PocketCamVulkanDexel::uploadStock(QRhi* rhi, QRhiCommandBuffer* commands, const toolpath::MultiDexelStock& stock)

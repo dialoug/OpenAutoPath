@@ -1,4 +1,5 @@
 #include "app/ui/dialogs/detail/PocketCamVulkanWidget.h"
+#include <QCoreApplication>
 #include <algorithm>
 #include <cmath>
 #include <limits>
@@ -24,7 +25,7 @@ PocketCamVulkanWidget::PocketCamVulkanWidget(toolpath::PocketCamSimulationScene 
     setFocusPolicy(Qt::StrongFocus);
     connect(this, &QRhiWidget::renderFailed, this, [this] {
         m_renderReady = false;
-        m_error = QStringLiteral("Vulkan 设备或窗口初始化失败，请使用 OpenGL 兼容显示。");
+        m_error = QCoreApplication::translate("OpenAutoPath", "Vulkan 设备或窗口初始化失败，请使用 OpenGL 兼容显示。");
     });
     connect(m_controller.get(), &IpwDisplayMeshController::resultReady,
         this, [this](const IpwDisplayMeshResult& result) { acceptFrame(result); });
@@ -125,7 +126,7 @@ void PocketCamVulkanWidget::requestFrame(std::size_t step)
     m_controller->cancel(true);
     m_pending = false;
     if (!m_initial || !m_initial->valid()) {
-        m_error = QStringLiteral("Vulkan 仿真缺少有效的初始 IPW。");
+        m_error = QCoreApplication::translate("OpenAutoPath", "Vulkan 仿真缺少有效的初始 IPW。");
         return;
     }
     IpwDisplayMeshRequest request;
@@ -140,18 +141,18 @@ void PocketCamVulkanWidget::requestFrame(std::size_t step)
     }
     else {
         const auto end = std::lower_bound(m_motionEnds.begin(), m_motionEnds.end(), step);
-        if (end == m_motionEnds.end()) { m_error = QStringLiteral("刀路播放索引无效。"); return; }
+        if (end == m_motionEnds.end()) { m_error = QCoreApplication::translate("OpenAutoPath", "刀路播放索引无效。"); return; }
         const auto index = static_cast<std::size_t>(end - m_motionEnds.begin());
         const auto& motion = m_scene.motions[index];
         if (motion.operationIndex < 0 || static_cast<std::size_t>(motion.operationIndex) >= m_sources.size() ||
             !m_sources[motion.operationIndex]) {
-            m_error = QStringLiteral("此工序缺少原始刀路 IPW 来源，无法生成 Vulkan 材料帧。");
+            m_error = QCoreApplication::translate("OpenAutoPath", "此工序缺少原始刀路 IPW 来源，无法生成 Vulkan 材料帧。");
             return;
         }
         auto source = std::make_shared<IpwTransientFrameSource>(*m_sources[motion.operationIndex]);
         const auto& path = m_sourcePaths[motion.operationIndex];
         if (!path.operation || motion.sourceMoveEndCount == 0 || motion.sourceMoveEndCount >= path.distances.size()) {
-            m_error = QStringLiteral("原始刀路与播放索引不一致。");
+            m_error = QCoreApplication::translate("OpenAutoPath", "原始刀路与播放索引不一致。");
             return;
         }
         std::size_t completed = motion.sourceMoveEndCount;
@@ -179,12 +180,12 @@ void PocketCamVulkanWidget::requestFrame(std::size_t step)
         request.transientSource = std::move(source);
     }
     const auto stock = request.stockSource ? request.stockSource : request.transientSource->parentStock;
-    if (!stock || !stock->valid()) { m_error = QStringLiteral("工序 IPW 检查点无效。"); return; }
+    if (!stock || !stock->valid()) { m_error = QCoreApplication::translate("OpenAutoPath", "工序 IPW 检查点无效。"); return; }
     request.meshOptions = IpwDisplayMeshController::meshOptionsForQuality(
         static_cast<int>(std::clamp(m_scene.quality, 1.0, 10.0)), stock->resolution());
     m_requestedStep = step;
     m_pending = m_controller->submit(std::move(request));
-    if (!m_pending) m_error = QStringLiteral("无法启动 Vulkan IPW 材料帧更新。");
+    if (!m_pending) m_error = QCoreApplication::translate("OpenAutoPath", "无法启动 Vulkan IPW 材料帧更新。");
 }
 
 void PocketCamVulkanWidget::acceptFrame(const IpwDisplayMeshResult& result)
@@ -193,14 +194,14 @@ void PocketCamVulkanWidget::acceptFrame(const IpwDisplayMeshResult& result)
     if (result.cancelled) return;
     const bool empty = result.materialStock && result.materialStock->valid() && result.materialStock->intervalCount() == 0;
     if ((!result.ok() && !empty) || !result.materialStock || !result.materialStock->valid()) {
-        m_error = QStringLiteral("IPW 材料帧生成失败：%1").arg(QString::fromStdString(result.error));
+        m_error = QCoreApplication::translate("OpenAutoPath", "IPW 材料帧生成失败：%1").arg(QCoreApplication::translate("OpenAutoPathDiagnostic", QString::fromStdString(result.error).toUtf8().constData()));
         return;
     }
     QString error;
     RenderMesh material;
     if (!m_gpuSurface && !empty) material = meshTriangulation(result.mesh, error);
     if (!error.isEmpty() || (!m_gpuSurface && !empty && material.empty())) {
-        m_error = QStringLiteral("IPW 网格转换失败：%1").arg(error);
+        m_error = QCoreApplication::translate("OpenAutoPath", "IPW 网格转换失败：%1").arg(error);
         return;
     }
     // Publish tool, progress and material atomically; stale requests are rejected by the controller.
@@ -231,11 +232,11 @@ void PocketCamVulkanWidget::updateTool()
 
 QString PocketCamVulkanWidget::materialStatusString() const
 {
-    if (m_gpuPlayback) return QStringLiteral("Vulkan GPU Multi-Dexel / TSDF｜增量去料与间接表面绘制");
-    if (m_gpuSurface) return QStringLiteral("Vulkan GPU Multi-Dexel / TSDF｜权威 IPW 材料｜%1")
-        .arg(playbackBusy() ? QStringLiteral("材料帧准备中") : QStringLiteral("材料帧已就绪"));
-    return QStringLiteral("Vulkan｜%1｜材料由原始刀路和 IPW 检查点计算，显示采用有界网格")
-        .arg(!m_error.isEmpty() ? QStringLiteral("显示失败") : playbackBusy() ? QStringLiteral("材料帧准备中") : QStringLiteral("材料帧已就绪"))
-        + (m_gpuFallbackReason.isEmpty() ? QString() : QStringLiteral("｜GPU 回退：") + m_gpuFallbackReason);
+    if (m_gpuPlayback) return QCoreApplication::translate("OpenAutoPath", "Vulkan GPU Multi-Dexel / TSDF｜增量去料与间接表面绘制");
+    if (m_gpuSurface) return QCoreApplication::translate("OpenAutoPath", "Vulkan GPU Multi-Dexel / TSDF｜权威 IPW 材料｜%1")
+        .arg(playbackBusy() ? QCoreApplication::translate("OpenAutoPath", "材料帧准备中") : QCoreApplication::translate("OpenAutoPath", "材料帧已就绪"));
+    return QCoreApplication::translate("OpenAutoPath", "Vulkan｜%1｜材料由原始刀路和 IPW 检查点计算，显示采用有界网格")
+        .arg(!m_error.isEmpty() ? QCoreApplication::translate("OpenAutoPath", "显示失败") : playbackBusy() ? QCoreApplication::translate("OpenAutoPath", "材料帧准备中") : QCoreApplication::translate("OpenAutoPath", "材料帧已就绪"))
+        + (m_gpuFallbackReason.isEmpty() ? QString() : QCoreApplication::translate("OpenAutoPath", "｜GPU 回退：") + m_gpuFallbackReason);
 }
 } // namespace oap::app::pocket_cam_detail

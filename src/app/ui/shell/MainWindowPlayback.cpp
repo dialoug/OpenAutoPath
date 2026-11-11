@@ -2,6 +2,7 @@
 // 保留跨多个工作区的播放命令适配：清除叠加层/孔段高亮显示等，把 UI 事件
 // 翻译为 workspace coordinator 调用。
 #include "MainWindow.h"
+#include <QCoreApplication>
 
 #include "app/orchestration/DesktopWorkspaceCoordinator.h"
 #include "app/playback/PlaybackWorkspaceCoordinator.h"
@@ -152,7 +153,7 @@ void MainWindow::highlightHoleStageToolpathForFace(
         m_view->context()->ClearSelected(Standard_False);
         m_view->view()->Redraw();
         statusBar()->showMessage(
-            QStringLiteral("已取消当前孔段高亮；仍保留 %1 个。")
+            QCoreApplication::translate("OpenAutoPath", "已取消当前孔段高亮；仍保留 %1 个。")
                 .arg(m_machiningWorkspace
                     ->highlightedHoleStageSources().size()));
         return;
@@ -161,8 +162,8 @@ void MainWindow::highlightHoleStageToolpathForFace(
             sourceIndex, m_machiningWorkspace->holePreviewEntries())) {
         statusBar()->showMessage(
             m_playbackWorkspace->currentToolOnly()
-                ? QStringLiteral("当前孔段不属于当前刀具批次。")
-                : QStringLiteral("当前孔段没有可高亮刀路，请先生成孔刀路。"));
+                ? QCoreApplication::translate("OpenAutoPath", "当前孔段不属于当前刀具批次。")
+                : QCoreApplication::translate("OpenAutoPath", "当前孔段没有可高亮刀路，请先生成孔刀路。"));
         return;
     }
     m_machiningWorkspace->toggleHighlightedHoleStage(sourceIndex);
@@ -171,12 +172,12 @@ void MainWindow::highlightHoleStageToolpathForFace(
     if (stats.moveCount == 0) {
         m_machiningWorkspace->removeHighlightedHoleStage(sourceIndex);
         rebuildHoleStageHighlightDisplay();
-        statusBar()->showMessage(QStringLiteral("孔段高亮显示构建失败。"));
+        statusBar()->showMessage(QCoreApplication::translate("OpenAutoPath", "孔段高亮显示构建失败。"));
         return;
     }
     m_view->view()->Redraw();
     statusBar()->showMessage(
-        QStringLiteral("已加入孔段高亮：%1 个孔段，%2 个孔壁，%3 个工序。")
+        QCoreApplication::translate("OpenAutoPath", "已加入孔段高亮：%1 个孔段，%2 个孔壁，%3 个工序。")
             .arg(m_machiningWorkspace
                 ->highlightedHoleStageSources().size())
             .arg(stats.wallCount)

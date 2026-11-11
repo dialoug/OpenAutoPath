@@ -1,6 +1,7 @@
 // HoleToolpathWorkbenchCoordinator 实现（oap_app_workflow_cam）。
 // 孔刀路工作台的值模型和事务边界，见 HoleToolpathWorkbenchCoordinator.h。
 #include "app/workflows/hole/HoleToolpathWorkbenchCoordinator.h"
+#include <QCoreApplication>
 
 #include <algorithm>
 #include <set>
@@ -25,13 +26,13 @@ bool isHoleKind(FeatureKind kind) noexcept
 QString featureKindText(FeatureKind kind)
 {
     switch (kind) {
-        case FeatureKind::ThroughHole: return QStringLiteral("通孔");
-        case FeatureKind::BlindHole: return QStringLiteral("盲孔");
-        case FeatureKind::CountersinkHole: return QStringLiteral("沉孔");
-        case FeatureKind::Slot: return QStringLiteral("槽");
-        case FeatureKind::Pocket: return QStringLiteral("腔");
+        case FeatureKind::ThroughHole: return QCoreApplication::translate("OpenAutoPath", "通孔");
+        case FeatureKind::BlindHole: return QCoreApplication::translate("OpenAutoPath", "盲孔");
+        case FeatureKind::CountersinkHole: return QCoreApplication::translate("OpenAutoPath", "沉孔");
+        case FeatureKind::Slot: return QCoreApplication::translate("OpenAutoPath", "槽");
+        case FeatureKind::Pocket: return QCoreApplication::translate("OpenAutoPath", "腔");
     }
-    return QStringLiteral("特征");
+    return QCoreApplication::translate("OpenAutoPath", "特征");
 }
 
 QString phaseText(
@@ -39,22 +40,22 @@ QString phaseText(
     ToolpathBatchFamily family)
 {
     if (family == ToolpathBatchFamily::Profile)
-        return QStringLiteral("外轮廓加工");
+        return QCoreApplication::translate("OpenAutoPath", "外轮廓加工");
     if (family == ToolpathBatchFamily::SurfaceFinishing)
-        return QStringLiteral("雕刻加工");
+        return QCoreApplication::translate("OpenAutoPath", "雕刻加工");
     switch (phase) {
         case toolpath::HoleMachiningPhase::CenterSpot:
-            return QStringLiteral("定位阶段");
+            return QCoreApplication::translate("OpenAutoPath", "定位阶段");
         case toolpath::HoleMachiningPhase::Drill:
-            return QStringLiteral("钻孔阶段");
+            return QCoreApplication::translate("OpenAutoPath", "钻孔阶段");
         case toolpath::HoleMachiningPhase::FlatEndMill:
-            return QStringLiteral("平底刀阶段");
+            return QCoreApplication::translate("OpenAutoPath", "平底刀阶段");
         case toolpath::HoleMachiningPhase::Standard:
             return family == ToolpathBatchFamily::Hole
-                ? QStringLiteral("单刀孔加工阶段")
-                : QStringLiteral("槽/腔加工阶段");
+                ? QCoreApplication::translate("OpenAutoPath", "单刀孔加工阶段")
+                : QCoreApplication::translate("OpenAutoPath", "槽/腔加工阶段");
     }
-    return QStringLiteral("加工阶段");
+    return QCoreApplication::translate("OpenAutoPath", "加工阶段");
 }
 
 ToolpathBatchFamily operationFamily(const PlaybackMove& move) noexcept
@@ -96,34 +97,34 @@ QString operationStateText(manufacturing::JobOperationState state)
 {
     switch (state) {
         case manufacturing::JobOperationState::Planned:
-            return QStringLiteral("待生成");
+            return QCoreApplication::translate("OpenAutoPath", "待生成");
         case manufacturing::JobOperationState::Dirty:
-            return QStringLiteral("已修改");
+            return QCoreApplication::translate("OpenAutoPath", "已修改");
         case manufacturing::JobOperationState::Generated:
-            return QStringLiteral("已生成");
+            return QCoreApplication::translate("OpenAutoPath", "已生成");
         case manufacturing::JobOperationState::Warning:
-            return QStringLiteral("有警告");
+            return QCoreApplication::translate("OpenAutoPath", "有警告");
         case manufacturing::JobOperationState::Error:
-            return QStringLiteral("失败");
+            return QCoreApplication::translate("OpenAutoPath", "失败");
         case manufacturing::JobOperationState::Stale:
-            return QStringLiteral("下游失效");
+            return QCoreApplication::translate("OpenAutoPath", "下游失效");
         case manufacturing::JobOperationState::NeedsReview:
-            return QStringLiteral("需复核");
+            return QCoreApplication::translate("OpenAutoPath", "需复核");
     }
-    return QStringLiteral("未知");
+    return QCoreApplication::translate("OpenAutoPath", "未知");
 }
 
 QString ipwStatusText(manufacturing::ipw::IpwNodeStatus status)
 {
     using Status = manufacturing::ipw::IpwNodeStatus;
     switch (status) {
-        case Status::Dirty: return QStringLiteral("待重建");
-        case Status::Computing: return QStringLiteral("计算中");
-        case Status::Ready: return QStringLiteral("就绪");
-        case Status::Failed: return QStringLiteral("失败");
-        case Status::Cancelled: return QStringLiteral("已取消");
+        case Status::Dirty: return QCoreApplication::translate("OpenAutoPath", "待重建");
+        case Status::Computing: return QCoreApplication::translate("OpenAutoPath", "计算中");
+        case Status::Ready: return QCoreApplication::translate("OpenAutoPath", "就绪");
+        case Status::Failed: return QCoreApplication::translate("OpenAutoPath", "失败");
+        case Status::Cancelled: return QCoreApplication::translate("OpenAutoPath", "已取消");
     }
-    return QStringLiteral("未知");
+    return QCoreApplication::translate("OpenAutoPath", "未知");
 }
 
 void addOperationIssue(
@@ -161,8 +162,8 @@ void projectOperationTargets(
             if (!operation)
                 return;
             view.targetCount = static_cast<int>(operation->target.unitIds.size());
-            view.targetSummary = QStringLiteral("%1 个完整实体").arg(view.targetCount);
-            view.boundaryMode = QStringLiteral("固定刀轴曲面平行扫描");
+            view.targetSummary = QCoreApplication::translate("OpenAutoPath", "%1 个完整实体").arg(view.targetCount);
+            view.boundaryMode = QCoreApplication::translate("OpenAutoPath", "固定刀轴曲面平行扫描");
             return;
         }
         case Kind::Hole: {
@@ -177,10 +178,10 @@ void projectOperationTargets(
                         ? target.hole.sourceFaceIds.size()
                         : target.hole.stageWallFaceIds.size());
             }
-            view.targetSummary = QStringLiteral("%1 个孔目标 · %2 个来源面")
+            view.targetSummary = QCoreApplication::translate("OpenAutoPath", "%1 个孔目标 · %2 个来源面")
                 .arg(view.targetCount)
                 .arg(view.targetFaceCount);
-            view.boundaryMode = QStringLiteral("孔圆柱/入口几何");
+            view.boundaryMode = QCoreApplication::translate("OpenAutoPath", "孔圆柱/入口几何");
             return;
         }
         case Kind::Pocket: {
@@ -191,14 +192,14 @@ void projectOperationTargets(
             view.targetCount = 1;
             view.targetFaceCount = static_cast<int>(
                 operation->target.sourceFaceIds.size());
-            view.targetSummary = QStringLiteral("1 个槽腔区域 · %1 个来源面")
+            view.targetSummary = QCoreApplication::translate("OpenAutoPath", "1 个槽腔区域 · %1 个来源面")
                 .arg(view.targetFaceCount);
             view.boundaryMode = operation->target.sourceKind ==
                     manufacturing::PocketRegionSourceKind::RootInnerWire
-                ? QStringLiteral("根面内环")
+                ? QCoreApplication::translate("OpenAutoPath", "根面内环")
                 : (operation->target.allowOpenSectionContours
-                       ? QStringLiteral("特征轮廓（允许开放截面）")
-                       : QStringLiteral("特征闭合轮廓"));
+                       ? QCoreApplication::translate("OpenAutoPath", "特征轮廓（允许开放截面）")
+                       : QCoreApplication::translate("OpenAutoPath", "特征闭合轮廓"));
             return;
         }
         case Kind::Profile: {
@@ -209,9 +210,9 @@ void projectOperationTargets(
             view.targetCount = 1;
             view.targetFaceCount = static_cast<int>(
                 operation->target.machiningFaceIds.size());
-            view.targetSummary = QStringLiteral("1 个外轮廓 · %1 个加工面")
+            view.targetSummary = QCoreApplication::translate("OpenAutoPath", "1 个外轮廓 · %1 个加工面")
                 .arg(view.targetFaceCount);
-            view.boundaryMode = QStringLiteral("根面真实外环");
+            view.boundaryMode = QCoreApplication::translate("OpenAutoPath", "根面真实外环");
             return;
         }
     }
@@ -228,19 +229,19 @@ void projectOperationStateIssues(
     if (!descriptor.enabled) {
         addOperationIssue(
             view, QStringLiteral("formal.operation_disabled"),
-            QStringLiteral("正式工序已禁用，不进入运行期程序或 IPW 计划。"),
+            QCoreApplication::translate("OpenAutoPath", "正式工序已禁用，不进入运行期程序或 IPW 计划。"),
             Severity::Info);
     }
     switch (descriptor.state) {
         case State::Planned:
             addOperationIssue(
                 view, QStringLiteral("formal.not_generated"),
-                QStringLiteral("正式工序尚未生成。"), Severity::Info);
+                QCoreApplication::translate("OpenAutoPath", "正式工序尚未生成。"), Severity::Info);
             break;
         case State::Dirty:
             addOperationIssue(
                 view, QStringLiteral("formal.definition_dirty"),
-                QStringLiteral("正式输入已修改，需要重新生成并验证。"),
+                QCoreApplication::translate("OpenAutoPath", "正式输入已修改，需要重新生成并验证。"),
                 Severity::Warning);
             break;
         case State::Generated:
@@ -248,24 +249,24 @@ void projectOperationStateIssues(
         case State::Warning:
             addOperationIssue(
                 view, QStringLiteral("formal.generation_warning"),
-                QStringLiteral("工序已生成，但保留非阻断验证警告。"),
+                QCoreApplication::translate("OpenAutoPath", "工序已生成，但保留非阻断验证警告。"),
                 Severity::Warning);
             break;
         case State::Error:
             addOperationIssue(
                 view, QStringLiteral("formal.generation_error"),
-                QStringLiteral("工序生成或安全验证失败。"), Severity::Error);
+                QCoreApplication::translate("OpenAutoPath", "工序生成或安全验证失败。"), Severity::Error);
             break;
         case State::Stale:
             addOperationIssue(
                 view, QStringLiteral("formal.upstream_stale"),
-                QStringLiteral("定义或上游材料状态已变化，必须从此处重建。"),
+                QCoreApplication::translate("OpenAutoPath", "定义或上游材料状态已变化，必须从此处重建。"),
                 Severity::Warning);
             break;
         case State::NeedsReview:
             addOperationIssue(
                 view, QStringLiteral("formal.review_required"),
-                QStringLiteral("稳定引用或装夹确认需要人工复核。"),
+                QCoreApplication::translate("OpenAutoPath", "稳定引用或装夹确认需要人工复核。"),
                 Severity::Warning);
             break;
     }
@@ -275,17 +276,17 @@ void projectOperationStateIssues(
     if (!setup) {
         addOperationIssue(
             view, QStringLiteral("formal.setup_missing"),
-            QStringLiteral("工序引用的 Setup 快照不存在。"),
+            QCoreApplication::translate("OpenAutoPath", "工序引用的 Setup 快照不存在。"),
             Severity::Error);
     } else if (!setup->valid) {
         addOperationIssue(
             view, QStringLiteral("formal.setup_invalid"),
-            QStringLiteral("工序引用的 Setup 快照无效。"),
+            QCoreApplication::translate("OpenAutoPath", "工序引用的 Setup 快照无效。"),
             Severity::Error);
     } else if (!setup->confirmation.confirmed) {
         addOperationIssue(
             view, QStringLiteral("formal.setup_unconfirmed"),
-            QStringLiteral("工序 Setup 尚未完成人工确认。"),
+            QCoreApplication::translate("OpenAutoPath", "工序 Setup 尚未完成人工确认。"),
             Severity::Warning);
     }
 
@@ -294,19 +295,19 @@ void projectOperationStateIssues(
     if (!controller) {
         addOperationIssue(
             view, QStringLiteral("formal.tool_missing"),
-            QStringLiteral("工序引用的刀具控制器快照不存在。"),
+            QCoreApplication::translate("OpenAutoPath", "工序引用的刀具控制器快照不存在。"),
             Severity::Error);
     } else if (!controller->tool.valid) {
         addOperationIssue(
             view, QStringLiteral("formal.tool_invalid"),
-            QStringLiteral("工序引用的刀具装配快照无效。"),
+            QCoreApplication::translate("OpenAutoPath", "工序引用的刀具装配快照无效。"),
             Severity::Error);
     }
 
     if (descriptor.enabled && !hasPlayback) {
         addOperationIssue(
             view, QStringLiteral("playback.result_missing"),
-            QStringLiteral("当前没有可播放的已验证运行期移动。"),
+            QCoreApplication::translate("OpenAutoPath", "当前没有可播放的已验证运行期移动。"),
             descriptor.state == State::Generated ||
                     descriptor.state == State::Warning
                 ? Severity::Warning : Severity::Info);
@@ -322,14 +323,14 @@ void projectOperationIpw(
     using Status = manufacturing::ipw::IpwNodeStatus;
     const auto& session = workspace.job().ipwSession();
     if (!descriptor.enabled) {
-        view.ipwStatus = QStringLiteral("未进入计划（已禁用）");
+        view.ipwStatus = QCoreApplication::translate("OpenAutoPath", "未进入计划（已禁用）");
         return;
     }
     if (!session.configured()) {
-        view.ipwStatus = QStringLiteral("未配置");
+        view.ipwStatus = QCoreApplication::translate("OpenAutoPath", "未配置");
         addOperationIssue(
             view, QStringLiteral("ipw.session_unconfigured"),
-            QStringLiteral("统一 IPW 会话尚未配置。"), Severity::Info);
+            QCoreApplication::translate("OpenAutoPath", "统一 IPW 会话尚未配置。"), Severity::Info);
         return;
     }
 
@@ -340,10 +341,10 @@ void projectOperationIpw(
             return node.operation.id == descriptor.id;
         });
     if (found == nodes.end()) {
-        view.ipwStatus = QStringLiteral("计划节点缺失");
+        view.ipwStatus = QCoreApplication::translate("OpenAutoPath", "计划节点缺失");
         addOperationIssue(
             view, QStringLiteral("ipw.node_missing"),
-            QStringLiteral("启用的正式工序没有对应 IPW 计划节点。"),
+            QCoreApplication::translate("OpenAutoPath", "启用的正式工序没有对应 IPW 计划节点。"),
             Severity::Warning);
         return;
     }
@@ -354,17 +355,17 @@ void projectOperationIpw(
     view.ipwStateKey = QString::fromStdString(found->stateKey);
     view.ipwStatus = ipwStatusText(found->status);
     if (nodeIndex == 0) {
-        view.predecessorOperationId = QStringLiteral("初始毛坯");
+        view.predecessorOperationId = QCoreApplication::translate("OpenAutoPath", "初始毛坯");
     } else {
         const auto& predecessor = nodes[nodeIndex - 1u];
         if (predecessor.stateKey == found->parentStateKey) {
             view.predecessorOperationId = QString::fromStdString(
                 predecessor.operation.id);
         } else {
-            view.predecessorOperationId = QStringLiteral("父链不一致");
+            view.predecessorOperationId = QCoreApplication::translate("OpenAutoPath", "父链不一致");
             addOperationIssue(
                 view, QStringLiteral("ipw.parent_chain_mismatch"),
-                QStringLiteral("IPW 节点父状态键未指向前一道计划工序。"),
+                QCoreApplication::translate("OpenAutoPath", "IPW 节点父状态键未指向前一道计划工序。"),
                 Severity::Error);
         }
     }
@@ -378,13 +379,13 @@ void projectOperationIpw(
         case Status::Dirty:
             addOperationIssue(
                 view, QStringLiteral("ipw.node_dirty"),
-                QStringLiteral("IPW 节点等待从父检查点重建。"),
+                QCoreApplication::translate("OpenAutoPath", "IPW 节点等待从父检查点重建。"),
                 Severity::Warning);
             break;
         case Status::Computing:
             addOperationIssue(
                 view, QStringLiteral("ipw.node_computing"),
-                QStringLiteral("IPW 节点正在计算，尚不可回放。"),
+                QCoreApplication::translate("OpenAutoPath", "IPW 节点正在计算，尚不可回放。"),
                 Severity::Info);
             break;
         case Status::Ready:
@@ -393,23 +394,23 @@ void projectOperationIpw(
             addOperationIssue(
                 view, QStringLiteral("ipw.node_failed"),
                 found->message.empty()
-                    ? QStringLiteral("IPW 节点执行失败。")
-                    : QString::fromStdString(found->message),
+                    ? QCoreApplication::translate("OpenAutoPath", "IPW 节点执行失败。")
+                    : QCoreApplication::translate("OpenAutoPathDiagnostic", QString::fromStdString(found->message).toUtf8().constData()),
                 Severity::Error);
             break;
         case Status::Cancelled:
             addOperationIssue(
                 view, QStringLiteral("ipw.node_cancelled"),
                 found->message.empty()
-                    ? QStringLiteral("IPW 节点执行已取消。")
-                    : QString::fromStdString(found->message),
+                    ? QCoreApplication::translate("OpenAutoPath", "IPW 节点执行已取消。")
+                    : QCoreApplication::translate("OpenAutoPathDiagnostic", QString::fromStdString(found->message).toUtf8().constData()),
                 Severity::Warning);
             break;
     }
     if (!view.parentCheckpointAvailable) {
         addOperationIssue(
             view, QStringLiteral("ipw.parent_checkpoint_missing"),
-            QStringLiteral("父 IPW 检查点不在当前运行期缓存中。"),
+            QCoreApplication::translate("OpenAutoPath", "父 IPW 检查点不在当前运行期缓存中。"),
             found->status == Status::Ready
                 ? Severity::Error : Severity::Warning);
     }
@@ -417,7 +418,7 @@ void projectOperationIpw(
         !view.operationCheckpointAvailable) {
         addOperationIssue(
             view, QStringLiteral("ipw.checkpoint_missing"),
-            QStringLiteral("就绪节点缺少自身不可变检查点。"),
+            QCoreApplication::translate("OpenAutoPath", "就绪节点缺少自身不可变检查点。"),
             Severity::Error);
     }
 }
@@ -425,7 +426,7 @@ void projectOperationIpw(
 QString formalInspectorDetails(const ToolpathOperationView& view)
 {
     const QString predecessor = view.predecessorOperationId.isEmpty()
-        ? QStringLiteral("无对应节点") : view.predecessorOperationId;
+        ? QCoreApplication::translate("OpenAutoPath", "无对应节点") : view.predecessorOperationId;
     const QString parentKey = view.parentIpwStateKey.isEmpty()
         ? QStringLiteral("—") : view.parentIpwStateKey;
     const QString stateKey = view.ipwStateKey.isEmpty()
@@ -433,45 +434,44 @@ QString formalInspectorDetails(const ToolpathOperationView& view)
     const QString parentCheckpoint = view.parentIpwStateKey.isEmpty()
         ? QStringLiteral("—")
         : (view.parentCheckpointAvailable
-               ? QStringLiteral("存在") : QStringLiteral("缺失"));
+               ? QCoreApplication::translate("OpenAutoPath", "存在") : QCoreApplication::translate("OpenAutoPath", "缺失"));
     const QString operationCheckpoint = view.ipwStateKey.isEmpty()
         ? QStringLiteral("—")
         : (view.operationCheckpointAvailable
-               ? QStringLiteral("存在") : QStringLiteral("缺失"));
-    QString text = QStringLiteral(
-        "正式输入与依赖\n目标：%1\n边界：%2\n前序 IPW：%3\n"
+               ? QCoreApplication::translate("OpenAutoPath", "存在") : QCoreApplication::translate("OpenAutoPath", "缺失"));
+    QString text = QCoreApplication::translate("OpenAutoPath", "正式输入与依赖\n目标：%1\n边界：%2\n前序 IPW：%3\n"
         "父状态键：%4\n父检查点：%5\n本状态键：%6\n本检查点：%7\n"
         "IPW 状态：%8")
         .arg(view.targetSummary.isEmpty()
-                 ? QStringLiteral("未投影") : view.targetSummary)
+                 ? QCoreApplication::translate("OpenAutoPath", "未投影") : view.targetSummary)
         .arg(view.boundaryMode.isEmpty()
-                 ? QStringLiteral("未投影") : view.boundaryMode)
+                 ? QCoreApplication::translate("OpenAutoPath", "未投影") : view.boundaryMode)
         .arg(predecessor, parentKey, parentCheckpoint)
         .arg(stateKey, operationCheckpoint)
         .arg(view.ipwStatus.isEmpty()
-                 ? QStringLiteral("未投影") : view.ipwStatus);
+                 ? QCoreApplication::translate("OpenAutoPath", "未投影") : view.ipwStatus);
     if (!view.issues.isEmpty()) {
         QStringList issues;
         for (const ToolpathOperationIssueView& issue : view.issues) {
             QString severity;
             switch (issue.severity) {
                 case ToolpathOperationIssueSeverity::Info:
-                    severity = QStringLiteral("提示");
+                    severity = QCoreApplication::translate("OpenAutoPath", "提示");
                     break;
                 case ToolpathOperationIssueSeverity::Warning:
-                    severity = QStringLiteral("警告");
+                    severity = QCoreApplication::translate("OpenAutoPath", "警告");
                     break;
                 case ToolpathOperationIssueSeverity::Error:
-                    severity = QStringLiteral("错误");
+                    severity = QCoreApplication::translate("OpenAutoPath", "错误");
                     break;
             }
             issues.push_back(QStringLiteral("- %1 [%2] %3")
                 .arg(severity, issue.code, issue.message));
         }
-        text += QStringLiteral("\n状态原因：\n%1").arg(
+        text += QCoreApplication::translate("OpenAutoPath", "\n状态原因：\n%1").arg(
             issues.join(QLatin1Char('\n')));
     } else {
-        text += QStringLiteral("\n状态原因：无");
+        text += QCoreApplication::translate("OpenAutoPath", "\n状态原因：无");
     }
     return text;
 }
@@ -533,7 +533,7 @@ const manufacturing::JobToolController* toolForDescriptor(
 QString toolLabel(const toolpath::ToolpathToolContext& tool)
 {
     if (!tool.valid)
-        return QStringLiteral("未绑定刀具");
+        return QCoreApplication::translate("OpenAutoPath", "未绑定刀具");
     const tooling::ToolType type = tooling::toolTypeFromId(
         QString::fromStdString(tool.toolType));
     return QStringLiteral("T%1 · %2 · Ø%3 mm")
@@ -566,8 +566,8 @@ std::pair<int, int> toolBatchRange(
 QString setupText(MoldSetupFace setupFace)
 {
     return setupFace == MoldSetupFace::Unresolved
-        ? QStringLiteral("未解析装夹面")
-        : QStringLiteral("%1 装夹面").arg(
+        ? QCoreApplication::translate("OpenAutoPath", "未解析装夹面")
+        : QCoreApplication::translate("OpenAutoPath", "%1 装夹面").arg(
               QString::fromLatin1(moldSetupFaceName(setupFace)));
 }
 
@@ -679,7 +679,7 @@ HoleToolTreeModel HoleToolpathWorkbenchCoordinator::buildTreeModel(
         view.sequence = batchDescriptor
             ? batchDescriptor->sequence : -1;
         QStringList details{
-            QStringLiteral("阶段：%1").arg(
+            QCoreApplication::translate("OpenAutoPath", "阶段：%1").arg(
                 phaseText(move.phase, view.family))};
         if (move.tool.valid) {
             const tooling::ToolType type = tooling::toolTypeFromId(
@@ -689,16 +689,16 @@ HoleToolTreeModel HoleToolpathWorkbenchCoordinator::buildTreeModel(
                 .arg(tooling::toolTypeDisplayName(type))
                 .arg(move.tool.diameter, 0, 'f', 3);
             if (!move.tool.toolName.empty()) {
-                details << QStringLiteral("名称：%1").arg(
+                details << QCoreApplication::translate("OpenAutoPath", "名称：%1").arg(
                     QString::fromStdString(move.tool.toolName));
             }
             if (!move.tool.toolId.empty()) {
-                details << QStringLiteral("刀具 ID：%1").arg(
+                details << QCoreApplication::translate("OpenAutoPath", "刀具 ID：%1").arg(
                     QString::fromStdString(move.tool.toolId));
             }
         } else {
-            view.toolLabel = QStringLiteral("未绑定刀具");
-            details << QStringLiteral("缺少刀库快照，请重新生成");
+            view.toolLabel = QCoreApplication::translate("OpenAutoPath", "未绑定刀具");
+            details << QCoreApplication::translate("OpenAutoPath", "缺少刀库快照，请重新生成");
         }
         view.detailText = details.join(QLatin1Char('\n'));
         view.setupOrder = static_cast<int>(move.setupFace);
@@ -759,44 +759,40 @@ HoleToolTreeModel HoleToolpathWorkbenchCoordinator::buildTreeModel(
                                 static_cast<std::size_t>(sourceIndex)];
                         operationView.stageKey =
                             QString::fromStdString(source.key);
-                        sourceText = QStringLiteral("孔段 #%1 · %2")
+                        sourceText = QCoreApplication::translate("OpenAutoPath", "孔段 #%1 · %2")
                             .arg(sourceIndex + 1)
                             .arg(featureKindText(source.hole.kind));
-                        editText = QStringLiteral("参数作用域：自动孔加工；修改项目参数后重新生成");
+                        editText = QCoreApplication::translate("OpenAutoPath", "参数作用域：自动孔加工；修改项目参数后重新生成");
                     } else {
-                        sourceText = QStringLiteral("孔段来源未解析");
-                        editText = QStringLiteral("当前工序不可直接编辑");
+                        sourceText = QCoreApplication::translate("OpenAutoPath", "孔段来源未解析");
+                        editText = QCoreApplication::translate("OpenAutoPath", "当前工序不可直接编辑");
                     }
                 } else if (view.family == ToolpathBatchFamily::Pocket) {
                     sourceText = operationView.sourceIndex >= 0
-                        ? QStringLiteral("槽/腔来源 #%1")
+                        ? QCoreApplication::translate("OpenAutoPath", "槽/腔来源 #%1")
                               .arg(operationView.sourceIndex + 1)
-                        : QStringLiteral("槽/腔批次");
-                    editText = QStringLiteral(
-                        "参数作用域：槽/腔批次；修改后需重新生成");
+                        : QCoreApplication::translate("OpenAutoPath", "槽/腔批次");
+                    editText = QCoreApplication::translate("OpenAutoPath", "参数作用域：槽/腔批次；修改后需重新生成");
                 } else if (view.family == ToolpathBatchFamily::Profile) {
-                    sourceText = QStringLiteral("正式外轮廓工序");
-                    editText = QStringLiteral(
-                        "参数作用域：外轮廓批次；修改后需重新生成");
+                    sourceText = QCoreApplication::translate("OpenAutoPath", "正式外轮廓工序");
+                    editText = QCoreApplication::translate("OpenAutoPath", "参数作用域：外轮廓批次；修改后需重新生成");
                 } else if (view.family == ToolpathBatchFamily::SurfaceFinishing) {
-                    sourceText = QStringLiteral("正式雕刻加工工序");
-                    editText = QStringLiteral("参数作用域：雕刻加工工序组；采样接触结果需结合IPW与碰撞检查审查");
+                    sourceText = QCoreApplication::translate("OpenAutoPath", "正式雕刻加工工序");
+                    editText = QCoreApplication::translate("OpenAutoPath", "参数作用域：雕刻加工工序组；采样接触结果需结合IPW与碰撞检查审查");
                 }
                 const QString cuttingText = operationMove.tool.valid
-                    ? QStringLiteral(
-                          "主轴：%1 rpm · 水平/垂直进给：%2/%3 mm/min")
+                    ? QCoreApplication::translate("OpenAutoPath", "主轴：%1 rpm · 水平/垂直进给：%2/%3 mm/min")
                           .arg(operationMove.tool.spindleSpeed, 0, 'f', 0)
                           .arg(operationMove.tool.horizontalFeed, 0, 'f', 1)
                           .arg(operationMove.tool.verticalFeed, 0, 'f', 1)
-                    : QStringLiteral("切削参数：缺少刀库快照");
-                operationView.detailText = QStringLiteral(
-                    "运行期 ID：%1\n正式工序：%2\n状态：%3%4\n来源：%5\n阶段：%6\n装夹：%7\n刀具：%8\n"
+                    : QCoreApplication::translate("OpenAutoPath", "切削参数：缺少刀库快照");
+                operationView.detailText = QCoreApplication::translate("OpenAutoPath", "运行期 ID：%1\n正式工序：%2\n状态：%3%4\n来源：%5\n阶段：%6\n装夹：%7\n刀具：%8\n"
                     "%9\n移动范围：#%10–#%11（%12 段）\n%13")
                     .arg(operationView.operationId)
                     .arg(operationView.formalOperationId)
                     .arg(operationStateText(operationView.state))
                     .arg(operationView.enabled
-                             ? QString{} : QStringLiteral("（已禁用）"))
+                             ? QString{} : QCoreApplication::translate("OpenAutoPath", "（已禁用）"))
                     .arg(sourceText)
                     .arg(operationView.phaseLabel)
                     .arg(operationView.setupLabel)
@@ -835,18 +831,17 @@ HoleToolTreeModel HoleToolpathWorkbenchCoordinator::buildTreeModel(
         view.setupOrder = setup
             ? static_cast<int>(setup->face) : 6;
         view.setupLabel = setup
-            ? setupText(setup->face) : QStringLiteral("缺失 Setup");
+            ? setupText(setup->face) : QCoreApplication::translate("OpenAutoPath", "缺失 Setup");
         const manufacturing::JobToolController* controller =
             toolForDescriptor(workspace, descriptor);
         view.toolLabel = controller
-            ? toolLabel(controller->tool) : QStringLiteral("缺失刀具快照");
-        view.detailText = QStringLiteral(
-            "正式工序 #%1 · %2\n状态：%3%4\n算法：%5\n当前没有可播放的已验证移动")
+            ? toolLabel(controller->tool) : QCoreApplication::translate("OpenAutoPath", "缺失刀具快照");
+        view.detailText = QCoreApplication::translate("OpenAutoPath", "正式工序 #%1 · %2\n状态：%3%4\n算法：%5\n当前没有可播放的已验证移动")
             .arg(descriptor.sequence + 1)
             .arg(QString::fromStdString(descriptor.id))
             .arg(operationStateText(descriptor.state))
             .arg(descriptor.enabled
-                     ? QString{} : QStringLiteral("（已禁用）"))
+                     ? QString{} : QCoreApplication::translate("OpenAutoPath", "（已禁用）"))
             .arg(QString::fromStdString(descriptor.algorithmId));
         ToolpathOperationView operationView;
         operationView.operationId = QString::fromStdString(descriptor.id);
@@ -856,7 +851,7 @@ HoleToolTreeModel HoleToolpathWorkbenchCoordinator::buildTreeModel(
             .arg(operationView.operationId)
             .arg(operationStateText(descriptor.state))
             .arg(descriptor.enabled
-                     ? QString{} : QStringLiteral("，已禁用"));
+                     ? QString{} : QCoreApplication::translate("OpenAutoPath", "，已禁用"));
         operationView.detailText = view.detailText;
         operationView.setupLabel = view.setupLabel;
         operationView.toolLabel = view.toolLabel;

@@ -41,6 +41,11 @@ Runtime 与 Development 安装组件均携带本项目 MIT、本文、AnalysisSi
 
 ## Windows SDK 附带的运行时
 
+桌面程序另内嵌 Qt 6.11.1 的简体中文翻译资源 `qtbase_zh_CN.ts`，上游文件未经修改，
+采用其 `licenseRule.json` 允许的 LGPL-3.0-only 许可路径。源码、来源说明和许可副本位于
+`resources/i18n/qt`，桌面安装包中位于 `share/licenses/OpenAutoPath/qttranslations`。
+项目根目录的 MIT 许可证不替代该资源的许可。
+
 部署列表还涉及 FreeType 2.13.3、FreeImage 3.18.0、oneTBB 2021.13.0、
 OpenVR 1.14.15、DirectX Shader Compiler 和 Microsoft Visual C++
 运行库。这些文件不是 OpenAutoPath 自有代码。Qt Network 及平台、图像、TLS 等插件

@@ -1,6 +1,7 @@
 // GCodeReviewDialog 实现:导出前 NC 审查对话框。每个文件一页只读代码,并附
 // 结构审计树;审计有错误时禁用确认写出,操作者勾选逐行核对后才允许落盘。
 #include "app/ui/dialogs/GCodeReviewDialog.h"
+#include <QCoreApplication>
 
 #include "toolpath/program/validation/GCodeReview.h"
 
@@ -79,7 +80,7 @@ private:
         m_editor->setExtraSelections({selection});
         const QTextCursor cursor = m_editor->textCursor();
         m_position->setText(
-            QStringLiteral("行 %1，列 %2")
+            QCoreApplication::translate("OpenAutoPath", "行 %1，列 %2")
                 .arg(cursor.blockNumber() + 1)
                 .arg(cursor.positionInBlock() + 1));
     }
@@ -99,7 +100,7 @@ bool confirmGCodeReview(QWidget* parent,
         return false;
 
     QDialog dialog(parent);
-    dialog.setWindowTitle(QStringLiteral("导出前 NC 审查"));
+    dialog.setWindowTitle(QCoreApplication::translate("OpenAutoPath", "导出前 NC 审查"));
     dialog.resize(1050, 760);
     auto *layout = new QVBoxLayout(&dialog);
     auto *summary = new QLabel(&dialog);
@@ -127,8 +128,8 @@ bool confirmGCodeReview(QWidget* parent,
 
     auto *audit = new QTreeWidget(&dialog);
     audit->setObjectName(QStringLiteral("gcodeReviewAudit"));
-    audit->setHeaderLabels({QStringLiteral("级别"), QStringLiteral("文件"),
-                            QStringLiteral("行"), QStringLiteral("审计项")});
+    audit->setHeaderLabels({QCoreApplication::translate("OpenAutoPath", "级别"), QCoreApplication::translate("OpenAutoPath", "文件"),
+                            QCoreApplication::translate("OpenAutoPath", "行"), QCoreApplication::translate("OpenAutoPath", "审计项")});
     audit->header()->setSectionResizeMode(0, QHeaderView::ResizeToContents);
     audit->header()->setSectionResizeMode(1, QHeaderView::ResizeToContents);
     audit->header()->setSectionResizeMode(2, QHeaderView::ResizeToContents);
@@ -138,9 +139,9 @@ bool confirmGCodeReview(QWidget* parent,
         const auto& report = reports[documentIndex];
         if (report.issues.empty()) {
             auto *item = new QTreeWidgetItem(audit);
-            item->setText(0, QStringLiteral("通过"));
+            item->setText(0, QCoreApplication::translate("OpenAutoPath", "通过"));
             item->setText(1, documents[documentIndex].title);
-            item->setText(3, QStringLiteral("结构审计未发现问题"));
+            item->setText(3, QCoreApplication::translate("OpenAutoPath", "结构审计未发现问题"));
             item->setForeground(0, QBrush(QColor(0, 120, 0)));
             continue;
         }
@@ -148,12 +149,12 @@ bool confirmGCodeReview(QWidget* parent,
             auto *item = new QTreeWidgetItem(audit);
             const bool error = issue.severity ==
                 oap::toolpath::GCodeReviewSeverity::Error;
-            item->setText(0, error ? QStringLiteral("错误")
-                                   : QStringLiteral("警告"));
+            item->setText(0, error ? QCoreApplication::translate("OpenAutoPath", "错误")
+                                   : QCoreApplication::translate("OpenAutoPath", "警告"));
             item->setText(1, documents[documentIndex].title);
             item->setText(2, issue.line > 0
-                ? QString::number(issue.line) : QStringLiteral("全局"));
-            item->setText(3, QString::fromStdString(issue.message));
+                ? QString::number(issue.line) : QCoreApplication::translate("OpenAutoPath", "全局"));
+            item->setText(3, QCoreApplication::translate("OpenAutoPathDiagnostic", QString::fromStdString(issue.message).toUtf8().constData()));
             item->setToolTip(3, QString::fromStdString(issue.code));
             item->setData(0, kDocumentRole, documentIndex);
             item->setData(0, kLineRole, issue.line);
@@ -178,23 +179,23 @@ bool confirmGCodeReview(QWidget* parent,
 
     summary->setText(
         totalErrors == 0
-            ? QStringLiteral("%1 个参考 NC 文件结构审计通过；警告 %2。请逐行核对刀具信息、G54–G59、S/F、固定循环和退刀位置。")
+            ? QCoreApplication::translate("OpenAutoPath", "%1 个参考 NC 文件结构审计通过；警告 %2。请逐行核对刀具信息、G54–G59、S/F、固定循环和退刀位置。")
                   .arg(documents.size()).arg(totalWarnings)
-            : QStringLiteral("结构审计发现错误 %1、警告 %2；修正前不能写出 NC。")
+            : QCoreApplication::translate("OpenAutoPath", "结构审计发现错误 %1、警告 %2；修正前不能写出 NC。")
                   .arg(totalErrors).arg(totalWarnings));
     summary->setStyleSheet(totalErrors == 0
         ? QStringLiteral("color:#166534")
         : QStringLiteral("color:#b91c1c;font-weight:bold"));
 
     auto *confirmed = new QCheckBox(
-        QStringLiteral("我已逐行核对所有文件的刀具信息、工件坐标、转速进给、循环和安全退刀"),
+        QCoreApplication::translate("OpenAutoPath", "我已逐行核对所有文件的刀具信息、工件坐标、转速进给、循环和安全退刀"),
         &dialog);
     confirmed->setEnabled(totalErrors == 0);
     layout->addWidget(confirmed);
     auto *buttons = new QDialogButtonBox(
         QDialogButtonBox::Save | QDialogButtonBox::Cancel, &dialog);
     QPushButton* save = buttons->button(QDialogButtonBox::Save);
-    save->setText(QStringLiteral("确认并写出"));
+    save->setText(QCoreApplication::translate("OpenAutoPath", "确认并写出"));
     save->setEnabled(false);
     QObject::connect(confirmed, &QCheckBox::toggled,
                      save, &QPushButton::setEnabled);

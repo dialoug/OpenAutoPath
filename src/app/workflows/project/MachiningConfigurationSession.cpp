@@ -1,6 +1,7 @@
 // MachiningConfigurationSession 实现（oap_app_workflow_cam）。
 // 桌面加工参数与程序级配置，见 MachiningConfigurationSession.h。
 #include "MachiningConfigurationSession.h"
+#include <QCoreApplication>
 
 #include <utility>
 
@@ -20,7 +21,7 @@ QString MachiningConfigurationSession::loadDefaults()
             m_holeToolSelectionMode,
             m_pocketToolSelectionMode, m_profileToolSelectionMode,
             m_gcodeOptions.coolant, &warning) && warning.isEmpty()) {
-        warning = QStringLiteral("无法读取本地刀路参数配置");
+        warning = QCoreApplication::translate("OpenAutoPath", "无法读取本地刀路参数配置");
     }
     QString engravingWarning;
     EngravingSettingsStorage::loadDefault(m_engraving, &engravingWarning);

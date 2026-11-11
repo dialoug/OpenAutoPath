@@ -1,5 +1,6 @@
 // 雕刻加工沿用统一参数、生成、工序树、主视图播放与项目 IPW 流程。
 #include "app/ui/shell/MainWindow.h"
+#include <QCoreApplication>
 #include "app/simulation/StockSimulationWorkspaceCoordinator.h"
 #include "app/playback/PlaybackWorkspaceCoordinator.h"
 #include "app/dialogs/QtWorkflowInteraction.h"
@@ -22,9 +23,9 @@ void MainWindow::generateEngravingToolpaths()
 {
     if (m_uiBusy)
         return;
-    const QString title = QStringLiteral("雕刻加工");
+    const QString title = QCoreApplication::translate("OpenAutoPath", "雕刻加工");
     if (model().units.empty()) {
-        QMessageBox::information(this, title, QStringLiteral("请先加载雕刻件 STEP 模型。无需先识别孔或槽腔。"));
+        QMessageBox::information(this, title, QCoreApplication::translate("OpenAutoPath", "请先加载雕刻件 STEP 模型。无需先识别孔或槽腔。"));
         return;
     }
     oap::app::EngravingToolpathGenerationRequest request;
@@ -33,7 +34,7 @@ void MainWindow::generateEngravingToolpaths()
     for (const auto& unit : model().units) {
         const auto* shape = stepIndexer().shapeForUnit(unit.unit_id);
         if (!shape || shape->IsNull()) {
-            QMessageBox::warning(this, title, QStringLiteral("部分实体缺少完整几何，请重新加载模型后生成雕刻刀路。"));
+            QMessageBox::warning(this, title, QCoreApplication::translate("OpenAutoPath", "部分实体缺少完整几何，请重新加载模型后生成雕刻刀路。"));
             return;
         }
         request.targets.push_back(*shape);
@@ -79,34 +80,34 @@ void MainWindow::simulateEngravingStock()
 
 void MainWindow::simulateOrderedStock(bool engravingOnly)
 {
-    const QString title = engravingOnly ? QStringLiteral("雕刻 IPW") : QStringLiteral("加工项目 IPW");
+    const QString title = engravingOnly ? QCoreApplication::translate("OpenAutoPath", "雕刻 IPW") : QCoreApplication::translate("OpenAutoPath", "加工项目 IPW");
     if (m_uiBusy)
         return;
     if (!m_machiningWorkspace->hasProjectContent() || model().units.empty()) {
-        QMessageBox::information(this, title, QStringLiteral("请先生成并应用正式加工工序。"));
+        QMessageBox::information(this, title, QCoreApplication::translate("OpenAutoPath", "请先生成并应用正式加工工序。"));
         return;
     }
     auto initial = m_stockSimulationWorkspace->profileDialogState(
         {}, QFileInfo(currentPath()).absolutePath());
-    initial.setups = {{-1, QStringLiteral("全部启用工序（按项目全局顺序）")}};
+    initial.setups = {{-1, QCoreApplication::translate("OpenAutoPath", "全部启用工序（按项目全局顺序）")}};
     if (engravingOnly) {
-        initial.scopeDescription = QStringLiteral("按全局顺序计算至所选方向的最后一道雕刻工序，保留前序加工的剩余毛坯；可手动打开仅播放所选雕刻刀路的动画。");
+        initial.scopeDescription = QCoreApplication::translate("OpenAutoPath", "按全局顺序计算至所选方向的最后一道雕刻工序，保留前序加工的剩余毛坯；可手动打开仅播放所选雕刻刀路的动画。");
         const auto program = m_machiningWorkspace->finishingPreviewProgram();
         if (program.empty()) {
-            QMessageBox::information(this, title, QStringLiteral("请先生成有效的雕刻刀路。"));
+            QMessageBox::information(this, title, QCoreApplication::translate("OpenAutoPath", "请先生成有效的雕刻刀路。"));
             return;
         }
-        initial.setups = {{-1, QStringLiteral("全部雕刻方向（含前序材料准备）")}};
+        initial.setups = {{-1, QCoreApplication::translate("OpenAutoPath", "全部雕刻方向（含前序材料准备）")}};
         for (const auto& operation : program.operations) {
             if (std::none_of(initial.setups.begin(), initial.setups.end(),
                     [&](const auto& choice) { return choice.setupIndex == operation.setupIndex; }))
                 initial.setups.push_back({operation.setupIndex,
-                    QStringLiteral("雕刻 %1（含前序材料准备）").arg(QString::fromLatin1(oap::moldSetupFaceName(operation.setupFace)))});
+                    QCoreApplication::translate("OpenAutoPath", "雕刻 %1（含前序材料准备）").arg(QString::fromLatin1(oap::moldSetupFaceName(operation.setupFace)))});
         }
     }
     initial.selectedSetup = -1;
     const auto edited = oap::app::editPocketStockSimulationSettings(this, initial,
-        engravingOnly ? QStringLiteral("雕刻") : QStringLiteral("完整加工项目"), false);
+        engravingOnly ? QCoreApplication::translate("OpenAutoPath", "雕刻") : QCoreApplication::translate("OpenAutoPath", "完整加工项目"), false);
     if (!edited)
         return;
     const auto settings = *edited;
@@ -116,7 +117,7 @@ void MainWindow::simulateOrderedStock(bool engravingOnly)
     for (const auto& unit : model().units) {
         const auto* shape = stepIndexer().shapeForUnit(unit.unit_id);
         if (!shape || shape->IsNull()) {
-            QMessageBox::warning(this, title, QStringLiteral("部分完整模型几何缺失，不能执行项目 IPW。"));
+            QMessageBox::warning(this, title, QCoreApplication::translate("OpenAutoPath", "部分完整模型几何缺失，不能执行项目 IPW。"));
             return;
         }
         builder.Add(target, *shape);
@@ -165,9 +166,9 @@ void MainWindow::simulateOrderedStock(bool engravingOnly)
     // Disabled OCCT presentation must not silently opt the user into playback.
     const bool allowAnimation = simulated.playbackError.isEmpty();
     if (!allowAnimation)
-        statusBar()->showMessage(simulated.summary + QStringLiteral(" 动画不可用：") + simulated.playbackError);
+        statusBar()->showMessage(simulated.summary + QCoreApplication::translate("OpenAutoPath", " 动画不可用：") + simulated.playbackError);
     if (!showPocketIpwTimeline(allowAnimation)) {
-        statusBar()->showMessage(QStringLiteral("已保留 IPW 最终检查点；%1").arg(simulated.summary));
+        statusBar()->showMessage(QCoreApplication::translate("OpenAutoPath", "已保留 IPW 最终检查点；%1").arg(simulated.summary));
         return;
     }
     auto input = std::move(simulated.camInput);

@@ -1,5 +1,6 @@
 // HoleCoverageAuditPanel 实现 — 只展示 HoleCoverageReport，不重复计算覆盖状态。
 #include "app/ui/panels/HoleCoverageAuditPanel.h"
+#include <QCoreApplication>
 
 #include "toolpath/core/ToolpathDiagnostics.h"
 
@@ -69,13 +70,13 @@ IssueGroup issueGroup(oap::toolpath::ToolpathDiagnosticCode code)
 QString issueGroupTitle(IssueGroup group)
 {
     switch (group) {
-        case IssueGroup::Tool: return QStringLiteral("缺刀 / 刀具问题");
-        case IssueGroup::Setup: return QStringLiteral("装夹 / 入口问题");
-        case IssueGroup::Collision: return QStringLiteral("碰撞问题");
-        case IssueGroup::Generation: return QStringLiteral("生成阻断项");
+        case IssueGroup::Tool: return QCoreApplication::translate("OpenAutoPath", "缺刀 / 刀具问题");
+        case IssueGroup::Setup: return QCoreApplication::translate("OpenAutoPath", "装夹 / 入口问题");
+        case IssueGroup::Collision: return QCoreApplication::translate("OpenAutoPath", "碰撞问题");
+        case IssueGroup::Generation: return QCoreApplication::translate("OpenAutoPath", "生成阻断项");
         case IssueGroup::Count: break;
     }
-    return QStringLiteral("阻断项");
+    return QCoreApplication::translate("OpenAutoPath", "阻断项");
 }
 
 QTreeWidgetItem* addCategory(QTreeWidget* tree,
@@ -85,7 +86,7 @@ QTreeWidgetItem* addCategory(QTreeWidget* tree,
 {
     auto* item = new QTreeWidgetItem(tree);
     item->setText(0, label);
-    item->setText(1, QStringLiteral("%1 项").arg(count));
+    item->setText(1, QCoreApplication::translate("OpenAutoPath", "%1 项").arg(count));
     item->setForeground(0, QBrush(color));
     item->setForeground(1, QBrush(color));
     item->setExpanded(true);
@@ -105,7 +106,7 @@ void addHoleIndices(QTreeWidget* tree,
         tree, label, static_cast<int>(indices.size()), color);
     for (int sourceIndex : indices) {
         auto* item = new QTreeWidgetItem(category);
-        item->setText(0, QStringLiteral("孔段 %1").arg(sourceIndex + 1));
+        item->setText(0, QCoreApplication::translate("OpenAutoPath", "孔段 %1").arg(sourceIndex + 1));
         item->setText(1, detail);
         item->setData(0, kRoleSourceHoleIndex, sourceIndex);
         item->setData(
@@ -120,15 +121,15 @@ QString operationStateText(oap::manufacturing::JobOperationState state)
 {
     using State = oap::manufacturing::JobOperationState;
     switch (state) {
-        case State::Planned: return QStringLiteral("待生成");
-        case State::Dirty: return QStringLiteral("已修改");
-        case State::Generated: return QStringLiteral("已生成");
-        case State::Warning: return QStringLiteral("有警告");
-        case State::Error: return QStringLiteral("失败");
-        case State::Stale: return QStringLiteral("下游失效");
-        case State::NeedsReview: return QStringLiteral("需复核");
+        case State::Planned: return QCoreApplication::translate("OpenAutoPath", "待生成");
+        case State::Dirty: return QCoreApplication::translate("OpenAutoPath", "已修改");
+        case State::Generated: return QCoreApplication::translate("OpenAutoPath", "已生成");
+        case State::Warning: return QCoreApplication::translate("OpenAutoPath", "有警告");
+        case State::Error: return QCoreApplication::translate("OpenAutoPath", "失败");
+        case State::Stale: return QCoreApplication::translate("OpenAutoPath", "下游失效");
+        case State::NeedsReview: return QCoreApplication::translate("OpenAutoPath", "需复核");
     }
-    return QStringLiteral("未知");
+    return QCoreApplication::translate("OpenAutoPath", "未知");
 }
 } // namespace
 
@@ -148,7 +149,7 @@ HoleCoverageAuditPanel::HoleCoverageAuditPanel(QWidget* parent)
     m_tree = new QTreeWidget(this);
     m_tree->setObjectName(QStringLiteral("holeCoverageAuditTree"));
     m_tree->setHeaderLabels(
-        {QStringLiteral("审计项目"), QStringLiteral("明细")});
+        {QCoreApplication::translate("OpenAutoPath", "审计项目"), QCoreApplication::translate("OpenAutoPath", "明细")});
     m_tree->header()->setSectionResizeMode(0, QHeaderView::ResizeToContents);
     m_tree->header()->setSectionResizeMode(1, QHeaderView::Stretch);
     m_tree->setSelectionMode(QAbstractItemView::SingleSelection);
@@ -180,7 +181,7 @@ void HoleCoverageAuditPanel::clear()
 {
     m_tree->clear();
     m_statusLabel->setText(
-        QStringLiteral("等待审计｜生成孔刀路后显示覆盖明细"));
+        QCoreApplication::translate("OpenAutoPath", "等待审计｜生成孔刀路后显示覆盖明细"));
     QPalette statusPalette = m_statusLabel->palette();
     statusPalette.setColor(
         QPalette::WindowText,
@@ -188,8 +189,8 @@ void HoleCoverageAuditPanel::clear()
     m_statusLabel->setPalette(statusPalette);
 
     auto* item = new QTreeWidgetItem(m_tree);
-    item->setText(0, QStringLiteral("尚未生成孔加工审计结果"));
-    item->setText(1, QStringLiteral("参考 NC 导出时将提示复核"));
+    item->setText(0, QCoreApplication::translate("OpenAutoPath", "尚未生成孔加工审计结果"));
+    item->setText(1, QCoreApplication::translate("OpenAutoPath", "参考 NC 导出时将提示复核"));
 }
 
 void HoleCoverageAuditPanel::setReport(
@@ -225,16 +226,15 @@ void HoleCoverageAuditPanel::setReport(
 
     if (passed) {
         m_statusLabel->setText(
-            QStringLiteral("审计通过%1｜六面孔段覆盖 %2/%3 · 六面外警告 %4")
-                .arg(hasWarnings ? QStringLiteral("（有警告）") : QString())
+            QCoreApplication::translate("OpenAutoPath", "审计通过%1｜六面孔段覆盖 %2/%3 · 六面外警告 %4")
+                .arg(hasWarnings ? QCoreApplication::translate("OpenAutoPath", "（有警告）") : QString())
                 .arg(report.coveredHoleSegmentCount)
                 .arg(report.sixFaceHoleSegmentCount)
                 .arg(static_cast<int>(
                     report.outsideSixFaceSourceHoleIndices.size())));
     } else {
         m_statusLabel->setText(
-            QStringLiteral(
-                "审计未通过｜漏孔 %1 · 未解析装夹 %2 · 跳过 %3 · 问题项 %4 · 六面外警告 %5")
+            QCoreApplication::translate("OpenAutoPath", "审计未通过｜漏孔 %1 · 未解析装夹 %2 · 跳过 %3 · 问题项 %4 · 六面外警告 %5")
                 .arg(static_cast<int>(
                     report.uncoveredSourceHoleIndices.size()))
                 .arg(static_cast<int>(
@@ -249,24 +249,24 @@ void HoleCoverageAuditPanel::setReport(
     m_statusLabel->setPalette(statusPalette);
 
     auto* summary = new QTreeWidgetItem(m_tree);
-    summary->setText(0, QStringLiteral("审计范围"));
+    summary->setText(0, QCoreApplication::translate("OpenAutoPath", "审计范围"));
     summary->setText(
-        1, passed ? QStringLiteral("通过") : QStringLiteral("未通过"));
+        1, passed ? QCoreApplication::translate("OpenAutoPath", "通过") : QCoreApplication::translate("OpenAutoPath", "未通过"));
     summary->setForeground(1, QBrush(statusColor));
     summary->setExpanded(true);
 
     const std::array<std::pair<QString, QString>, 5> summaryRows{{
-        {QStringLiteral("识别孔段"),
+        {QCoreApplication::translate("OpenAutoPath", "识别孔段"),
          QStringLiteral("%1").arg(report.inputHoleSegmentCount)},
-        {QStringLiteral("六面加工孔段"),
+        {QCoreApplication::translate("OpenAutoPath", "六面加工孔段"),
          QStringLiteral("%1").arg(report.sixFaceHoleSegmentCount)},
-        {QStringLiteral("物理孔"),
+        {QCoreApplication::translate("OpenAutoPath", "物理孔"),
          QStringLiteral("%1").arg(report.physicalHoleCount)},
-        {QStringLiteral("已覆盖孔段"),
+        {QCoreApplication::translate("OpenAutoPath", "已覆盖孔段"),
          QStringLiteral("%1 / %2")
              .arg(report.coveredHoleSegmentCount)
              .arg(report.sixFaceHoleSegmentCount)},
-        {QStringLiteral("跳过加工操作"),
+        {QCoreApplication::translate("OpenAutoPath", "跳过加工操作"),
          QStringLiteral("%1").arg(report.skippedOperationCount)},
     }};
     for (const auto& [label, value] : summaryRows) {
@@ -276,20 +276,20 @@ void HoleCoverageAuditPanel::setReport(
     }
 
     auto* collisionScope = new QTreeWidgetItem(m_tree);
-    collisionScope->setText(0, QStringLiteral("碰撞审计范围"));
+    collisionScope->setText(0, QCoreApplication::translate("OpenAutoPath", "碰撞审计范围"));
     collisionScope->setText(
-        1, QStringLiteral("仅检查刀具装配与工件；夹具/机床结构未评估"));
+        1, QCoreApplication::translate("OpenAutoPath", "仅检查刀具装配与工件；夹具/机床结构未评估"));
     collisionScope->setForeground(0, QBrush(warningColor));
     collisionScope->setForeground(1, QBrush(warningColor));
     collisionScope->setToolTip(
-        0, QStringLiteral("采用六面装夹假设：加工一个面时默认其余五面被夹持；该假设不阻断导出"));
+        0, QCoreApplication::translate("OpenAutoPath", "采用六面装夹假设：加工一个面时默认其余五面被夹持；该假设不阻断导出"));
     collisionScope->setToolTip(1, collisionScope->toolTip(0));
 
     if (!bindings.isEmpty()) {
         auto* operationRoot = new QTreeWidgetItem(m_tree);
-        operationRoot->setText(0, QStringLiteral("正式孔工序归属"));
+        operationRoot->setText(0, QCoreApplication::translate("OpenAutoPath", "正式孔工序归属"));
         operationRoot->setText(
-            1, QStringLiteral("%1 道正式工序").arg(bindings.size()));
+            1, QCoreApplication::translate("OpenAutoPath", "%1 道正式工序").arg(bindings.size()));
         operationRoot->setExpanded(true);
         for (const oap::app::HoleCoverageOperationBinding& binding :
              bindings) {
@@ -303,13 +303,13 @@ void HoleCoverageAuditPanel::setReport(
                        .arg(binding.formalOperationId));
             QString state = operationStateText(binding.state);
             if (!binding.enabled)
-                state += QStringLiteral("，已禁用");
+                state += QCoreApplication::translate("OpenAutoPath", "，已禁用");
             if (!binding.hasPlayback)
-                state += QStringLiteral("，无可回放结果");
+                state += QCoreApplication::translate("OpenAutoPath", "，无可回放结果");
             item->setText(
                 1, holes.isEmpty()
-                       ? QStringLiteral("未绑定孔段｜%1").arg(state)
-                       : QStringLiteral("孔段 %1｜%2")
+                       ? QCoreApplication::translate("OpenAutoPath", "未绑定孔段｜%1").arg(state)
+                       : QCoreApplication::translate("OpenAutoPath", "孔段 %1｜%2")
                              .arg(holes.join(QStringLiteral("、")), state));
             item->setData(
                 0, kRoleFormalOperationId,
@@ -325,29 +325,29 @@ void HoleCoverageAuditPanel::setReport(
     }
 
     addHoleIndices(
-        m_tree, QStringLiteral("六面外孔（警告）"),
+        m_tree, QCoreApplication::translate("OpenAutoPath", "六面外孔（警告）"),
         report.outsideSixFaceSourceHoleIndices,
-        QStringLiteral("当前仅处理六面加工，不参与覆盖率；参考 NC 中提示复核"),
+        QCoreApplication::translate("OpenAutoPath", "当前仅处理六面加工，不参与覆盖率；参考 NC 中提示复核"),
         warningColor, formalOperationBySource);
     addHoleIndices(
-        m_tree, QStringLiteral("漏孔 / 未形成去料工序"),
+        m_tree, QCoreApplication::translate("OpenAutoPath", "漏孔 / 未形成去料工序"),
         report.uncoveredSourceHoleIndices,
-        QStringLiteral("没有进入实际材料去除工序"), errorColor,
+        QCoreApplication::translate("OpenAutoPath", "没有进入实际材料去除工序"), errorColor,
         formalOperationBySource);
     addHoleIndices(
-        m_tree, QStringLiteral("未解析装夹"),
+        m_tree, QCoreApplication::translate("OpenAutoPath", "未解析装夹"),
         report.unresolvedSourceHoleIndices,
-        QStringLiteral("装夹面或孔入口未可靠确定"), errorColor,
+        QCoreApplication::translate("OpenAutoPath", "装夹面或孔入口未可靠确定"), errorColor,
         formalOperationBySource);
 
     if (report.skippedOperationCount > 0) {
         QTreeWidgetItem* skipped = addCategory(
-            m_tree, QStringLiteral("跳过的加工操作"),
+            m_tree, QCoreApplication::translate("OpenAutoPath", "跳过的加工操作"),
             report.skippedOperationCount, warningColor);
         auto* detail = new QTreeWidgetItem(skipped);
-        detail->setText(0, QStringLiteral("生成阶段跳过"));
+        detail->setText(0, QCoreApplication::translate("OpenAutoPath", "生成阶段跳过"));
         detail->setText(
-            1, QStringLiteral("%1 道操作未进入最终程序")
+            1, QCoreApplication::translate("OpenAutoPath", "%1 道操作未进入最终程序")
                    .arg(report.skippedOperationCount));
     }
 
@@ -362,7 +362,7 @@ void HoleCoverageAuditPanel::setReport(
     QTreeWidgetItem* warningRoot = nullptr;
     if (nonScopeWarningCount > 0) {
         warningRoot = addCategory(
-            m_tree, QStringLiteral("非阻断警告"),
+            m_tree, QCoreApplication::translate("OpenAutoPath", "非阻断警告"),
             nonScopeWarningCount, warningColor);
     }
     for (const oap::toolpath::HoleCoverageIssue& issue :
@@ -372,17 +372,17 @@ void HoleCoverageAuditPanel::setReport(
             continue;
         }
         auto* item = new QTreeWidgetItem(warningRoot);
-        const QString reason = QString::fromUtf8(
+        const QString reason = QCoreApplication::translate("OpenAutoPath",
             oap::toolpath::toolpathDiagnosticDefaultMessageZh(issue.code));
         item->setText(
             0, issue.sourceHoleIndex >= 0
-                   ? QStringLiteral("孔段 %1 · %2")
+                   ? QCoreApplication::translate("OpenAutoPath", "孔段 %1 · %2")
                          .arg(issue.sourceHoleIndex + 1)
                          .arg(reason)
                    : reason);
         const QString code = QString::fromLatin1(
             oap::toolpath::toolpathDiagnosticCodeName(issue.code));
-        const QString context = QString::fromStdString(issue.message);
+        const QString context = QCoreApplication::translate("OpenAutoPathDiagnostic", QString::fromStdString(issue.message).toUtf8().constData());
         item->setText(1, context.isEmpty()
                              ? QStringLiteral("[%1]").arg(code)
                              : QStringLiteral("[%1] %2").arg(code, context));
@@ -408,17 +408,17 @@ void HoleCoverageAuditPanel::setReport(
             root->setExpanded(true);
         }
         auto* item = new QTreeWidgetItem(root);
-        const QString reason = QString::fromUtf8(
+        const QString reason = QCoreApplication::translate("OpenAutoPath",
             oap::toolpath::toolpathDiagnosticDefaultMessageZh(issue.code));
         item->setText(
             0, issue.sourceHoleIndex >= 0
-                   ? QStringLiteral("孔段 %1 · %2")
+                   ? QCoreApplication::translate("OpenAutoPath", "孔段 %1 · %2")
                          .arg(issue.sourceHoleIndex + 1)
                          .arg(reason)
                    : reason);
         const QString code = QString::fromLatin1(
             oap::toolpath::toolpathDiagnosticCodeName(issue.code));
-        const QString context = QString::fromStdString(issue.message);
+        const QString context = QCoreApplication::translate("OpenAutoPathDiagnostic", QString::fromStdString(issue.message).toUtf8().constData());
         item->setText(1, context.isEmpty()
                              ? QStringLiteral("[%1]").arg(code)
                              : QStringLiteral("[%1] %2").arg(code, context));
@@ -431,22 +431,22 @@ void HoleCoverageAuditPanel::setReport(
     }
     for (QTreeWidgetItem* root : issueRoots) {
         if (root)
-            root->setText(1, QStringLiteral("%1 项").arg(root->childCount()));
+            root->setText(1, QCoreApplication::translate("OpenAutoPath", "%1 项").arg(root->childCount()));
     }
 
     if (passed) {
         auto* item = new QTreeWidgetItem(m_tree);
         item->setText(
-            0, QStringLiteral("六面加工范围内未发现漏孔、缺刀、跳过或装夹阻断"));
+            0, QCoreApplication::translate("OpenAutoPath", "六面加工范围内未发现漏孔、缺刀、跳过或装夹阻断"));
         item->setText(1, hasWarnings
-                             ? QStringLiteral("覆盖审计通过，保留警告")
-                             : QStringLiteral("覆盖审计通过"));
+                             ? QCoreApplication::translate("OpenAutoPath", "覆盖审计通过，保留警告")
+                             : QCoreApplication::translate("OpenAutoPath", "覆盖审计通过"));
         item->setForeground(0, QBrush(statusColor));
         item->setForeground(1, QBrush(statusColor));
     } else if (report.inputHoleSegmentCount <= 0) {
         auto* item = new QTreeWidgetItem(m_tree);
-        item->setText(0, QStringLiteral("没有可审计的识别孔段"));
-        item->setText(1, QStringLiteral("请先完成孔识别"));
+        item->setText(0, QCoreApplication::translate("OpenAutoPath", "没有可审计的识别孔段"));
+        item->setText(1, QCoreApplication::translate("OpenAutoPath", "请先完成孔识别"));
         item->setForeground(0, QBrush(errorColor));
     }
     if (!previousFormalOperation.isEmpty())

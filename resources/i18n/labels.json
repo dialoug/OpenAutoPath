@@ -1,0 +1,254 @@
+{
+  "plane": {
+    "zh": "平面",
+    "en": "Plane"
+  },
+  "cylinder": {
+    "zh": "圆柱面",
+    "en": "Cylinder"
+  },
+  "cone": {
+    "zh": "圆锥面",
+    "en": "Cone"
+  },
+  "sphere": {
+    "zh": "球面",
+    "en": "Sphere"
+  },
+  "torus": {
+    "zh": "圆环面",
+    "en": "Torus"
+  },
+  "bezier": {
+    "zh": "贝塞尔",
+    "en": "Bezier"
+  },
+  "bspline": {
+    "zh": "B 样条",
+    "en": "B-spline"
+  },
+  "extrusion": {
+    "zh": "拉伸面",
+    "en": "Extrusion"
+  },
+  "revolution": {
+    "zh": "旋转面",
+    "en": "Revolution"
+  },
+  "other": {
+    "zh": "其他",
+    "en": "Other"
+  },
+  "line": {
+    "zh": "直线",
+    "en": "Line"
+  },
+  "circle": {
+    "zh": "圆",
+    "en": "Circle"
+  },
+  "ellipse": {
+    "zh": "椭圆",
+    "en": "Ellipse"
+  },
+  "hyperbola": {
+    "zh": "双曲线",
+    "en": "Hyperbola"
+  },
+  "parabola": {
+    "zh": "抛物线",
+    "en": "Parabola"
+  },
+  "inner": {
+    "zh": "内环",
+    "en": "Inner"
+  },
+  "outer": {
+    "zh": "外环",
+    "en": "Outer"
+  },
+  "solid": {
+    "zh": "实体",
+    "en": "Solid"
+  },
+  "shell": {
+    "zh": "壳",
+    "en": "Shell"
+  },
+  "body": {
+    "zh": "体",
+    "en": "Body"
+  },
+  "none": {
+    "zh": "无",
+    "en": "None"
+  },
+  "unknown_role": {
+    "zh": "未知角色",
+    "en": "Unknown role"
+  },
+  "unknown_unit": {
+    "zh": "未知单元",
+    "en": "Unknown unit"
+  },
+  "unknown_family": {
+    "zh": "未知类别",
+    "en": "Unknown family"
+  },
+  "block_like_unit": {
+    "zh": "块状单元",
+    "en": "Block-like unit"
+  },
+  "plate_like_unit": {
+    "zh": "板状单元",
+    "en": "Plate-like unit"
+  },
+  "column_like_unit": {
+    "zh": "柱状单元",
+    "en": "Column-like unit"
+  },
+  "block_like_candidate": {
+    "zh": "块状候选",
+    "en": "Block candidate"
+  },
+  "plate_layer_candidate": {
+    "zh": "板层候选",
+    "en": "Plate-layer candidate"
+  },
+  "block_layer_candidate": {
+    "zh": "块层候选",
+    "en": "Block-layer candidate"
+  },
+  "support_column_candidate": {
+    "zh": "支撑柱候选",
+    "en": "Support-column candidate"
+  },
+  "fastener_candidate": {
+    "zh": "紧固件候选",
+    "en": "Fastener candidate"
+  },
+  "insert_candidate": {
+    "zh": "镶件候选",
+    "en": "Insert candidate"
+  },
+  "scrap_or_aux_candidate": {
+    "zh": "废料或辅助件候选",
+    "en": "Scrap or auxiliary candidate"
+  },
+  "block_aux_family": {
+    "zh": "块状辅助件",
+    "en": "Block auxiliary"
+  },
+  "fastener_family": {
+    "zh": "紧固件",
+    "en": "Fastener"
+  },
+  "die_insert_family": {
+    "zh": "凹模镶件",
+    "en": "Die insert"
+  },
+  "guide_or_holder_family": {
+    "zh": "导向或固定件",
+    "en": "Guide or holder"
+  },
+  "insert_fastener_family": {
+    "zh": "镶件紧固件",
+    "en": "Insert fastener"
+  },
+  "insert_key_plate_family": {
+    "zh": "镶件键板",
+    "en": "Insert key plate"
+  },
+  "insert_or_screw_family": {
+    "zh": "镶件或螺钉",
+    "en": "Insert or screw"
+  },
+  "insert_plate_family": {
+    "zh": "镶件板",
+    "en": "Insert plate"
+  },
+  "insert_wear_family": {
+    "zh": "镶件耐磨件",
+    "en": "Insert wear part"
+  },
+  "lower_block_family": {
+    "zh": "下部块件",
+    "en": "Lower block"
+  },
+  "lower_plate_family": {
+    "zh": "下部板件",
+    "en": "Lower plate"
+  },
+  "plate_or_pad_family": {
+    "zh": "板或垫块",
+    "en": "Plate or pad"
+  },
+  "punch_family": {
+    "zh": "凸模",
+    "en": "Punch"
+  },
+  "punch_holder_family": {
+    "zh": "凸模固定件",
+    "en": "Punch holder"
+  },
+  "scrap_or_aux_family": {
+    "zh": "废料或辅助件",
+    "en": "Scrap or auxiliary"
+  },
+  "upper_aux_family": {
+    "zh": "上部辅助件",
+    "en": "Upper auxiliary"
+  },
+  "upper_block_family": {
+    "zh": "上部块件",
+    "en": "Upper block"
+  },
+  "upper_plate_family": {
+    "zh": "上部板件",
+    "en": "Upper plate"
+  },
+  "name_rule": {
+    "zh": "名称规则",
+    "en": "Name rule"
+  },
+  "conflict": {
+    "zh": "冲突",
+    "en": "Conflict"
+  },
+  "role_geometry_conflict": {
+    "zh": "角色与几何冲突",
+    "en": "Role/geometry conflict"
+  },
+  "unit_name_missing": {
+    "zh": "缺少单元名称",
+    "en": "Unit name missing"
+  },
+  "unresolved": {
+    "zh": "未解析",
+    "en": "Unresolved"
+  },
+  "fallback": {
+    "zh": "回退",
+    "en": "Fallback"
+  },
+  "concave": {
+    "zh": "凹边",
+    "en": "Concave"
+  },
+  "convex": {
+    "zh": "凸边",
+    "en": "Convex"
+  },
+  "smooth concave": {
+    "zh": "光滑凹边",
+    "en": "Smooth concave"
+  },
+  "smooth convex": {
+    "zh": "光滑凸边",
+    "en": "Smooth convex"
+  },
+  "unknown": {
+    "zh": "未知",
+    "en": "Unknown"
+  }
+}

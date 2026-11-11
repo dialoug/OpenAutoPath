@@ -6,6 +6,7 @@
 #include <unordered_set>
 #include <unordered_map>
 #include <algorithm>
+#include <atomic>
 #include <chrono>
 #include <cmath>
 #include <set>
@@ -25,6 +26,13 @@
 namespace oap {
 
 namespace {
+std::atomic<FeatureRecognizer::DiagnosticHandler> diagnosticHandler{nullptr};
+void reportDiagnostic(const char* prefix, const char* detail)
+{
+    if (const auto sink = diagnosticHandler.load()) sink(prefix, detail ? detail : "OCCT failure");
+    else std::cerr << prefix << (detail ? detail : "OCCT failure") << std::endl;
+}
+
 // 特征类别配色（RGB，0~1，sRGB 线性分量），用于识别结果视图高亮。
 const Quantity_Color kColorThroughHole    (0.0, 1.0, 0.0, Quantity_TOC_RGB);  // 通孔=绿
 const Quantity_Color kColorBlindHole      (0.0, 0.0, 1.0, Quantity_TOC_RGB);  // 盲孔=蓝
@@ -34,6 +42,11 @@ const Quantity_Color kColorPocket         (0.0, 0.5, 0.5, Quantity_TOC_RGB);  //
 const Quantity_Color kColorDefault        (0.78, 0.78, 0.80, Quantity_TOC_RGB); // 未识别=中性灰
 
 } // namespace
+
+void FeatureRecognizer::setDiagnosticHandler(DiagnosticHandler handler) noexcept
+{
+    diagnosticHandler.store(handler);
+}
 
 // 特征类别 -> 识别结果视图颜色。
 // 当前方案：通孔=绿、盲孔=蓝、沉孔=黄；槽=红、腔=青。
@@ -285,12 +298,10 @@ RecognitionResult FeatureRecognizer::recognize(const Model& model,
     try {
         session.build(model, indexer);
     } catch (const Standard_Failure& e) {
-        std::cerr << "[FeatureRecognizer] AAG build failed: "
-                  << e.GetMessageString() << std::endl;
+        reportDiagnostic("[FeatureRecognizer] AAG build failed: ", e.GetMessageString());
         return out;
     } catch (const std::exception& e) {
-        std::cerr << "[FeatureRecognizer] AAG build failed: "
-                  << e.what() << std::endl;
+        reportDiagnostic("[FeatureRecognizer] AAG build failed: ", e.what());
         return out;
     }
     if (!session.valid()) return out;
@@ -329,11 +340,9 @@ RecognitionResult FeatureRecognizer::recognize(const Model& model,
             holes, graph, model, indexer);
     } catch (const Standard_Failure& e) {
         // OCCT 异常:记录后继续(孔识别可能只完成一部分)。
-        std::cerr << "[FeatureRecognizer] hole recognition failed: "
-                  << e.GetMessageString() << std::endl;
+        reportDiagnostic("[FeatureRecognizer] hole recognition failed: ", e.GetMessageString());
     } catch (const std::exception& e) {
-        std::cerr << "[FeatureRecognizer] hole recognition failed: "
-                  << e.what() << std::endl;
+        reportDiagnostic("[FeatureRecognizer] hole recognition failed: ", e.what());
     }
 
     // instances 为权威数据；派生 faceKind 与各类别计数。
@@ -354,11 +363,9 @@ HoleGeometryRecognitionResult FeatureRecognizer::recognizeHoleGeometries(
     try {
         session.build(model, indexer);
     } catch (const Standard_Failure& e) {
-        std::cerr << "[FeatureRecognizer] hole-only AAG build failed: "
-                  << e.GetMessageString() << std::endl;
+        reportDiagnostic("[FeatureRecognizer] hole-only AAG build failed: ", e.GetMessageString());
     } catch (const std::exception& e) {
-        std::cerr << "[FeatureRecognizer] hole-only AAG build failed: "
-                  << e.what() << std::endl;
+        reportDiagnostic("[FeatureRecognizer] hole-only AAG build failed: ", e.what());
     }
     out.aagBuildMs = std::chrono::duration_cast<std::chrono::milliseconds>(
                          Clock::now() - aagStart)
@@ -383,11 +390,9 @@ HoleGeometryRecognitionResult FeatureRecognizer::recognizeHoleGeometries(
                                   Clock::now() - geometryStart)
                                   .count();
     } catch (const Standard_Failure& e) {
-        std::cerr << "[FeatureRecognizer] hole-only recognition failed: "
-                  << e.GetMessageString() << std::endl;
+        reportDiagnostic("[FeatureRecognizer] hole-only recognition failed: ", e.GetMessageString());
     } catch (const std::exception& e) {
-        std::cerr << "[FeatureRecognizer] hole-only recognition failed: "
-                  << e.what() << std::endl;
+        reportDiagnostic("[FeatureRecognizer] hole-only recognition failed: ", e.what());
     }
     return out;
 }

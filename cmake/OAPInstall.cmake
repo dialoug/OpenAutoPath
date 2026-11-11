@@ -50,6 +50,10 @@ if(OAP_INSTALL_DEVELOPMENT)
 endif()
 
 if(OAP_BUILD_GUI)
+    # Include the source and license of the embedded Qt translation resource.
+    install(DIRECTORY "${PROJECT_SOURCE_DIR}/resources/i18n/qt/"
+        DESTINATION ${CMAKE_INSTALL_DATADIR}/licenses/OpenAutoPath/qttranslations
+        COMPONENT Runtime)
     install(TARGETS OpenAutoPath RUNTIME DESTINATION . COMPONENT Runtime)
     install(TARGETS OpenAutoPathApp oap_opencamlib
         RUNTIME DESTINATION bin COMPONENT Runtime)

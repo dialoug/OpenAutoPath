@@ -1,6 +1,7 @@
 // ModelDocumentWorkspaceCoordinator 实现（oap_app_document）。
 // 已分析文档的所有权与异步加载生命周期，见 ModelDocumentWorkspaceCoordinator.h。
 #include "ModelDocumentWorkspaceCoordinator.h"
+#include <QCoreApplication>
 
 #include <utility>
 
@@ -117,7 +118,7 @@ DocumentLoadCompletion ModelDocumentWorkspaceCoordinator::completeLoad(
     // 结果校验按严重程度递减:无结果 > 取消 > 错误 > 警告/失败 > 缺文档/索引。
     if (!result) {
         completion.status = DocumentLoadStatus::Failed;
-        completion.message = QStringLiteral("后台分析未返回结果。");
+        completion.message = QCoreApplication::translate("OpenAutoPath", "后台分析未返回结果。");
         finish();
         return completion;
     }
@@ -149,8 +150,7 @@ DocumentLoadCompletion ModelDocumentWorkspaceCoordinator::completeLoad(
     }
     if (result->document.IsNull() || !result->stepIndexer) {
         completion.status = DocumentLoadStatus::Failed;
-        completion.message = QStringLiteral(
-            "后台分析结果缺少文档或稳定索引。");
+        completion.message = QCoreApplication::translate("OpenAutoPath", "后台分析结果缺少文档或稳定索引。");
         finish();
         return completion;
     }

@@ -1,5 +1,6 @@
 // ResultPanel 实现 — 参见 ResultPanel.h。
 #include "ResultPanel.h"
+#include <QCoreApplication>
 
 #include "StickyTreeWidget.h"
 
@@ -51,7 +52,7 @@ ResultPanel::ResultPanel(QWidget* parent) : QWidget(parent)
     // 搜索框:按 Unit / Face 序号定位节点。输入 "F123"/"123"(面)、"U12"(单元)
     // 等,回车后选中对应节点并联动 3D;同一关键词重复回车在多个匹配间循环。
     m_search = new QLineEdit(this);
-    m_search->setPlaceholderText(QStringLiteral("搜索 Unit / Face 序号 (如 F123、123、U12)，回车定位"));
+    m_search->setPlaceholderText(QCoreApplication::translate("OpenAutoPath", "搜索 Unit / Face 序号 (如 F123、123、U12)，回车定位"));
     m_search->setClearButtonEnabled(true);
     connect(m_search, &QLineEdit::returnPressed, this, &ResultPanel::onSearchSubmitted);
     layout->addWidget(m_search);
@@ -59,7 +60,7 @@ ResultPanel::ResultPanel(QWidget* parent) : QWidget(parent)
     auto* splitter = new QSplitter(Qt::Vertical, this);
 
     m_tree = new StickyTreeWidget(splitter);
-    m_tree->setHeaderLabels({QStringLiteral("单元 / 面"), QStringLiteral("类型"), QStringLiteral("角色")});
+    m_tree->setHeaderLabels({QCoreApplication::translate("OpenAutoPath", "单元 / 面"), QCoreApplication::translate("OpenAutoPath", "类型"), QCoreApplication::translate("OpenAutoPath", "角色")});
     m_tree->header()->setSectionResizeMode(0, QHeaderView::Stretch);
     m_tree->setColumnWidth(1, kTypeColumnWidth);
     m_tree->setSelectionMode(QAbstractItemView::ExtendedSelection); // Ctrl/Shift 多选
@@ -120,8 +121,8 @@ void ResultPanel::setModel(const oap::Model* model, const oap::StepIndexer* inde
             ? QString::fromStdString(u.unit_id)
             : QString::fromStdString(u.unit_id + "  " + u.decoded_name);
         uItem->setText(0, uname);
-        uItem->setText(1, QString::fromStdString(u.unit_geometry_class));
-        uItem->setText(2, QString::fromStdString(u.unit_role_hint));
+        uItem->setText(1, QCoreApplication::translate("OpenAutoPathLabel", (u.unit_geometry_class).c_str()));
+        uItem->setText(2, QCoreApplication::translate("OpenAutoPathLabel", (u.unit_role_hint).c_str()));
         uItem->setData(0, kRoleId, QString::fromStdString(u.unit_id));
         uItem->setData(0, kRoleKind, QStringLiteral("unit"));
         m_unitItems.emplace(u.unit_id, uItem);
@@ -131,7 +132,7 @@ void ResultPanel::setModel(const oap::Model* model, const oap::StepIndexer* inde
             auto it = faceType.find(fid);
             auto* fItem = new QTreeWidgetItem(uItem);
             fItem->setText(0, QString::fromStdString(fid));
-            fItem->setText(1, it != faceType.end() ? QString::fromStdString(*it->second) : QString());
+            fItem->setText(1, it != faceType.end() ? QCoreApplication::translate("OpenAutoPathLabel", (*it->second).c_str()) : QString());
             fItem->setData(0, kRoleId, QString::fromStdString(fid));
             fItem->setData(0, kRoleKind, QStringLiteral("face"));
             m_faceItems.emplace(fid, fItem);
@@ -334,9 +335,9 @@ void ResultPanel::showFaceProperties(const QString& faceId)
     if (!f) { m_props->clear(); return; }
 
     QString h;
-    h += QStringLiteral("<b>面 %1</b> &nbsp; (单元 %2)<br>")
+    h += QCoreApplication::translate("OpenAutoPath", "<b>面 %1</b> &nbsp; (单元 %2)<br>")
              .arg(htmlText(faceId), htmlText(f->unit_id));
-    h += QStringLiteral("曲面类型: <b>%1</b><br>").arg(htmlText(f->surface_type));
+    h += QCoreApplication::translate("OpenAutoPath", "曲面类型: <b>%1</b><br>").arg(QCoreApplication::translate("OpenAutoPathLabel", f->surface_type.c_str()).toHtmlEscaped());
     // 面积与面积质心在首次显示时通过同一次 SurfaceProperties 调用惰性计算，
     // 结果只缓存于面板，不回写只读 m_model。
     auto cachedProperties =
@@ -382,33 +383,33 @@ void ResultPanel::showFaceProperties(const QString& faceId)
         cachedProperties->second;
 
     if (f->area >= 0) {
-        h += QStringLiteral("面积: %1<br>").arg(fmt(f->area));
+        h += QCoreApplication::translate("OpenAutoPath", "面积: %1<br>").arg(fmt(f->area));
     } else if (surfaceProperties.hasArea) {
-        h += QStringLiteral("面积: %1<br>")
+        h += QCoreApplication::translate("OpenAutoPath", "面积: %1<br>")
                  .arg(fmt(surfaceProperties.area));
     }
-    if (f->radius >= 0) h += QStringLiteral("半径: %1<br>").arg(fmt(f->radius));
+    if (f->radius >= 0) h += QCoreApplication::translate("OpenAutoPath", "半径: %1<br>").arg(fmt(f->radius));
     if (f->has_center)
-        h += QStringLiteral("包围盒中心: [%1, %2, %3]<br>")
+        h += QCoreApplication::translate("OpenAutoPath", "包围盒中心: [%1, %2, %3]<br>")
                  .arg(fmt(f->center[0]), fmt(f->center[1]), fmt(f->center[2]));
     if (surfaceProperties.hasAreaCentroid) {
-        h += QStringLiteral("面积质心: [%1, %2, %3]<br>")
+        h += QCoreApplication::translate("OpenAutoPath", "面积质心: [%1, %2, %3]<br>")
                  .arg(
                      fmt(surfaceProperties.areaCentroid[0]),
                      fmt(surfaceProperties.areaCentroid[1]),
                      fmt(surfaceProperties.areaCentroid[2]));
     } else {
-        h += QStringLiteral("面积质心: 不可用<br>");
+        h += QCoreApplication::translate("OpenAutoPath", "面积质心: 不可用<br>");
     }
     if (f->has_normal)
-        h += QStringLiteral("法向: [%1, %2, %3]<br>")
+        h += QCoreApplication::translate("OpenAutoPath", "法向: [%1, %2, %3]<br>")
                  .arg(fmt(f->normal[0]), fmt(f->normal[1]), fmt(f->normal[2]));
     if (f->bbox.valid()) {
         auto s = f->bbox.size();
-        h += QStringLiteral("包围盒: [%1, %2, %3] .. [%4, %5, %6]<br>")
+        h += QCoreApplication::translate("OpenAutoPath", "包围盒: [%1, %2, %3] .. [%4, %5, %6]<br>")
                  .arg(fmt(f->bbox.xmin), fmt(f->bbox.ymin), fmt(f->bbox.zmin),
                       fmt(f->bbox.xmax), fmt(f->bbox.ymax), fmt(f->bbox.zmax));
-        h += QStringLiteral("尺寸: [%1, %2, %3]<br>").arg(fmt(s[0]), fmt(s[1]), fmt(s[2]));
+        h += QCoreApplication::translate("OpenAutoPath", "尺寸: [%1, %2, %3]<br>").arg(fmt(s[0]), fmt(s[1]), fmt(s[2]));
     }
     m_props->setHtml(h);
 }
@@ -424,23 +425,23 @@ void ResultPanel::showUnitProperties(const QString& unitId)
     if (!u) { m_props->clear(); return; }
 
     QString h;
-    h += QStringLiteral("<b>单元 %1</b><br>").arg(htmlText(unitId));
-    h += QStringLiteral("名称: %1<br>").arg(htmlText(u->decoded_name));
-    h += QStringLiteral("前缀 / 族: %1 / %2<br>")
-             .arg(htmlText(u->name_prefix), htmlText(u->name_family));
-    h += QStringLiteral("角色提示: <b>%1</b> (%2, 置信 %3)<br>")
-             .arg(htmlText(u->unit_role_hint),
-                   htmlText(u->role_hint_source), fmt(u->role_hint_confidence));
-    h += QStringLiteral("几何类别: %1<br>").arg(htmlText(u->unit_geometry_class));
-    h += QStringLiteral("面数: %1<br>").arg(int(u->face_ids.size()));
+    h += QCoreApplication::translate("OpenAutoPath", "<b>单元 %1</b><br>").arg(htmlText(unitId));
+    h += QCoreApplication::translate("OpenAutoPath", "名称: %1<br>").arg(htmlText(u->decoded_name));
+    h += QCoreApplication::translate("OpenAutoPath", "前缀 / 族: %1 / %2<br>")
+             .arg(htmlText(u->name_prefix), QCoreApplication::translate("OpenAutoPathLabel", u->name_family.c_str()).toHtmlEscaped());
+    h += QCoreApplication::translate("OpenAutoPath", "角色提示: <b>%1</b> (%2, 置信 %3)<br>")
+             .arg(QCoreApplication::translate("OpenAutoPathLabel", u->unit_role_hint.c_str()).toHtmlEscaped(),
+                   QCoreApplication::translate("OpenAutoPathLabel", u->role_hint_source.c_str()).toHtmlEscaped(), fmt(u->role_hint_confidence));
+    h += QCoreApplication::translate("OpenAutoPath", "几何类别: %1<br>").arg(QCoreApplication::translate("OpenAutoPathLabel", u->unit_geometry_class.c_str()).toHtmlEscaped());
+    h += QCoreApplication::translate("OpenAutoPath", "面数: %1<br>").arg(int(u->face_ids.size()));
     if (!u->role_hint_diagnostics.empty()) {
         QStringList d;
-        for (const auto& s : u->role_hint_diagnostics) d << htmlText(s);
-        h += QString("<span style='color:%1'>诊断: %2</span><br>").arg(kColorDiagnostics).arg(d.join(", "));
+        for (const auto& s : u->role_hint_diagnostics) d << QCoreApplication::translate("OpenAutoPathLabel", s.c_str()).toHtmlEscaped();
+        h += QCoreApplication::translate("OpenAutoPath", "<span style='color:%1'>诊断: %2</span><br>").arg(kColorDiagnostics).arg(d.join(", "));
     }
     if (u->bbox.valid()) {
         auto s = u->bbox.size();
-        h += QStringLiteral("尺寸: [%1, %2, %3]<br>").arg(fmt(s[0]), fmt(s[1]), fmt(s[2]));
+        h += QCoreApplication::translate("OpenAutoPath", "尺寸: [%1, %2, %3]<br>").arg(fmt(s[0]), fmt(s[1]), fmt(s[2]));
     }
 
     m_props->setHtml(h);
@@ -457,21 +458,21 @@ void ResultPanel::showEdgeProperties(const QString& edgeId)
     if (!e) { m_props->clear(); return; }
 
     QString h;
-    h += QStringLiteral("<b>边 %1</b> &nbsp; (单元 %2)<br>")
+    h += QCoreApplication::translate("OpenAutoPath", "<b>边 %1</b> &nbsp; (单元 %2)<br>")
              .arg(edgeId, QString::fromStdString(e->unit_id));
-    h += QStringLiteral("曲线类型: <b>%1</b><br>").arg(QString::fromStdString(e->curve_type));
-    if (e->length >= 0) h += QStringLiteral("长度: %1<br>").arg(fmt(e->length));
+    h += QCoreApplication::translate("OpenAutoPath", "曲线类型: <b>%1</b><br>").arg(QCoreApplication::translate("OpenAutoPathLabel", (e->curve_type).c_str()));
+    if (e->length >= 0) h += QCoreApplication::translate("OpenAutoPath", "长度: %1<br>").arg(fmt(e->length));
     if (e->has_start)
-        h += QStringLiteral("起点: [%1, %2, %3]<br>")
+        h += QCoreApplication::translate("OpenAutoPath", "起点: [%1, %2, %3]<br>")
                  .arg(fmt(e->start_point[0]), fmt(e->start_point[1]), fmt(e->start_point[2]));
     if (e->has_end)
-        h += QStringLiteral("终点: [%1, %2, %3]<br>")
+        h += QCoreApplication::translate("OpenAutoPath", "终点: [%1, %2, %3]<br>")
                  .arg(fmt(e->end_point[0]), fmt(e->end_point[1]), fmt(e->end_point[2]));
     {
         QStringList fl; for (const auto& s : e->face_ids) fl << QString::fromStdString(s);
-        h += QStringLiteral("面 (%1): %2<br>").arg(fl.size()).arg(fl.join(", "));
+        h += QCoreApplication::translate("OpenAutoPath", "面 (%1): %2<br>").arg(fl.size()).arg(fl.join(", "));
         QStringList wl; for (const auto& s : e->wire_ids) wl << QString::fromStdString(s);
-        h += QStringLiteral("线框 (%1): %2<br>").arg(wl.size()).arg(wl.join(", "));
+        h += QCoreApplication::translate("OpenAutoPath", "线框 (%1): %2<br>").arg(wl.size()).arg(wl.join(", "));
     }
     m_props->setHtml(h);
 }
@@ -487,17 +488,17 @@ void ResultPanel::showWireProperties(const QString& wireId)
     if (!w) { m_props->clear(); return; }
 
     QString h;
-    h += QStringLiteral("<b>线框 %1</b> &nbsp; (单元 %2, 面 %3)<br>")
+    h += QCoreApplication::translate("OpenAutoPath", "<b>线框 %1</b> &nbsp; (单元 %2, 面 %3)<br>")
              .arg(wireId, QString::fromStdString(w->unit_id), QString::fromStdString(w->face_id));
-    h += QStringLiteral("角色: <b>%1</b>%2<br>")
-             .arg(QString::fromStdString(w->wire_role), w->is_closed ? QStringLiteral(" (闭合)") : QString());
+    h += QCoreApplication::translate("OpenAutoPath", "角色: <b>%1</b>%2<br>")
+             .arg(QCoreApplication::translate("OpenAutoPathLabel", (w->wire_role).c_str()), w->is_closed ? QCoreApplication::translate("OpenAutoPath", " (闭合)") : QString());
     {
         QStringList el; for (const auto& s : w->edge_ids) el << QString::fromStdString(s);
-        h += QStringLiteral("边 (%1): %2<br>").arg(el.size()).arg(el.join(", "));
+        h += QCoreApplication::translate("OpenAutoPath", "边 (%1): %2<br>").arg(el.size()).arg(el.join(", "));
     }
     if (w->bbox.valid()) {
         auto s = w->bbox.size();
-        h += QStringLiteral("尺寸: [%1, %2, %3]<br>").arg(fmt(s[0]), fmt(s[1]), fmt(s[2]));
+        h += QCoreApplication::translate("OpenAutoPath", "尺寸: [%1, %2, %3]<br>").arg(fmt(s[0]), fmt(s[1]), fmt(s[2]));
     }
     m_props->setHtml(h);
 }

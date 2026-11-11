@@ -1,6 +1,7 @@
 // HoleToolpathWorkflowController 实现（oap_app_workflow_cam）。
 // 生成孔程序前的与 UI 无关的准备与原子提交，见 HoleToolpathWorkflowController.h。
 #include "app/workflows/hole/HoleToolpathWorkflowController.h"
+#include <QCoreApplication>
 
 #include "app/workflows/shared/detail/ToolpathRequestBuilder.h"
 #include "manufacturing/hole/HoleMachiningJobService.h"
@@ -59,7 +60,7 @@ HoleToolpathCommitResult HoleToolpathWorkflowController::commit(
     // 前置校验：任何必填输入缺失时直接失败，不触碰现有 Job。
     if (!request.currentJob || !request.inputs ||
         !request.generated || !request.setupFrames || !request.automaticSelection) {
-        result.error = QStringLiteral("孔加工提交请求不完整。");
+        result.error = QCoreApplication::translate("OpenAutoPath", "孔加工提交请求不完整。");
         return result;
     }
     result.job = *request.currentJob;
@@ -92,7 +93,7 @@ HoleToolpathCommitResult HoleToolpathWorkflowController::commit(
     std::string captureError;
     if (!manufacturing::HoleMachiningJobService().capture(
             result.job, capture, &captureError)) {
-        result.error = QString::fromStdString(captureError);
+        result.error = QCoreApplication::translate("OpenAutoPathDiagnostic", QString::fromStdString(captureError).toUtf8().constData());
         return result;
     }
 

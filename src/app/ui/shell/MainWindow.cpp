@@ -164,7 +164,7 @@ MainWindow::MainWindow()
         if (!m_uiBusy) return;
         const QString count = total > 0 ? QStringLiteral(" %1/%2").arg(done).arg(total) : QString{};
         statusBar()->showMessage(stage + count + (m_loadPreview.active()
-            ? QStringLiteral("；模型预览可见，分析完成后可加工") : QString{}));
+            ? QCoreApplication::translate("OpenAutoPath", "；模型预览可见，分析完成后可加工") : QString{}));
     });
     connect(m_documentWorkspace.get(),
             &oap::app::ModelDocumentWorkspaceCoordinator::cacheBuildProgress,
@@ -259,8 +259,7 @@ void MainWindow::closeEvent(QCloseEvent* event)
         if (m_playbackUi)
             m_playbackUi->stop();
         statusBar()->showMessage(
-            QStringLiteral(
-                "正在取消后台任务，任务安全结束后将自动关闭…"));
+            QCoreApplication::translate("OpenAutoPath", "正在取消后台任务，任务安全结束后将自动关闭…"));
         event->ignore();
         return;
     }

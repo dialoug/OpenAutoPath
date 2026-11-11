@@ -4,6 +4,7 @@
 #pragma once
 
 #include <optional>
+#include <QCoreApplication>
 #include <vector>
 
 #include <QDialog>
@@ -28,7 +29,7 @@ std::optional<PocketStockSimulationDialogState>
 editPocketStockSimulationSettings(
     QWidget* parent,
     const PocketStockSimulationDialogState& initial,
-    const QString& operationName = QStringLiteral("槽腔"),
+    const QString& operationName = QCoreApplication::translate("OpenAutoPath", "槽腔"),
     bool offerOpenGlPlayback = true);
 
 // 孔毛坯仿真对话框:通过回调集查询模型、执行仿真、刷新显示,

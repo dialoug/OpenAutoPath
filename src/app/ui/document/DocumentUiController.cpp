@@ -1,6 +1,7 @@
 // DocumentUiController 实现（oap_app_document_ui）。
 // 文件导航 dock 与激活边界，见 DocumentUiController.h。
 #include "app/ui/document/DocumentUiController.h"
+#include <QCoreApplication>
 
 #include "app/ui/panels/FileListPanel.h"
 
@@ -15,7 +16,7 @@ DocumentUiController::DocumentUiController(
     : QObject(&window)
 {
     m_fileList = new FileListPanel(&window);
-    m_dock = new QDockWidget(QStringLiteral("文件"), &window);
+    m_dock = new QDockWidget(QCoreApplication::translate("OpenAutoPath", "文件"), &window);
     m_dock->setObjectName(QStringLiteral("fileDock"));
     m_dock->setWidget(m_fileList);
     m_dock->setAllowedAreas(

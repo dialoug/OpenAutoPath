@@ -1,6 +1,7 @@
 // PlaybackUiController 实现（oap_app_playback_ui）。
 // 播放 dock 所有权与信号路由，见 PlaybackUiController.h。
 #include "PlaybackUiController.h"
+#include <QCoreApplication>
 
 #include <algorithm>
 #include <utility>
@@ -43,7 +44,7 @@ PlaybackUiController::PlaybackUiController(
       m_callbacks(std::move(callbacks))
 {
     m_panel = new ToolpathPlayerPanel(&window);
-    m_dock = new QDockWidget(QStringLiteral("刀路播放"), &window);
+    m_dock = new QDockWidget(QCoreApplication::translate("OpenAutoPath", "刀路播放"), &window);
     m_dock->setObjectName(QStringLiteral("toolpathPlayerDock"));
     m_dock->setWidget(m_panel);
     m_dock->setAllowedAreas(

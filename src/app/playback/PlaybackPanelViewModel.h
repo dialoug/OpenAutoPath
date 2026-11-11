@@ -6,6 +6,7 @@
 #pragma once
 
 #include <vector>
+#include <QCoreApplication>
 
 #include <QString>
 
@@ -25,7 +26,7 @@ struct PlaybackPanelViewModelInput {
 // 上/下一刀具使能状态。
 struct PlaybackPanelViewModel {
     QString infoText;
-    QString phaseText = QStringLiteral("等待开始");
+    QString phaseText = QCoreApplication::translate("OpenAutoPath", "等待开始");
     QString toolText = QStringLiteral("—");
     int navigationMoveIndex = -1;
     int informationMoveIndex = -1;

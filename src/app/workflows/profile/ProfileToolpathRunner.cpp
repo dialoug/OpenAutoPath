@@ -1,6 +1,7 @@
 // ProfileToolpathRunner 实现（oap_app_workflow_cam）。
 // 外轮廓刀路后台调用器：协调刀库自动选刀、进度和取消，见 ProfileToolpathRunner.h。
 #include "app/workflows/profile/ProfileToolpathRunner.h"
+#include <QCoreApplication>
 
 #include <atomic>
 #include <chrono>
@@ -131,14 +132,13 @@ generateProfilesWithProgress(
     toolpath::HeavyJobWaitGuard waitGuard(future, cancellation);
 
     WorkflowProgressRequest request;
-    request.title = directionOptions ? QStringLiteral("外轮廓方向规划与刀路生成")
-                        : directContour ? QStringLiteral("外轮廓单刀生成")
-                                  : QStringLiteral("外轮廓自动选刀");
-    request.label = directionOptions ? QStringLiteral("正在验证加工方向覆盖、选择刀具并生成刀路…")
-                        : directContour ? QStringLiteral("正在生成单刀外轮廓刀路并进行安全验证…")
-                                  : QStringLiteral("正在比较铣刀组合并生成多刀余料刀路…");
-    request.cancellingLabel = QStringLiteral(
-        "正在取消，等待当前候选刀具计算结束…");
+    request.title = directionOptions ? QCoreApplication::translate("OpenAutoPath", "外轮廓方向规划与刀路生成")
+                        : directContour ? QCoreApplication::translate("OpenAutoPath", "外轮廓单刀生成")
+                                  : QCoreApplication::translate("OpenAutoPath", "外轮廓自动选刀");
+    request.label = directionOptions ? QCoreApplication::translate("OpenAutoPath", "正在验证加工方向覆盖、选择刀具并生成刀路…")
+                        : directContour ? QCoreApplication::translate("OpenAutoPath", "正在生成单刀外轮廓刀路并进行安全验证…")
+                                  : QCoreApplication::translate("OpenAutoPath", "正在比较铣刀组合并生成多刀余料刀路…");
+    request.cancellingLabel = QCoreApplication::translate("OpenAutoPath", "正在取消，等待当前候选刀具计算结束…");
     request.initialTotal = 1u;
     request.snapshot = [] {
         return WorkflowProgressSnapshot{0u, 1u, {}};

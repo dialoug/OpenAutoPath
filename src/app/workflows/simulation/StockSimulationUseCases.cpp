@@ -1,5 +1,6 @@
 // StockSimulationUseCases 实现：孔/腔毛坯仿真用例主流程与相机输入组装。
 #include "app/workflows/simulation/StockSimulationUseCases.h"
+#include <QCoreApplication>
 #include "app/workflows/simulation/IpwDisplayMeshWorker.h"
 
 #include "manufacturing/job/MachiningJobStorage.h"
@@ -67,7 +68,7 @@ HoleStockRunOutcome HoleStockSimulationUseCase::execute(
     HoleStockRunOutcome outcome;
     if (!request.session || !request.coordinator || !request.job ||
         !request.buildTarget) {
-        outcome.error = QStringLiteral("孔毛胚仿真请求不完整。");
+        outcome.error = QCoreApplication::translate("OpenAutoPath", "孔毛胚仿真请求不完整。");
         return outcome;
     }
 
@@ -95,7 +96,7 @@ HoleStockRunOutcome HoleStockSimulationUseCase::execute(
             !request.buildInitialStock(
                 request.settings, initialStock, blockCount, error)) {
             outcome.error = error.isEmpty()
-                ? QStringLiteral("无法构造孔加工初始毛坯。")
+                ? QCoreApplication::translate("OpenAutoPath", "无法构造孔加工初始毛坯。")
                 : error;
             return outcome;
         }
@@ -108,7 +109,7 @@ HoleStockRunOutcome HoleStockSimulationUseCase::execute(
                 request.settings.stepPath, &error);
         if (!error.isEmpty() || stockSourceFingerprint.isEmpty()) {
             outcome.error = error.isEmpty()
-                ? QStringLiteral("无法计算毛坯 STEP 指纹。")
+                ? QCoreApplication::translate("OpenAutoPath", "无法计算毛坯 STEP 指纹。")
                 : error;
             return outcome;
         }
@@ -117,8 +118,7 @@ HoleStockRunOutcome HoleStockSimulationUseCase::execute(
     const toolpath::HoleToolpathBatch* holeResult =
         request.job->holeResult();
     if (!holeResult) {
-        outcome.error = QStringLiteral(
-            "当前加工 Job 没有可仿真的孔工序结果。");
+        outcome.error = QCoreApplication::translate("OpenAutoPath", "当前加工 Job 没有可仿真的孔工序结果。");
         return outcome;
     }
 
@@ -148,7 +148,7 @@ HoleStockRunOutcome HoleStockSimulationUseCase::execute(
         return outcome;
     }
     if (!runResult.errorMessage.empty()) {
-        outcome.error = QString::fromStdString(runResult.errorMessage);
+        outcome.error = QCoreApplication::translate("OpenAutoPathDiagnostic", QString::fromStdString(runResult.errorMessage).toUtf8().constData());
         return outcome;
     }
 
@@ -158,9 +158,8 @@ HoleStockRunOutcome HoleStockSimulationUseCase::execute(
     outcome.ok = true;
     if (!request.session->hasHoleSimulation()) {
         outcome.status = cancelled
-            ? QStringLiteral(
-                  "孔毛胚仿真已取消，尚未产生可显示快照。")
-            : QStringLiteral("孔毛胚仿真未产生可显示结果。");
+            ? QCoreApplication::translate("OpenAutoPath", "孔毛胚仿真已取消，尚未产生可显示快照。")
+            : QCoreApplication::translate("OpenAutoPath", "孔毛胚仿真未产生可显示结果。");
         return outcome;
     }
     outcome.status =
@@ -200,14 +199,14 @@ PocketStockSimulationUseCase::buildDialogState(
     for (const auto& [setupIndex, setup] : setups) {
         const QString setupName =
             setup.first == MoldSetupFace::Unresolved
-            ? QStringLiteral("未解析装夹面")
+            ? QCoreApplication::translate("OpenAutoPath", "未解析装夹面")
             : QStringLiteral("%1 / VIEW%2")
                   .arg(QString::fromLatin1(
                       moldSetupFaceName(setup.first)))
                   .arg(setupIndex + 1);
         result.setups.push_back({
             setupIndex,
-            QStringLiteral("%1（%2 道腔工序）")
+            QCoreApplication::translate("OpenAutoPath", "%1（%2 道腔工序）")
                 .arg(setupName)
                 .arg(setup.second)});
     }
@@ -242,7 +241,7 @@ PocketStockSimulationUseCase::execute(
     PocketStockSimulationUseCaseResult result;
     if (!request.session || !request.coordinator || !request.job ||
         request.targetShape.IsNull()) {
-        result.error = QStringLiteral("统一 IPW 腔加工仿真请求不完整。");
+        result.error = QCoreApplication::translate("OpenAutoPath", "统一 IPW 腔加工仿真请求不完整。");
         return result;
     }
 
@@ -273,7 +272,7 @@ PocketStockSimulationUseCase::execute(
         if (!loaded.ok()) {
             result.failure =
                 PocketStockSimulationFailure::StockLoadFailed;
-            result.error = QString::fromStdString(loaded.message);
+            result.error = QCoreApplication::translate("OpenAutoPathDiagnostic", QString::fromStdString(loaded.message).toUtf8().constData());
             return result;
         }
         initialStock = loaded.shape;
@@ -284,13 +283,13 @@ PocketStockSimulationUseCase::execute(
             result.failure =
                 PocketStockSimulationFailure::StockLoadFailed;
             result.error = error.isEmpty()
-                ? QStringLiteral("无法计算毛坯 STEP 指纹。")
+                ? QCoreApplication::translate("OpenAutoPath", "无法计算毛坯 STEP 指纹。")
                 : error;
             return result;
         }
     } else if (initialStock.IsNull()) {
         result.failure = PocketStockSimulationFailure::PreparationFailed;
-        result.error = QStringLiteral("无法构造腔加工初始毛坯。");
+        result.error = QCoreApplication::translate("OpenAutoPath", "无法构造腔加工初始毛坯。");
         return result;
     }
 
@@ -329,7 +328,7 @@ PocketStockSimulationUseCase::execute(
     }
     if (result.runResult.cancelled) {
         result.failure = PocketStockSimulationFailure::Cancelled;
-        result.error = QStringLiteral("统一 IPW 腔加工仿真已取消。");
+        result.error = QCoreApplication::translate("OpenAutoPath", "统一 IPW 腔加工仿真已取消。");
         return result;
     }
 
@@ -339,13 +338,13 @@ PocketStockSimulationUseCase::execute(
     if (!request.session->hasPocketSimulation()) {
         result.failure = PocketStockSimulationFailure::EmptyResult;
         result.error = result.runResult.errorMessage.empty()
-            ? QStringLiteral("统一 IPW 未产生可显示检查点。")
-            : QString::fromStdString(result.runResult.errorMessage);
+            ? QCoreApplication::translate("OpenAutoPath", "统一 IPW 未产生可显示检查点。")
+            : QCoreApplication::translate("OpenAutoPathDiagnostic", QString::fromStdString(result.runResult.errorMessage).toUtf8().constData());
         return result;
     }
     if (result.runResult.failed) {
-        result.warning = QString::fromStdString(
-            result.runResult.errorMessage);
+        result.warning = QCoreApplication::translate("OpenAutoPathDiagnostic", QString::fromStdString(
+            result.runResult.errorMessage).toUtf8().constData());
     }
     result.summary =
         StockSimulationWorkflowController::pocketSummary(
@@ -513,14 +512,14 @@ ProfileStockSimulationUseCase::buildDialogState(
     for (const auto& [setupIndex, setup] : setups) {
         const QString setupName =
             setup.first == MoldSetupFace::Unresolved
-            ? QStringLiteral("未解析装夹面")
+            ? QCoreApplication::translate("OpenAutoPath", "未解析装夹面")
             : QStringLiteral("%1 / VIEW%2")
                   .arg(QString::fromLatin1(
                       moldSetupFaceName(setup.first)))
                   .arg(setupIndex + 1);
         result.setups.push_back({
             setupIndex,
-            QStringLiteral("%1（%2 道外轮廓工序）")
+            QCoreApplication::translate("OpenAutoPath", "%1（%2 道外轮廓工序）")
                 .arg(setupName)
                 .arg(setup.second)});
     }
@@ -537,8 +536,7 @@ ProfileStockSimulationUseCase::execute(
     if (!request.session || !request.coordinator || !request.job ||
         !request.operations || !request.effectiveParams ||
         request.targetShape.IsNull()) {
-        result.error = QStringLiteral(
-            "统一 IPW 外轮廓仿真请求不完整。");
+        result.error = QCoreApplication::translate("OpenAutoPath", "统一 IPW 外轮廓仿真请求不完整。");
         return result;
     }
 
@@ -571,7 +569,7 @@ ProfileStockSimulationUseCase::execute(
         if (!loaded.ok()) {
             result.failure =
                 PocketStockSimulationFailure::StockLoadFailed;
-            result.error = QString::fromStdString(loaded.message);
+            result.error = QCoreApplication::translate("OpenAutoPathDiagnostic", QString::fromStdString(loaded.message).toUtf8().constData());
             return result;
         }
         initialStock = loaded.shape;
@@ -582,14 +580,14 @@ ProfileStockSimulationUseCase::execute(
             result.failure =
                 PocketStockSimulationFailure::StockLoadFailed;
             result.error = error.isEmpty()
-                ? QStringLiteral("无法计算毛坯 STEP 指纹。")
+                ? QCoreApplication::translate("OpenAutoPath", "无法计算毛坯 STEP 指纹。")
                 : error;
             return result;
         }
     } else if (initialStock.IsNull()) {
         result.failure =
             PocketStockSimulationFailure::PreparationFailed;
-        result.error = QStringLiteral("无法构造外轮廓初始毛坯。");
+        result.error = QCoreApplication::translate("OpenAutoPath", "无法构造外轮廓初始毛坯。");
         return result;
     }
 
@@ -631,8 +629,7 @@ ProfileStockSimulationUseCase::execute(
     }
     if (result.runResult.cancelled) {
         result.failure = PocketStockSimulationFailure::Cancelled;
-        result.error = QStringLiteral(
-            "统一 IPW 外轮廓仿真已取消。");
+        result.error = QCoreApplication::translate("OpenAutoPath", "统一 IPW 外轮廓仿真已取消。");
         return result;
     }
     StockSimulationWorkflowController::installProfileResult(
@@ -641,13 +638,13 @@ ProfileStockSimulationUseCase::execute(
     if (!request.session->hasPocketSimulation()) {
         result.failure = PocketStockSimulationFailure::EmptyResult;
         result.error = result.runResult.errorMessage.empty()
-            ? QStringLiteral("统一 IPW 未产生可显示检查点。")
-            : QString::fromStdString(result.runResult.errorMessage);
+            ? QCoreApplication::translate("OpenAutoPath", "统一 IPW 未产生可显示检查点。")
+            : QCoreApplication::translate("OpenAutoPathDiagnostic", QString::fromStdString(result.runResult.errorMessage).toUtf8().constData());
         return result;
     }
     if (result.runResult.failed) {
-        result.warning = QString::fromStdString(
-            result.runResult.errorMessage);
+        result.warning = QCoreApplication::translate("OpenAutoPathDiagnostic", QString::fromStdString(
+            result.runResult.errorMessage).toUtf8().constData());
     }
     result.summary =
         StockSimulationWorkflowController::profileSummary(

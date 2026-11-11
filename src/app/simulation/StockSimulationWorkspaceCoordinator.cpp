@@ -1,6 +1,7 @@
 // StockSimulationWorkspaceCoordinator 实现（oap_app_simulation）。
 // 毛坯/IPW 状态、异步显示派生与 OCCT 呈现的应用边界，见 StockSimulationWorkspaceCoordinator.h。
 #include "app/simulation/StockSimulationWorkspaceCoordinator.h"
+#include <QCoreApplication>
 
 #include "app/presentation/StockSimulationPresenter.h"
 #include "app/workflows/simulation/IpwDisplayMeshController.h"
@@ -39,18 +40,18 @@ const Quantity_Color kPocketStockColor(
 QString featureKindLabel(const std::string& kind)
 {
     if (kind == "through_hole")
-        return QStringLiteral("通孔");
+        return QCoreApplication::translate("OpenAutoPath", "通孔");
     if (kind == "blind_hole")
-        return QStringLiteral("盲孔");
+        return QCoreApplication::translate("OpenAutoPath", "盲孔");
     if (kind == "countersink_hole")
-        return QStringLiteral("沉孔");
+        return QCoreApplication::translate("OpenAutoPath", "沉孔");
     if (kind == "slot")
-        return QStringLiteral("槽");
+        return QCoreApplication::translate("OpenAutoPath", "槽");
     if (kind == "pocket")
-        return QStringLiteral("腔");
+        return QCoreApplication::translate("OpenAutoPath", "腔");
     if (kind == "profile")
-        return QStringLiteral("外轮廓");
-    return QStringLiteral("特征");
+        return QCoreApplication::translate("OpenAutoPath", "外轮廓");
+    return QCoreApplication::translate("OpenAutoPath", "特征");
 }
 
 } // namespace
@@ -261,8 +262,7 @@ bool StockSimulationWorkspaceCoordinator::buildHoleOpenGlRequest(
         m_session.holeSimulation();
     if (!m_session.hasHoleSimulation() ||
         simulation.initialStock.IsNull() || !simulation.complete) {
-        error = QStringLiteral(
-            "请先完成孔 IPW 仿真，再启动 OpenGL 刀具动画。");
+        error = QCoreApplication::translate("OpenAutoPath", "请先完成孔 IPW 仿真，再启动 OpenGL 刀具动画。");
         return false;
     }
     std::vector<std::size_t> selectedIndices;
@@ -271,22 +271,20 @@ bool StockSimulationWorkspaceCoordinator::buildHoleOpenGlRequest(
             selectedIndices.push_back(index);
     }
     if (selectedIndices.empty()) {
-        error = QStringLiteral("所选 Setup 没有可播放的孔加工工序。");
+        error = QCoreApplication::translate("OpenAutoPath", "所选 Setup 没有可播放的孔加工工序。");
         return false;
     }
     const std::size_t firstIndex = selectedIndices.front();
     const std::size_t lastIndex = selectedIndices.back();
     for (std::size_t index = firstIndex; index <= lastIndex; ++index) {
         if (operations[index].setupIndex != setupIndex) {
-            error = QStringLiteral(
-                "所选 Setup 的孔工序在程序中不是连续区间，"
+            error = QCoreApplication::translate("OpenAutoPath", "所选 Setup 的孔工序在程序中不是连续区间，"
                 "无法建立单一 OpenGL 材料基线。");
             return false;
         }
     }
     if (simulation.steps.size() <= lastIndex) {
-        error = QStringLiteral(
-            "孔 IPW 快照数量少于当前孔程序，请重新执行孔 IPW。");
+        error = QCoreApplication::translate("OpenAutoPath", "孔 IPW 快照数量少于当前孔程序，请重新执行孔 IPW。");
         return false;
     }
 
@@ -296,8 +294,7 @@ bool StockSimulationWorkspaceCoordinator::buildHoleOpenGlRequest(
     const TopoDS_Shape& finalSnapshot =
         simulation.steps[lastIndex].stockAfter;
     if (initialSnapshot.IsNull() || finalSnapshot.IsNull()) {
-        error = QStringLiteral(
-            "所选 Setup 缺少有效的加工前后孔 IPW 快照。");
+        error = QCoreApplication::translate("OpenAutoPath", "所选 Setup 缺少有效的加工前后孔 IPW 快照。");
         return false;
     }
 
@@ -527,7 +524,7 @@ void StockSimulationWorkspaceCoordinator::displayHoleSnapshot(
         shape, kHoleStockColor, 0.48,
         Graphic3d_ZLayerId_Default, modelTransform);
     if (!result.ok) {
-        emit statusChanged(QString::fromStdString(result.error));
+        emit statusChanged(QCoreApplication::translate("OpenAutoPathDiagnostic", QString::fromStdString(result.error).toUtf8().constData()));
     }
 }
 
@@ -566,7 +563,7 @@ void StockSimulationWorkspaceCoordinator::displayHoleComparison(
         shape, color, transparency, Graphic3d_ZLayerId_Top,
         modelTransform, viewMode == 2);
     if (!result.ok)
-        emit statusChanged(QString::fromStdString(result.error));
+        emit statusChanged(QCoreApplication::translate("OpenAutoPathDiagnostic", QString::fromStdString(result.error).toUtf8().constData()));
 }
 
 // 显示某工序的过切归属形状;索引越界或形状为空时清空孔显示。
@@ -594,7 +591,7 @@ displayHoleOperationOvercut(
         shape, kOperationOvercutColor, 0.02,
         Graphic3d_ZLayerId_Top, modelTransform);
     if (!result.ok)
-        emit statusChanged(QString::fromStdString(result.error));
+        emit statusChanged(QCoreApplication::translate("OpenAutoPathDiagnostic", QString::fromStdString(result.error).toUtf8().constData()));
 }
 
 // 特征余量列表:优先取统一 IPW(槽)结果,否则取孔对比结果;
@@ -646,7 +643,7 @@ void StockSimulationWorkspaceCoordinator::displayFeatureAllowance(
     if (item.resultIndex < 0 ||
         item.resultIndex >=
             static_cast<int>(comparison.featureAllowances.size())) {
-        emit statusChanged(QStringLiteral("所选特征余量结果已失效，请重新打开视图。"));
+        emit statusChanged(QCoreApplication::translate("OpenAutoPath", "所选特征余量结果已失效，请重新打开视图。"));
         return;
     }
     const toolpath::StockFeatureAllowance& allowance =
@@ -657,8 +654,7 @@ void StockSimulationWorkspaceCoordinator::displayFeatureAllowance(
     // 余量体积极小视为加工完成,无可显示内容。
     if (allowance.remainingAllowanceVolume <= 1.0e-12) {
         removePocketPresentation();
-        emit statusChanged(QStringLiteral(
-            "%1 已加工完成，没有可显示的剩余余量。")
+        emit statusChanged(QCoreApplication::translate("OpenAutoPath", "%1 已加工完成，没有可显示的剩余余量。")
             .arg(item.displayName));
         return;
     }
@@ -666,15 +662,14 @@ void StockSimulationWorkspaceCoordinator::displayFeatureAllowance(
     if (!item.unifiedIpw) {
         if (allowance.remainingAllowance.IsNull()) {
             removePocketPresentation();
-            emit statusChanged(QStringLiteral("该特征没有可显示的 BRep 余量。"));
+            emit statusChanged(QCoreApplication::translate("OpenAutoPath", "该特征没有可显示的 BRep 余量。"));
             return;
         }
         presentPocketBRep(
             allowance.remainingAllowance,
             kRemainingAllowanceColor, 0.12, true,
             modelTransform);
-        emit statusChanged(QStringLiteral(
-            "%1 加工后余量：%2 mm³，完成率 %3%。")
+        emit statusChanged(QCoreApplication::translate("OpenAutoPath", "%1 加工后余量：%2 mm³，完成率 %3%。")
             .arg(item.displayName)
             .arg(allowance.remainingAllowanceVolume, 0, 'f', 3)
             .arg(allowance.completionRatio * 100.0, 0, 'f', 1));
@@ -683,7 +678,7 @@ void StockSimulationWorkspaceCoordinator::displayFeatureAllowance(
 
     if (!comparison.heightFieldDisplaySource) {
         removePocketPresentation();
-        emit statusChanged(QStringLiteral("该特征缺少 Multi-Dexel 余量显示源。"));
+        emit statusChanged(QCoreApplication::translate("OpenAutoPath", "该特征缺少 Multi-Dexel 余量显示源。"));
         return;
     }
     // 特征余量网格依赖三角化的表面显示形式,不满足时给出警告。
@@ -691,9 +686,8 @@ void StockSimulationWorkspaceCoordinator::displayFeatureAllowance(
         !triangulationEnabled()) {
         removePocketPresentation();
         emit warningRequested(
-            QStringLiteral("特征余量视图"),
-            QStringLiteral(
-                "特征余量网格需要启用三角化，并将 OCCT 显示形式设为带网格、着色或线框表面。"));
+            QCoreApplication::translate("OpenAutoPath", "特征余量视图"),
+            QCoreApplication::translate("OpenAutoPath", "特征余量网格需要启用三角化，并将 OCCT 显示形式设为带网格、着色或线框表面。"));
         return;
     }
 
@@ -712,8 +706,7 @@ void StockSimulationWorkspaceCoordinator::displayFeatureAllowance(
         presentPocketTriangulation(
             cached, Quantity_Color(1.0, 0.72, 0.08, Quantity_TOC_RGB),
             0.12, true, displayMode(), modelTransform);
-        emit statusChanged(QStringLiteral(
-            "%1 加工后余量：%2 mm³，完成率 %3%（缓存）。")
+        emit statusChanged(QCoreApplication::translate("OpenAutoPath", "%1 加工后余量：%2 mm³，完成率 %3%（缓存）。")
             .arg(item.displayName)
             .arg(allowance.remainingAllowanceVolume, 0, 'f', 3)
             .arg(allowance.completionRatio * 100.0, 0, 'f', 1));
@@ -744,8 +737,8 @@ bool StockSimulationWorkspaceCoordinator::presentPocketTriangulation(
         mesh, color, transparency, topLayer, mode, modelTransform);
     if (!result.ok) {
         emit statusChanged(
-            QStringLiteral("统一 IPW 网格发布失败，已保留当前进程：%1")
-                .arg(QString::fromStdString(result.error)));
+            QCoreApplication::translate("OpenAutoPath", "统一 IPW 网格发布失败，已保留当前进程：%1")
+                .arg(QCoreApplication::translate("OpenAutoPathDiagnostic", QString::fromStdString(result.error).toUtf8().constData())));
     }
     return result.ok;
 }
@@ -763,8 +756,8 @@ presentPocketPrimitiveGeometry(
         geometry, color, transparency, topLayer, modelTransform);
     if (!result.ok) {
         emit statusChanged(
-            QStringLiteral("Multi-Dexel 直接图元发布失败：%1")
-                .arg(QString::fromStdString(result.error)));
+            QCoreApplication::translate("OpenAutoPath", "Multi-Dexel 直接图元发布失败：%1")
+                .arg(QCoreApplication::translate("OpenAutoPathDiagnostic", QString::fromStdString(result.error).toUtf8().constData())));
     }
     return result.ok;
 }
@@ -781,8 +774,8 @@ bool StockSimulationWorkspaceCoordinator::presentPocketBRep(
         shape, color, transparency, topLayer, modelTransform);
     if (!result.ok) {
         emit statusChanged(
-            QStringLiteral("Multi-Dexel BRep 发布失败：%1")
-                .arg(QString::fromStdString(result.error)));
+            QCoreApplication::translate("OpenAutoPath", "Multi-Dexel BRep 发布失败：%1")
+                .arg(QCoreApplication::translate("OpenAutoPathDiagnostic", QString::fromStdString(result.error).toUtf8().constData())));
     }
     return result.ok;
 }
@@ -805,7 +798,7 @@ void StockSimulationWorkspaceCoordinator::requestDisplay(
     if (!m_taskCoordinator.displayMeshController() ||
         !m_taskCoordinator.displayMeshController()->running()) {
         emit statusChanged(
-            QStringLiteral("IPW 显示网格后台线程不可用。"));
+            QCoreApplication::translate("OpenAutoPath", "IPW 显示网格后台线程不可用。"));
         return;
     }
     emit statusChanged(
@@ -813,7 +806,7 @@ void StockSimulationWorkspaceCoordinator::requestDisplay(
     if (!m_taskCoordinator.submitDisplay(std::move(request))) {
         m_taskCoordinator.cancelDisplay(false);
         emit statusChanged(
-            QStringLiteral("无法提交 IPW 显示网格后台请求。"));
+            QCoreApplication::translate("OpenAutoPath", "无法提交 IPW 显示网格后台请求。"));
     }
 }
 
@@ -839,7 +832,7 @@ void StockSimulationWorkspaceCoordinator::handleDisplayResult(
     if (publication.disposition == Disposition::Failed) {
         emit statusChanged(publication.error);
         emit warningRequested(
-            QStringLiteral("统一 IPW 显示网格"), publication.error);
+            QCoreApplication::translate("OpenAutoPath", "统一 IPW 显示网格"), publication.error);
         removePocketPresentation();
         emit asynchronousDisplayFinished();
         return;
@@ -893,14 +886,13 @@ void StockSimulationWorkspaceCoordinator::displayPocketSnapshot(
     if (displayMode() == IpwOcctDisplayMode::Off) {
         removePocketPresentation();
         emit statusChanged(
-            QStringLiteral("Multi-Dexel 主视口显示已关闭。"));
+            QCoreApplication::translate("OpenAutoPath", "Multi-Dexel 主视口显示已关闭。"));
         return;
     }
     if (isIpwSurfaceDisplayMode(displayMode()) &&
         !triangulationEnabled()) {
         removePocketPresentation();
-        emit statusChanged(QStringLiteral(
-            "当前表面形式需要三角化；可改选 Dexel 柱、点云、"
+        emit statusChanged(QCoreApplication::translate("OpenAutoPath", "当前表面形式需要三角化；可改选 Dexel 柱、点云、"
             "体素柱、剖面或 BRep。"));
         return;
     }
@@ -923,8 +915,7 @@ void StockSimulationWorkspaceCoordinator::displayPocketSnapshot(
     }
     if (!checkpoint || !checkpoint->dexelStock) {
         removePocketPresentation();
-        emit statusChanged(QStringLiteral(
-            "该结果不是统一 Multi-Dexel IPW，已停止显示 BRep 毛坯。"));
+        emit statusChanged(QCoreApplication::translate("OpenAutoPath", "该结果不是统一 Multi-Dexel IPW，已停止显示 BRep 毛坯。"));
         return;
     }
 
@@ -964,8 +955,7 @@ void StockSimulationWorkspaceCoordinator::displayPocketSnapshot(
         displayMode(), modelTransform);
     const IpwDisplayCacheStats cacheStats =
         m_taskCoordinator.displayCacheStats();
-    emit statusChanged(QStringLiteral(
-        "IPW 检查点网格：缓存命中（%1 项，%2 MiB）。")
+    emit statusChanged(QCoreApplication::translate("OpenAutoPath", "IPW 检查点网格：缓存命中（%1 项，%2 MiB）。")
         .arg(cacheStats.residentArtifactCount)
         .arg(cacheStats.residentBytes / (1024.0 * 1024.0),
              0, 'f', 1));
@@ -1068,7 +1058,7 @@ void StockSimulationWorkspaceCoordinator::displayPocketTransient(
         : nullptr;
     if (!node) {
         emit statusChanged(
-            QStringLiteral("当前 IPW 节点不存在。"));
+            QCoreApplication::translate("OpenAutoPath", "当前 IPW 节点不存在。"));
         return;
     }
 
@@ -1080,8 +1070,7 @@ void StockSimulationWorkspaceCoordinator::displayPocketTransient(
         const toolpath::ProfileToolpathBatch* profile =
             job.profileResult();
         if (!profile) {
-            emit statusChanged(QStringLiteral(
-                "当前 IPW 节点没有可重放的外轮廓刀路。"));
+            emit statusChanged(QCoreApplication::translate("OpenAutoPath", "当前 IPW 节点没有可重放的外轮廓刀路。"));
             return;
         }
         effectiveParams = profile->effectiveParams;
@@ -1104,8 +1093,7 @@ void StockSimulationWorkspaceCoordinator::displayPocketTransient(
                manufacturing::ipw::IpwOperationKind::Pocket) {
         const toolpath::PocketToolpathBatch* batch = job.pocketResult();
         if (!batch) {
-            emit statusChanged(QStringLiteral(
-                "当前 IPW 节点没有可重放的腔刀路。"));
+            emit statusChanged(QCoreApplication::translate("OpenAutoPath", "当前 IPW 节点没有可重放的腔刀路。"));
             return;
         }
         effectiveParams = batch->effectiveParams;
@@ -1119,7 +1107,7 @@ void StockSimulationWorkspaceCoordinator::displayPocketTransient(
                manufacturing::ipw::IpwOperationKind::SurfaceFinishing) {
         const auto* finishing = job.currentFinishingResult();
         if (!finishing) {
-            emit statusChanged(QStringLiteral("当前精加工刀路已失效，请重新生成。"));
+            emit statusChanged(QCoreApplication::translate("OpenAutoPath", "当前精加工刀路已失效，请重新生成。"));
             return;
         }
         for (const auto& operation : finishing->operations) {
@@ -1142,8 +1130,7 @@ void StockSimulationWorkspaceCoordinator::displayPocketTransient(
             toolProfiles.push_back(profile);
         }
     } else {
-        emit statusChanged(QStringLiteral(
-            "当前 IPW 节点不支持逐移动重放。"));
+        emit statusChanged(QCoreApplication::translate("OpenAutoPath", "当前 IPW 节点不支持逐移动重放。"));
         return;
     }
 
@@ -1164,8 +1151,7 @@ void StockSimulationWorkspaceCoordinator::displayPocketTransient(
     for (const auto& operation : *operations)
         totalMoveCount += operation.clearing.moves.size();
     if (operations->empty()) {
-        emit statusChanged(QStringLiteral(
-            "当前 IPW 节点的运行期腔刀路已失效。"));
+        emit statusChanged(QCoreApplication::translate("OpenAutoPath", "当前 IPW 节点的运行期腔刀路已失效。"));
         return;
     }
 
@@ -1192,15 +1178,14 @@ void StockSimulationWorkspaceCoordinator::displayPocketTransient(
         m_taskCoordinator.cancelDisplay(false);
         removePocketPresentation();
         emit statusChanged(
-            QStringLiteral("Multi-Dexel 主视口显示已关闭。"));
+            QCoreApplication::translate("OpenAutoPath", "Multi-Dexel 主视口显示已关闭。"));
         return;
     }
     if (isIpwSurfaceDisplayMode(displayMode()) &&
         !triangulationEnabled()) {
         m_taskCoordinator.cancelDisplay(false);
         removePocketPresentation();
-        emit statusChanged(QStringLiteral(
-            "当前表面形式需要三角化；直接图元和 BRep 仍可使用。"));
+        emit statusChanged(QCoreApplication::translate("OpenAutoPath", "当前表面形式需要三角化；直接图元和 BRep 仍可使用。"));
         return;
     }
 
@@ -1208,7 +1193,7 @@ void StockSimulationWorkspaceCoordinator::displayPocketTransient(
         job.runtime().ipwCheckpoints.find(node->parentStateKey);
     if (!parent || !parent->dexelStock) {
         emit statusChanged(
-            QStringLiteral("IPW 临时帧缺少不可变父检查点。"));
+            QCoreApplication::translate("OpenAutoPath", "IPW 临时帧缺少不可变父检查点。"));
         return;
     }
     // 构造瞬时帧源:父检查点 + 待重放操作 + 完成移动数,作为请求键的
@@ -1248,14 +1233,14 @@ void StockSimulationWorkspaceCoordinator::refreshPocketDisplay(
     if (displayMode() == IpwOcctDisplayMode::Off) {
         removePocketPresentation();
         emit statusChanged(
-            QStringLiteral("Multi-Dexel 主视口显示已关闭。"));
+            QCoreApplication::translate("OpenAutoPath", "Multi-Dexel 主视口显示已关闭。"));
         return;
     }
     if (!m_session.hasPocketSimulation() ||
         !m_session.pocketUsesUnifiedIpw()) {
         removePocketPresentation();
         emit statusChanged(
-            QStringLiteral("Multi-Dexel 显示形式已设为“%1”。")
+            QCoreApplication::translate("OpenAutoPath", "Multi-Dexel 显示形式已设为“%1”。")
                 .arg(StockSimulationCoordinator::displayModeText(
                     displayMode())));
         return;
@@ -1290,13 +1275,13 @@ StockSimulationWorkspaceCoordinator::timelineOperations(
     const auto statusText = [](manufacturing::ipw::IpwNodeStatus status) {
         using Status = manufacturing::ipw::IpwNodeStatus;
         switch (status) {
-            case Status::Dirty: return QStringLiteral("待重建");
-            case Status::Computing: return QStringLiteral("计算中");
-            case Status::Ready: return QStringLiteral("就绪");
-            case Status::Failed: return QStringLiteral("失败");
-            case Status::Cancelled: return QStringLiteral("已取消");
+            case Status::Dirty: return QCoreApplication::translate("OpenAutoPath", "待重建");
+            case Status::Computing: return QCoreApplication::translate("OpenAutoPath", "计算中");
+            case Status::Ready: return QCoreApplication::translate("OpenAutoPath", "就绪");
+            case Status::Failed: return QCoreApplication::translate("OpenAutoPath", "失败");
+            case Status::Cancelled: return QCoreApplication::translate("OpenAutoPath", "已取消");
         }
-        return QStringLiteral("未知");
+        return QCoreApplication::translate("OpenAutoPath", "未知");
     };
     for (std::size_t index = 0; index < ipwSession.nodes().size(); ++index) {
         const auto& node = ipwSession.nodes()[index];
@@ -1313,16 +1298,16 @@ StockSimulationWorkspaceCoordinator::timelineOperations(
         QString status = statusText(node.status);
         if (node.status == manufacturing::ipw::IpwNodeStatus::Ready &&
             !replayAvailable) {
-            status += QStringLiteral("，检查点缺失");
+            status += QCoreApplication::translate("OpenAutoPath", "，检查点缺失");
         }
         if (!node.message.empty()) {
             status += QStringLiteral("：%1").arg(
-                QString::fromStdString(node.message));
+                QCoreApplication::translate("OpenAutoPathDiagnostic", QString::fromStdString(node.message).toUtf8().constData()));
         }
         operations.push_back({
             static_cast<int>(index), moveCount,
             QString::fromStdString(node.operation.id),
-            QStringLiteral("#%1 · %2［%3］（%4 个移动）")
+            QCoreApplication::translate("OpenAutoPath", "#%1 · %2［%3］（%4 个移动）")
                 .arg(node.operation.sequence + 1)
                 .arg(QString::fromStdString(node.operation.id), status)
                 .arg(moveCount),

@@ -1,5 +1,6 @@
 // MainWindow 菜单、工具栏、停靠面板、快捷键与 UI 状态适配器。
 #include "MainWindow.h"
+#include "app/ui/LanguageSettings.h"
 #include "app/ui/playback/PlaybackUiController.h"
 #include "app/ui/recognition/RecognitionSelectionUiController.h"
 #include "app/ui/document/DocumentUiController.h"
@@ -176,24 +177,24 @@ bool isAllowedMouseSharing(const QStringList& ids)
 
 void MainWindow::setupMenus()
 {
-    QMenu *fileMenu = menuBar()->addMenu(QStringLiteral("文件(&F)"));
-    QAction *openAct = fileMenu->addAction(QStringLiteral("打开 STEP(&O)..."));
+    QMenu *fileMenu = menuBar()->addMenu(QCoreApplication::translate("OpenAutoPath", "文件(&F)"));
+    QAction *openAct = fileMenu->addAction(QCoreApplication::translate("OpenAutoPath", "打开 STEP(&O)..."));
     connect(openAct, &QAction::triggered, this, &MainWindow::openStep);
-    registerShortcut(QStringLiteral("file.open"), QStringLiteral("打开 STEP"),
+    registerShortcut(QStringLiteral("file.open"), QCoreApplication::translate("OpenAutoPath", "打开 STEP"),
                      openAct, QKeySequence::Open);
-    QAction *openFolderAct = fileMenu->addAction(QStringLiteral("打开文件夹(&F)..."));
+    QAction *openFolderAct = fileMenu->addAction(QCoreApplication::translate("OpenAutoPath", "打开文件夹(&F)..."));
     connect(openFolderAct, &QAction::triggered, this, &MainWindow::openFolder);
-    m_actPrevFile = fileMenu->addAction(QStringLiteral("上一个文件"));
+    m_actPrevFile = fileMenu->addAction(QCoreApplication::translate("OpenAutoPath", "上一个文件"));
     connect(m_actPrevFile, &QAction::triggered, this,
             [this] { navigateRelativeFile(-1); });
     registerShortcut(QStringLiteral("navigation.previous_file"),
-                     QStringLiteral("上一个文件"), m_actPrevFile,
+                     QCoreApplication::translate("OpenAutoPath", "上一个文件"), m_actPrevFile,
                      QKeySequence(Qt::Key_W));
-    m_actNextFile = fileMenu->addAction(QStringLiteral("下一个文件"));
+    m_actNextFile = fileMenu->addAction(QCoreApplication::translate("OpenAutoPath", "下一个文件"));
     connect(m_actNextFile, &QAction::triggered, this,
             [this] { navigateRelativeFile(1); });
     registerShortcut(QStringLiteral("navigation.next_file"),
-                     QStringLiteral("下一个文件"), m_actNextFile,
+                     QCoreApplication::translate("OpenAutoPath", "下一个文件"), m_actNextFile,
                      QKeySequence(Qt::Key_S));
     // 旧版曾把 W 用于着色；文件导航接管 W 时只迁移这一默认值，
     // 用户明确保存的其它自定义键保持不变。
@@ -210,7 +211,7 @@ void MainWindow::setupMenus()
     }
     updateFileNavigationActions();
     fileMenu->addSeparator();
-    QAction *quitAct = fileMenu->addAction(QStringLiteral("退出(&Q)"));
+    QAction *quitAct = fileMenu->addAction(QCoreApplication::translate("OpenAutoPath", "退出(&Q)"));
     connect(quitAct, &QAction::triggered, this, &QWidget::close);
 
     // CAM 菜单按标准加工流程排序。FreeCAD 的 Job/Setup/Tools/Operations/
@@ -218,126 +219,155 @@ void MainWindow::setupMenus()
     // 覆盖审计/IPW 和 Reference NC 审查。
     QMenu *camMenu = menuBar()->addMenu(QStringLiteral("CAM(&C)"));
     m_actOpenMachiningJob = camMenu->addAction(
-        QStringLiteral("1. 打开加工 Job(&O)..."));
-    m_actOpenMachiningJob->setIconText(QStringLiteral("打开 Job"));
+        QCoreApplication::translate("OpenAutoPath", "1. 打开加工 Job(&O)..."));
+    m_actOpenMachiningJob->setIconText(QCoreApplication::translate("OpenAutoPath", "打开 Job"));
     connect(m_actOpenMachiningJob, &QAction::triggered,
             this, &MainWindow::openMachiningJob);
     m_actSaveMachiningJob = camMenu->addAction(
-        QStringLiteral("保存加工 Job(&S)..."));
-    m_actSaveMachiningJob->setIconText(QStringLiteral("保存 Job"));
+        QCoreApplication::translate("OpenAutoPath", "保存加工 Job(&S)..."));
+    m_actSaveMachiningJob->setIconText(QCoreApplication::translate("OpenAutoPath", "保存 Job"));
     connect(m_actSaveMachiningJob, &QAction::triggered,
             this, &MainWindow::saveMachiningJob);
     camMenu->addSeparator();
 
     m_actRecognizeCamFeatures = camMenu->addAction(
-        QStringLiteral("2. 识别加工特征(&R)"));
-    m_actRecognizeCamFeatures->setIconText(QStringLiteral("特征识别"));
+        QCoreApplication::translate("OpenAutoPath", "2. 识别加工特征(&R)"));
+    m_actRecognizeCamFeatures->setIconText(QCoreApplication::translate("OpenAutoPath", "特征识别"));
     connect(m_actRecognizeCamFeatures, &QAction::triggered,
             this, &MainWindow::recognizeInnerOuterStructures);
     m_actToolpathParams = camMenu->addAction(
-        QStringLiteral("3. 加工参数与装夹(&P)..."));
-    m_actToolpathParams->setIconText(QStringLiteral("参数 / 装夹"));
+        QCoreApplication::translate("OpenAutoPath", "3. 加工参数与装夹(&P)..."));
+    m_actToolpathParams->setIconText(QCoreApplication::translate("OpenAutoPath", "参数 / 装夹"));
     connect(m_actToolpathParams, &QAction::triggered,
             this, &MainWindow::configureToolpathParams);
     auto* selectToolLibraryAction = camMenu->addAction(
-        QStringLiteral("4. 选择活动刀库(&T)..."));
-    selectToolLibraryAction->setIconText(QStringLiteral("选择刀库"));
+        QCoreApplication::translate("OpenAutoPath", "4. 选择活动刀库(&T)..."));
+    selectToolLibraryAction->setIconText(QCoreApplication::translate("OpenAutoPath", "选择刀库"));
     connect(selectToolLibraryAction, &QAction::triggered,
             this, &MainWindow::selectToolLibrary);
     m_actToolLibrary = camMenu->addAction(
-        QStringLiteral("刀具资产管理(&L)..."));
-    m_actToolLibrary->setIconText(QStringLiteral("刀库"));
+        QCoreApplication::translate("OpenAutoPath", "刀具资产管理(&L)..."));
+    m_actToolLibrary->setIconText(QCoreApplication::translate("OpenAutoPath", "刀库"));
     connect(m_actToolLibrary, &QAction::triggered,
             this, &MainWindow::openToolLibrary);
     camMenu->addSeparator();
 
     m_actHolePaths = camMenu->addAction(
-        QStringLiteral("5. 生成 / 更新 / 显示孔刀路(&H)"));
-    m_actHolePaths->setIconText(QStringLiteral("孔刀路"));
+        QCoreApplication::translate("OpenAutoPath", "5. 生成 / 更新 / 显示孔刀路(&H)"));
+    m_actHolePaths->setIconText(QCoreApplication::translate("OpenAutoPath", "孔刀路"));
     m_actHolePaths->setCheckable(true);
     m_actHolePaths->setToolTip(
-        QStringLiteral("识别孔、按参数页配置的刀具来源验证并生成统一孔程序；取消勾选仅隐藏显示"));
+        QCoreApplication::translate("OpenAutoPath", "识别孔、按参数页配置的刀具来源验证并生成统一孔程序；取消勾选仅隐藏显示"));
     connect(m_actHolePaths, &QAction::triggered,
             this, &MainWindow::showHolePaths);
     m_actPocketClearing = camMenu->addAction(
-        QStringLiteral("生成 / 更新槽腔刀路(&C)"));
-    m_actPocketClearing->setIconText(QStringLiteral("槽腔刀路"));
+        QCoreApplication::translate("OpenAutoPath", "生成 / 更新槽腔刀路(&C)"));
+    m_actPocketClearing->setIconText(QCoreApplication::translate("OpenAutoPath", "槽腔刀路"));
     m_actPocketClearing->setToolTip(
-        QStringLiteral("为主外表面内环槽腔生成逐层清腔工序"));
+        QCoreApplication::translate("OpenAutoPath", "为主外表面内环槽腔生成逐层清腔工序"));
     connect(m_actPocketClearing, &QAction::triggered,
             this, &MainWindow::showPocketClearing);
     m_actProfileContour = camMenu->addAction(
-        QStringLiteral("生成 / 更新外轮廓刀路(&P)"));
-    m_actProfileContour->setIconText(QStringLiteral("外轮廓刀路"));
+        QCoreApplication::translate("OpenAutoPath", "生成 / 更新外轮廓刀路(&P)"));
+    m_actProfileContour->setIconText(QCoreApplication::translate("OpenAutoPath", "外轮廓刀路"));
     m_actProfileContour->setToolTip(
-        QStringLiteral(
-            "自动识别主外表面的闭合外边界，并在工件外侧生成分层 Profile 工序"));
+        QCoreApplication::translate("OpenAutoPath", "自动识别主外表面的闭合外边界，并在工件外侧生成分层 Profile 工序"));
     connect(m_actProfileContour, &QAction::triggered,
             this, &MainWindow::showProfileContour);
-    m_actSurfaceFinishing = camMenu->addAction(QStringLiteral("生成雕刻刀路"));
+    m_actSurfaceFinishing = camMenu->addAction(QCoreApplication::translate("OpenAutoPath", "生成雕刻刀路"));
     m_actSurfaceFinishing->setToolTip(
-        QStringLiteral("按统一雕刻参数生成刀路，默认六面，也可选择任一单面；不要求孔槽特征识别"));
+        QCoreApplication::translate("OpenAutoPath", "按统一雕刻参数生成刀路，默认六面，也可选择任一单面；不要求孔槽特征识别"));
     connect(m_actSurfaceFinishing, &QAction::triggered,
             this, &MainWindow::generateEngravingToolpaths);
-    m_actProjectStock = camMenu->addAction(QStringLiteral("加工项目 IPW（按全局工序顺序）…"));
+    m_actProjectStock = camMenu->addAction(QCoreApplication::translate("OpenAutoPath", "加工项目 IPW（按全局工序顺序）…"));
     connect(m_actProjectStock, &QAction::triggered, this, &MainWindow::simulateProjectStock);
     camMenu->addSeparator();
 
-    m_actHoleStock = camMenu->addAction(QStringLiteral("6. 孔 IPW 仿真..."));
-    m_actHoleStock->setIconText(QStringLiteral("孔 IPW"));
+    m_actHoleStock = camMenu->addAction(QCoreApplication::translate("OpenAutoPath", "6. 孔 IPW 仿真..."));
+    m_actHoleStock->setIconText(QCoreApplication::translate("OpenAutoPath", "孔 IPW"));
     m_actHoleStock->setToolTip(
-        QStringLiteral("自动生成或复用当前孔程序，逐工序减料并查看剩余毛坯"));
+        QCoreApplication::translate("OpenAutoPath", "自动生成或复用当前孔程序，逐工序减料并查看剩余毛坯"));
     connect(m_actHoleStock, &QAction::triggered,
             this, &MainWindow::simulateHoleStock);
-    m_actPocketStock = camMenu->addAction(QStringLiteral("槽腔 IPW 仿真..."));
-    m_actPocketStock->setIconText(QStringLiteral("槽腔 IPW"));
+    m_actPocketStock = camMenu->addAction(QCoreApplication::translate("OpenAutoPath", "槽腔 IPW 仿真..."));
+    m_actPocketStock->setIconText(QCoreApplication::translate("OpenAutoPath", "槽腔 IPW"));
     m_actPocketStock->setToolTip(
-        QStringLiteral("复用当前腔刀路，逐工序减料并查看剩余毛坯与过切"));
+        QCoreApplication::translate("OpenAutoPath", "复用当前腔刀路，逐工序减料并查看剩余毛坯与过切"));
     connect(m_actPocketStock, &QAction::triggered,
             this, &MainWindow::simulatePocketStock);
     m_actProfileStock = camMenu->addAction(
-        QStringLiteral("外轮廓 IPW 仿真..."));
-    m_actProfileStock->setIconText(QStringLiteral("外轮廓 IPW"));
+        QCoreApplication::translate("OpenAutoPath", "外轮廓 IPW 仿真..."));
+    m_actProfileStock->setIconText(QCoreApplication::translate("OpenAutoPath", "外轮廓 IPW"));
     m_actProfileStock->setToolTip(
-        QStringLiteral(
-            "复用当前外轮廓刀路，逐工序减料并查看剩余毛坯、余量与过切"));
+        QCoreApplication::translate("OpenAutoPath", "复用当前外轮廓刀路，逐工序减料并查看剩余毛坯、余量与过切"));
     connect(m_actProfileStock, &QAction::triggered,
             this, &MainWindow::simulateProfileStock);
-    m_actEngravingStock = camMenu->addAction(QStringLiteral("雕刻 IPW 仿真..."));
-    m_actEngravingStock->setIconText(QStringLiteral("雕刻 IPW"));
-    m_actEngravingStock->setToolTip(QStringLiteral("按所选雕刻方向接续前序剩余毛坯，显示材料去除与刀具动画"));
+    m_actEngravingStock = camMenu->addAction(QCoreApplication::translate("OpenAutoPath", "雕刻 IPW 仿真..."));
+    m_actEngravingStock->setIconText(QCoreApplication::translate("OpenAutoPath", "雕刻 IPW"));
+    m_actEngravingStock->setToolTip(QCoreApplication::translate("OpenAutoPath", "按所选雕刻方向接续前序剩余毛坯，显示材料去除与刀具动画"));
     connect(m_actEngravingStock, &QAction::triggered, this, &MainWindow::simulateEngravingStock);
     m_actFeatureAllowance = camMenu->addAction(
-        QStringLiteral("特征余量视图(&A)..."));
+        QCoreApplication::translate("OpenAutoPath", "特征余量视图(&A)..."));
     m_actFeatureAllowance->setToolTip(
-        QStringLiteral("列出各个孔、槽、腔及外轮廓加工后的局部余量，并在主视口单独显示"));
+        QCoreApplication::translate("OpenAutoPath", "列出各个孔、槽、腔及外轮廓加工后的局部余量，并在主视口单独显示"));
     connect(m_actFeatureAllowance, &QAction::triggered,
             this, &MainWindow::showFeatureAllowanceView);
     camMenu->addSeparator();
     m_actExportToolpath = camMenu->addAction(
-        QStringLiteral("8. 审查并导出当前程序(&E)..."));
-    m_actExportToolpath->setIconText(QStringLiteral("审查 / 导出"));
+        QCoreApplication::translate("OpenAutoPath", "8. 审查并导出当前程序(&E)..."));
+    m_actExportToolpath->setIconText(QCoreApplication::translate("OpenAutoPath", "审查 / 导出"));
     connect(m_actExportToolpath, &QAction::triggered,
             this, &MainWindow::exportCurrentToolpathPreview);
 
-    m_viewMenu = menuBar()->addMenu(QStringLiteral("视图(&V)"));
-    m_displayMenu = m_viewMenu->addMenu(QStringLiteral("显示(&D)"));
-    m_panelMenu = m_viewMenu->addMenu(QStringLiteral("面板(&P)"));
-    m_toolbarMenu = m_viewMenu->addMenu(QStringLiteral("工具栏(&T)"));
-    QAction* shortcutAct = m_viewMenu->addAction(QStringLiteral("修改按键(&K)..."));
-    shortcutAct->setToolTip(QStringLiteral("设置键盘快捷键和 3D 鼠标操作"));
+    m_viewMenu = menuBar()->addMenu(QCoreApplication::translate("OpenAutoPath", "视图(&V)"));
+    auto* languageMenu = m_viewMenu->addMenu(QCoreApplication::translate("OpenAutoPath", "语言"));
+    auto* languageGroup = new QActionGroup(languageMenu);
+    languageGroup->setExclusive(true);
+    const auto addLanguage = [this, languageMenu, languageGroup](
+                                 const QString& label, const QString& code) {
+        auto* action = languageMenu->addAction(label);
+        action->setCheckable(true);
+        action->setData(code);
+        action->setChecked(oap::app::preferredLanguage() == code);
+        languageGroup->addAction(action);
+        connect(action, &QAction::triggered, this, [this, code, languageGroup] {
+            if (oap::app::preferredLanguage() == code)
+                return;
+            const auto previous = oap::app::preferredLanguage();
+            QSettings settings;
+            settings.setValue(QStringLiteral("ui/language"), code);
+            settings.sync();
+            if (settings.status() != QSettings::NoError) {
+                settings.setValue(QStringLiteral("ui/language"), previous);
+                for (auto* choice : languageGroup->actions())
+                    choice->setChecked(choice->data().toString() == previous);
+                QMessageBox::warning(this, QCoreApplication::translate("OpenAutoPath", "语言"),
+                    QCoreApplication::translate("OpenAutoPath", "无法保存语言设置。"));
+                return;
+            }
+            QMessageBox::information(this, QCoreApplication::translate("OpenAutoPath", "语言"),
+                QCoreApplication::translate("OpenAutoPath", "语言设置已保存，将在下次启动时生效。"));
+        });
+    };
+    addLanguage(QCoreApplication::translate("OpenAutoPath", "简体中文"), QStringLiteral("zh_CN"));
+    addLanguage(QCoreApplication::translate("OpenAutoPath", "英语"), QStringLiteral("en"));
+    m_displayMenu = m_viewMenu->addMenu(QCoreApplication::translate("OpenAutoPath", "显示(&D)"));
+    m_panelMenu = m_viewMenu->addMenu(QCoreApplication::translate("OpenAutoPath", "面板(&P)"));
+    m_toolbarMenu = m_viewMenu->addMenu(QCoreApplication::translate("OpenAutoPath", "工具栏(&T)"));
+    QAction* shortcutAct = m_viewMenu->addAction(QCoreApplication::translate("OpenAutoPath", "修改按键(&K)..."));
+    shortcutAct->setToolTip(QCoreApplication::translate("OpenAutoPath", "设置键盘快捷键和 3D 鼠标操作"));
     connect(shortcutAct, &QAction::triggered, this, &MainWindow::showShortcutSettings);
     registerShortcut(QStringLiteral("settings.shortcut_settings"),
-                     QStringLiteral("修改按键"), shortcutAct,
+                     QCoreApplication::translate("OpenAutoPath", "修改按键"), shortcutAct,
                      QKeySequence(Qt::Key_L));
     m_viewMenu->addSeparator();
-    QAction *resetLayoutAct = m_viewMenu->addAction(QStringLiteral("重置布局(&R)"));
-    resetLayoutAct->setToolTip(QStringLiteral("恢复默认的面板与工具栏布局"));
+    QAction *resetLayoutAct = m_viewMenu->addAction(QCoreApplication::translate("OpenAutoPath", "重置布局(&R)"));
+    resetLayoutAct->setToolTip(QCoreApplication::translate("OpenAutoPath", "恢复默认的面板与工具栏布局"));
     connect(resetLayoutAct, &QAction::triggered, this, &MainWindow::resetViewLayout);
 
-    m_actFitAll = m_displayMenu->addAction(QStringLiteral("自动回正并适合窗口"));
+    m_actFitAll = m_displayMenu->addAction(QCoreApplication::translate("OpenAutoPath", "自动回正并适合窗口"));
     m_actFitAll->setToolTip(
-        QStringLiteral("恢复初始标准轴测方向，并在 3D 视图中完整显示模型 (Home)"));
+        QCoreApplication::translate("OpenAutoPath", "恢复初始标准轴测方向，并在 3D 视图中完整显示模型 (Home)"));
     connect(m_actFitAll, &QAction::triggered, this, [this]
             {
         if (m_view->view().IsNull())
@@ -349,31 +379,31 @@ void MainWindow::setupMenus()
         fitModelInView();
     });
     registerShortcut(QStringLiteral("view.fit_all"),
-                     QStringLiteral("自动回正并适合窗口"),
+                     QCoreApplication::translate("OpenAutoPath", "自动回正并适合窗口"),
                      m_actFitAll, QKeySequence(Qt::Key_Home));
 
     m_actNearestStandardView =
-        m_displayMenu->addAction(QStringLiteral("最近方位并适合窗口"));
+        m_displayMenu->addAction(QCoreApplication::translate("OpenAutoPath", "最近方位并适合窗口"));
     m_actNearestStandardView->setToolTip(
-        QStringLiteral("吸附到当前观察方向最接近的前、后、左、右、顶或底视图 (F8)"));
+        QCoreApplication::translate("OpenAutoPath", "吸附到当前观察方向最接近的前、后、左、右、顶或底视图 (F8)"));
     connect(m_actNearestStandardView, &QAction::triggered,
             this, &MainWindow::snapToNearestStandardView);
     registerShortcut(QStringLiteral("view.nearest_standard"),
-                     QStringLiteral("最近方位并适合窗口"),
+                     QCoreApplication::translate("OpenAutoPath", "最近方位并适合窗口"),
                      m_actNearestStandardView, QKeySequence(Qt::Key_F8));
 
     QAction* focusSelectionAction =
-        m_displayMenu->addAction(QStringLiteral("定位当前选择并居中"));
+        m_displayMenu->addAction(QCoreApplication::translate("OpenAutoPath", "定位当前选择并居中"));
     focusSelectionAction->setToolTip(
-        QStringLiteral("将当前选择的区域缩放并显示在视图中央 (F)"));
+        QCoreApplication::translate("OpenAutoPath", "将当前选择的区域缩放并显示在视图中央 (F)"));
     connect(focusSelectionAction, &QAction::triggered,
             this, &MainWindow::focusCurrentSelection);
     registerShortcut(QStringLiteral("view.focus_selection"),
-                     QStringLiteral("定位当前选择并居中"),
+                     QCoreApplication::translate("OpenAutoPath", "定位当前选择并居中"),
                      focusSelectionAction, QKeySequence(Qt::Key_F));
 
     QMenu* standardViewsMenu =
-        m_displayMenu->addMenu(QStringLiteral("快速切换方位"));
+        m_displayMenu->addMenu(QCoreApplication::translate("OpenAutoPath", "快速切换方位"));
     const auto addStandardView =
         [this, standardViewsMenu](const QString& id,
                                   const QString& text,
@@ -385,31 +415,31 @@ void MainWindow::setupMenus()
                 fitModelInView();
             });
             registerShortcut(QStringLiteral("view.%1").arg(id),
-                             QStringLiteral("%1并适合窗口").arg(text),
+                             QCoreApplication::translate("OpenAutoPath", "%1并适合窗口").arg(text),
                              action, QKeySequence());
         };
-    addStandardView(QStringLiteral("front"), QStringLiteral("前视图"),
+    addStandardView(QStringLiteral("front"), QCoreApplication::translate("OpenAutoPath", "前视图"),
                     V3d_TypeOfOrientation_Zup_Front);
-    addStandardView(QStringLiteral("back"), QStringLiteral("后视图"),
+    addStandardView(QStringLiteral("back"), QCoreApplication::translate("OpenAutoPath", "后视图"),
                     V3d_TypeOfOrientation_Zup_Back);
-    addStandardView(QStringLiteral("left"), QStringLiteral("左视图"),
+    addStandardView(QStringLiteral("left"), QCoreApplication::translate("OpenAutoPath", "左视图"),
                     V3d_TypeOfOrientation_Zup_Left);
-    addStandardView(QStringLiteral("right"), QStringLiteral("右视图"),
+    addStandardView(QStringLiteral("right"), QCoreApplication::translate("OpenAutoPath", "右视图"),
                     V3d_TypeOfOrientation_Zup_Right);
-    addStandardView(QStringLiteral("top"), QStringLiteral("顶视图"),
+    addStandardView(QStringLiteral("top"), QCoreApplication::translate("OpenAutoPath", "顶视图"),
                     V3d_TypeOfOrientation_Zup_Top);
-    addStandardView(QStringLiteral("bottom"), QStringLiteral("底视图"),
+    addStandardView(QStringLiteral("bottom"), QCoreApplication::translate("OpenAutoPath", "底视图"),
                     V3d_TypeOfOrientation_Zup_Bottom);
     standardViewsMenu->addSeparator();
-    addStandardView(QStringLiteral("axo_left"), QStringLiteral("左轴测视图"),
+    addStandardView(QStringLiteral("axo_left"), QCoreApplication::translate("OpenAutoPath", "左轴测视图"),
                     V3d_TypeOfOrientation_Zup_AxoLeft);
-    addStandardView(QStringLiteral("axo_right"), QStringLiteral("右轴测视图"),
+    addStandardView(QStringLiteral("axo_right"), QCoreApplication::translate("OpenAutoPath", "右轴测视图"),
                     V3d_TypeOfOrientation_Zup_AxoRight);
 
     QMenu* toolpathLayerMenu =
-        m_displayMenu->addMenu(QStringLiteral("刀路显示层级"));
+        m_displayMenu->addMenu(QCoreApplication::translate("OpenAutoPath", "刀路显示层级"));
     toolpathLayerMenu->setToolTip(
-        QStringLiteral("控制刀路是否接受模型和余料的深度遮挡"));
+        QCoreApplication::translate("OpenAutoPath", "控制刀路是否接受模型和余料的深度遮挡"));
     QActionGroup* toolpathLayerGroup =
         new QActionGroup(toolpathLayerMenu);
     toolpathLayerGroup->setExclusive(true);
@@ -425,16 +455,16 @@ void MainWindow::setupMenus()
             toolpathLayerGroup->addAction(action);
         };
     addToolpathLayer(
-        QStringLiteral("模型深度层（默认）"),
-        QStringLiteral("刀路接受模型和余料的正常深度遮挡，不透过实体显示"),
+        QCoreApplication::translate("OpenAutoPath", "模型深度层（默认）"),
+        QCoreApplication::translate("OpenAutoPath", "刀路接受模型和余料的正常深度遮挡，不透过实体显示"),
         0);
     addToolpathLayer(
-        QStringLiteral("分析顶层"),
-        QStringLiteral("刀路显示在普通模型之上，并与 IPW 分析结果共享顶层"),
+        QCoreApplication::translate("OpenAutoPath", "分析顶层"),
+        QCoreApplication::translate("OpenAutoPath", "刀路显示在普通模型之上，并与 IPW 分析结果共享顶层"),
         1);
     addToolpathLayer(
-        QStringLiteral("最顶层"),
-        QStringLiteral("刀路始终置顶，可透过模型观察完整路径"),
+        QCoreApplication::translate("OpenAutoPath", "最顶层"),
+        QCoreApplication::translate("OpenAutoPath", "刀路始终置顶，可透过模型观察完整路径"),
         2);
     connect(
         toolpathLayerGroup, &QActionGroup::triggered,
@@ -452,20 +482,19 @@ void MainWindow::setupMenus()
             if (m_playbackUi)
                 m_playbackUi->applyDisplayLayer();
             const QStringList names = {
-                QStringLiteral("模型深度层"),
-                QStringLiteral("分析顶层"),
-                QStringLiteral("最顶层")};
+                QCoreApplication::translate("OpenAutoPath", "模型深度层"),
+                QCoreApplication::translate("OpenAutoPath", "分析顶层"),
+                QCoreApplication::translate("OpenAutoPath", "最顶层")};
             statusBar()->showMessage(
-                QStringLiteral("刀路显示层级：%1")
+                QCoreApplication::translate("OpenAutoPath", "刀路显示层级：%1")
                     .arg(names[m_playbackWorkspace->displayLayer()]));
         });
 
     QMenu* ipwDisplayModeMenu =
         m_displayMenu->addMenu(
-            QStringLiteral("Multi-Dexel 显示形式"));
+            QCoreApplication::translate("OpenAutoPath", "Multi-Dexel 显示形式"));
     ipwDisplayModeMenu->setToolTip(
-        QStringLiteral(
-            "选择统一 IPW 在 OCCT 主视口中的派生显示形式"));
+        QCoreApplication::translate("OpenAutoPath", "选择统一 IPW 在 OCCT 主视口中的派生显示形式"));
     QActionGroup* ipwDisplayModeGroup =
         new QActionGroup(ipwDisplayModeMenu);
     ipwDisplayModeGroup->setExclusive(true);
@@ -483,42 +512,42 @@ void MainWindow::setupMenus()
             ipwDisplayModeGroup->addAction(action);
         };
     addIpwDisplayMode(
-        QStringLiteral("带网格表面（默认）"),
-        QStringLiteral("三角化材料外表面，显示着色和完整三角边"),
+        QCoreApplication::translate("OpenAutoPath", "带网格表面（默认）"),
+        QCoreApplication::translate("OpenAutoPath", "三角化材料外表面，显示着色和完整三角边"),
         oap::app::IpwOcctDisplayMode::SurfaceWithEdges);
     addIpwDisplayMode(
-        QStringLiteral("无边线着色表面"),
-        QStringLiteral("三角化材料外表面，但隐藏三角边"),
+        QCoreApplication::translate("OpenAutoPath", "无边线着色表面"),
+        QCoreApplication::translate("OpenAutoPath", "三角化材料外表面，但隐藏三角边"),
         oap::app::IpwOcctDisplayMode::SurfaceShaded);
     addIpwDisplayMode(
-        QStringLiteral("纯三角线框"),
-        QStringLiteral("只显示三角网格边，不显示表面填充"),
+        QCoreApplication::translate("OpenAutoPath", "纯三角线框"),
+        QCoreApplication::translate("OpenAutoPath", "只显示三角网格边，不显示表面填充"),
         oap::app::IpwOcctDisplayMode::SurfaceWireframe);
     ipwDisplayModeMenu->addSeparator();
     addIpwDisplayMode(
-        QStringLiteral("Dexel 材料柱"),
-        QStringLiteral("每个材料区间显示为沿 W 轴的一条线段"),
+        QCoreApplication::translate("OpenAutoPath", "Dexel 材料柱"),
+        QCoreApplication::translate("OpenAutoPath", "每个材料区间显示为沿 W 轴的一条线段"),
         oap::app::IpwOcctDisplayMode::DexelColumns);
     addIpwDisplayMode(
-        QStringLiteral("区间端点点云"),
-        QStringLiteral("显示每个 Multi-Dexel 材料区间的上下端点"),
+        QCoreApplication::translate("OpenAutoPath", "区间端点点云"),
+        QCoreApplication::translate("OpenAutoPath", "显示每个 Multi-Dexel 材料区间的上下端点"),
         oap::app::IpwOcctDisplayMode::IntervalEndpoints);
     addIpwDisplayMode(
-        QStringLiteral("材料体素柱"),
-        QStringLiteral("每个材料区间显示为一个 UV 单元棱柱"),
+        QCoreApplication::translate("OpenAutoPath", "材料体素柱"),
+        QCoreApplication::translate("OpenAutoPath", "每个材料区间显示为一个 UV 单元棱柱"),
         oap::app::IpwOcctDisplayMode::IntervalPrisms);
     addIpwDisplayMode(
-        QStringLiteral("W 向中剖面"),
-        QStringLiteral("显示材料整体 W 范围 50% 位置的占用单元"),
+        QCoreApplication::translate("OpenAutoPath", "W 向中剖面"),
+        QCoreApplication::translate("OpenAutoPath", "显示材料整体 W 范围 50% 位置的占用单元"),
         oap::app::IpwOcctDisplayMode::MidSection);
     addIpwDisplayMode(
-        QStringLiteral("BRep 实体"),
-        QStringLiteral("按需把材料区间重建为 OCCT 拓扑实体；大模型可能较慢"),
+        QCoreApplication::translate("OpenAutoPath", "BRep 实体"),
+        QCoreApplication::translate("OpenAutoPath", "按需把材料区间重建为 OCCT 拓扑实体；大模型可能较慢"),
         oap::app::IpwOcctDisplayMode::BRepSnapshot);
     ipwDisplayModeMenu->addSeparator();
     addIpwDisplayMode(
-        QStringLiteral("关闭 Multi-Dexel 显示"),
-        QStringLiteral("保留材料检查点和审计结果，不在主视口发布 IPW"),
+        QCoreApplication::translate("OpenAutoPath", "关闭 Multi-Dexel 显示"),
+        QCoreApplication::translate("OpenAutoPath", "保留材料检查点和审计结果，不在主视口发布 IPW"),
         oap::app::IpwOcctDisplayMode::Off);
     connect(
         ipwDisplayModeGroup, &QActionGroup::triggered,
@@ -539,7 +568,7 @@ void MainWindow::setupMenus()
         });
 
     QMenu* rotationModeMenu =
-        m_displayMenu->addMenu(QStringLiteral("旋转方式"));
+        m_displayMenu->addMenu(QCoreApplication::translate("OpenAutoPath", "旋转方式"));
     QActionGroup* rotationModeGroup = new QActionGroup(rotationModeMenu);
     rotationModeGroup->setExclusive(true);
     QSettings viewSettings;
@@ -548,18 +577,18 @@ void MainWindow::setupMenus()
                            QStringLiteral("camera")).toString() ==
         QStringLiteral("model");
     m_actCameraRotation =
-        rotationModeMenu->addAction(QStringLiteral("相机环绕（默认）"));
+        rotationModeMenu->addAction(QCoreApplication::translate("OpenAutoPath", "相机环绕（默认）"));
     m_actCameraRotation->setCheckable(true);
     m_actCameraRotation->setChecked(!useModelRotation);
     rotationModeGroup->addAction(m_actCameraRotation);
     m_actModelRotation =
-        rotationModeMenu->addAction(QStringLiteral("固定相机，旋转模型"));
+        rotationModeMenu->addAction(QCoreApplication::translate("OpenAutoPath", "固定相机，旋转模型"));
     m_actModelRotation->setCheckable(true);
     m_actModelRotation->setChecked(useModelRotation);
     rotationModeGroup->addAction(m_actModelRotation);
     rotationModeMenu->addSeparator();
     QAction* invertModelVerticalAction =
-        rotationModeMenu->addAction(QStringLiteral("固定相机：上下旋转反转"));
+        rotationModeMenu->addAction(QCoreApplication::translate("OpenAutoPath", "固定相机：上下旋转反转"));
     invertModelVerticalAction->setCheckable(true);
     const bool invertModelVertical =
         viewSettings.value(
@@ -601,31 +630,31 @@ void MainWindow::setupToolbars()
 
     // Keep everyday camera commands on the toolbar; appearance controls share
     // a popup so they do not compete with the viewport for horizontal space.
-    QToolBar *viewBar = addToolBar(QStringLiteral("视图"));
+    QToolBar *viewBar = addToolBar(QCoreApplication::translate("OpenAutoPath", "视图"));
     viewBar->setObjectName(QStringLiteral("viewToolbar"));
-    addToolbarToggle(viewBar, QStringLiteral("视图控制"));
-    m_actFitAll->setIconText(QStringLiteral("适合窗口"));
+    addToolbarToggle(viewBar, QCoreApplication::translate("OpenAutoPath", "视图控制"));
+    m_actFitAll->setIconText(QCoreApplication::translate("OpenAutoPath", "适合窗口"));
     viewBar->addAction(m_actFitAll);
     if (m_actNearestStandardView) {
-        m_actNearestStandardView->setIconText(QStringLiteral("标准视图"));
+        m_actNearestStandardView->setIconText(QCoreApplication::translate("OpenAutoPath", "标准视图"));
         viewBar->addAction(m_actNearestStandardView);
     }
-    auto* appearanceMenu = new QMenu(QStringLiteral("显示"), viewBar);
+    auto* appearanceMenu = new QMenu(QCoreApplication::translate("OpenAutoPath", "显示"), viewBar);
     auto* appearanceButton = new QToolButton(viewBar);
-    appearanceButton->setText(QStringLiteral("显示"));
-    appearanceButton->setToolTip(QStringLiteral("模型外观、结构颜色和背景灰度"));
+    appearanceButton->setText(QCoreApplication::translate("OpenAutoPath", "显示"));
+    appearanceButton->setToolTip(QCoreApplication::translate("OpenAutoPath", "模型外观、结构颜色和背景灰度"));
     appearanceButton->setPopupMode(QToolButton::InstantPopup);
     appearanceButton->setMenu(appearanceMenu);
     viewBar->addWidget(appearanceButton);
     auto* backgroundControl = new QWidget(appearanceMenu);
     auto* backgroundLayout = new QHBoxLayout(backgroundControl);
     backgroundLayout->setContentsMargins(12, 8, 12, 8);
-    backgroundLayout->addWidget(new QLabel(QStringLiteral("背景"), backgroundControl));
+    backgroundLayout->addWidget(new QLabel(QCoreApplication::translate("OpenAutoPath", "背景"), backgroundControl));
     QSlider *graySlider = new QSlider(Qt::Horizontal, backgroundControl);
     graySlider->setRange(kGraySliderMin, kGraySliderMax);
     graySlider->setValue(int(m_view->backgroundGray() * kGraySliderScale));
     graySlider->setFixedWidth(kGraySliderWidth);
-    graySlider->setToolTip(QStringLiteral("背景灰度:黑到白"));
+    graySlider->setToolTip(QCoreApplication::translate("OpenAutoPath", "背景灰度:黑到白"));
     backgroundLayout->addWidget(graySlider);
     auto* backgroundAction = new QWidgetAction(appearanceMenu);
     backgroundAction->setDefaultWidget(backgroundControl);
@@ -633,106 +662,106 @@ void MainWindow::setupToolbars()
     appearanceMenu->addSeparator();
     connect(graySlider, &QSlider::valueChanged, this, [this](int v)
             { m_view->setBackgroundGray(v / kGraySliderScale); });
-    m_actFaded = appearanceMenu->addAction(QStringLiteral("褪色"));
+    m_actFaded = appearanceMenu->addAction(QCoreApplication::translate("OpenAutoPath", "褪色"));
     m_actFaded->setCheckable(true);
     m_actFaded->setChecked(true);
-    m_actFaded->setToolTip(QStringLiteral("以淡灰色显示普通面，使特征颜色更突出"));
+    m_actFaded->setToolTip(QCoreApplication::translate("OpenAutoPath", "以淡灰色显示普通面，使特征颜色更突出"));
     connect(m_actFaded, &QAction::toggled, this, &MainWindow::toggleFaded);
 
     // CAM 特征识别已进入左侧标准工作流。顶部识别工具栏只保留
     // 识别结果的显示与诊断命令，避免同一操作出现两个按钮入口。
-    QToolBar *recogBar = addToolBar(QStringLiteral("识别"));
+    QToolBar *recogBar = addToolBar(QCoreApplication::translate("OpenAutoPath", "识别"));
     recogBar->setObjectName(QStringLiteral("recognitionToolbar"));
     m_recognitionToolbar = recogBar;
-    addToolbarToggle(recogBar, QStringLiteral("识别"));
+    addToolbarToggle(recogBar, QCoreApplication::translate("OpenAutoPath", "识别"));
     recogBar->hide();
     m_actRecognizeCamFeatures->setToolTip(
-        QStringLiteral("统一识别孔、通结构和 Z→Y→X 内外环结构并染色；"
+        QCoreApplication::translate("OpenAutoPath", "统一识别孔、通结构和 Z→Y→X 内外环结构并染色；"
                        "孔与通结构优先从内外环追踪入口排除"));
     // 结构染色 / 原始颜色视图切换：识别完成后启用。
-    m_actFeatureColors = appearanceMenu->addAction(QStringLiteral("结构颜色"));
+    m_actFeatureColors = appearanceMenu->addAction(QCoreApplication::translate("OpenAutoPath", "结构颜色"));
     m_actFeatureColors->setCheckable(true);
     m_actFeatureColors->setChecked(false);
     m_actFeatureColors->setEnabled(false);
     m_actFeatureColors->setToolTip(
-        QStringLiteral("在内外环结构识别染色与底色之间切换 (Q)"));
+        QCoreApplication::translate("OpenAutoPath", "在内外环结构识别染色与底色之间切换 (Q)"));
     connect(m_actFeatureColors, &QAction::toggled, this, &MainWindow::toggleFeatureColors);
-    registerShortcut(QStringLiteral("view.feature_colors"), QStringLiteral("结构颜色"),
+    registerShortcut(QStringLiteral("view.feature_colors"), QCoreApplication::translate("OpenAutoPath", "结构颜色"),
                      m_actFeatureColors, QKeySequence(Qt::Key_Q));
     // 基面识别:把与所属体 AABB 紧贴的平面(基面)找出来涂黑。
-    QAction *baseBtn = recogBar->addAction(QStringLiteral("识别基面"));
-    baseBtn->setToolTip(QStringLiteral("识别与包围盒齐平的面并涂黑"));
+    QAction *baseBtn = recogBar->addAction(QCoreApplication::translate("OpenAutoPath", "识别基面"));
+    baseBtn->setToolTip(QCoreApplication::translate("OpenAutoPath", "识别与包围盒齐平的面并涂黑"));
     connect(baseBtn, &QAction::triggered, this, &MainWindow::recognizeBaseFaces);
     // 显示特征识别所用的逐体 AABB 包围盒(线框叠加,黄色)。
-    QAction *boxBtn = recogBar->addAction(QStringLiteral("显示包围盒"));
-    boxBtn->setToolTip(QStringLiteral("显示特征识别所用的逐体 AABB 包围盒"));
+    QAction *boxBtn = recogBar->addAction(QCoreApplication::translate("OpenAutoPath", "显示包围盒"));
+    boxBtn->setToolTip(QCoreApplication::translate("OpenAutoPath", "显示特征识别所用的逐体 AABB 包围盒"));
     connect(boxBtn, &QAction::triggered, this, &MainWindow::showFeatureBoxes);
     m_displayMenu->addAction(baseBtn);
     m_displayMenu->addAction(boxBtn);
     // 显示隐藏工具栏:对当前选择(面或单元)执行 Hide / Only / Show / Show All。
     // 同样的命令也出现在 3D 右键菜单中,二者共用下面的槽。
-    QToolBar *visBar = addToolBar(QStringLiteral("可见性"));
+    QToolBar *visBar = addToolBar(QCoreApplication::translate("OpenAutoPath", "可见性"));
     visBar->setObjectName(QStringLiteral("visibilityToolbar"));
     m_visibilityToolbar = visBar;
-    addToolbarToggle(visBar, QStringLiteral("可见性"));
-    m_actHide = visBar->addAction(QStringLiteral("隐藏"));
-    m_actHide->setToolTip(QStringLiteral("隐藏所选 (B)"));
+    addToolbarToggle(visBar, QCoreApplication::translate("OpenAutoPath", "可见性"));
+    m_actHide = visBar->addAction(QCoreApplication::translate("OpenAutoPath", "隐藏"));
+    m_actHide->setToolTip(QCoreApplication::translate("OpenAutoPath", "隐藏所选 (B)"));
     connect(m_actHide, &QAction::triggered, this, &MainWindow::hideSelected);
-    registerShortcut(QStringLiteral("visibility.hide"), QStringLiteral("隐藏"),
+    registerShortcut(QStringLiteral("visibility.hide"), QCoreApplication::translate("OpenAutoPath", "隐藏"),
                      m_actHide, QKeySequence(Qt::Key_B));
 
-    m_actOnly = visBar->addAction(QStringLiteral("仅显示"));
-    m_actOnly->setToolTip(QStringLiteral("仅显示所选 (Shift+H)"));
+    m_actOnly = visBar->addAction(QCoreApplication::translate("OpenAutoPath", "仅显示"));
+    m_actOnly->setToolTip(QCoreApplication::translate("OpenAutoPath", "仅显示所选 (Shift+H)"));
     connect(m_actOnly, &QAction::triggered, this, &MainWindow::onlySelected);
-    registerShortcut(QStringLiteral("visibility.only"), QStringLiteral("仅显示"),
+    registerShortcut(QStringLiteral("visibility.only"), QCoreApplication::translate("OpenAutoPath", "仅显示"),
                      m_actOnly, QKeySequence(Qt::SHIFT | Qt::Key_H));
 
-    m_actInvertShow = visBar->addAction(QStringLiteral("反显示"));
-    m_actInvertShow->setToolTip(QStringLiteral("可见与隐藏对象互换 (Ctrl+B)"));
+    m_actInvertShow = visBar->addAction(QCoreApplication::translate("OpenAutoPath", "反显示"));
+    m_actInvertShow->setToolTip(QCoreApplication::translate("OpenAutoPath", "可见与隐藏对象互换 (Ctrl+B)"));
     connect(m_actInvertShow, &QAction::triggered, this, &MainWindow::invertShow);
-    registerShortcut(QStringLiteral("visibility.invert"), QStringLiteral("反显示"),
+    registerShortcut(QStringLiteral("visibility.invert"), QCoreApplication::translate("OpenAutoPath", "反显示"),
                      m_actInvertShow, QKeySequence(Qt::CTRL | Qt::Key_B));
 
-    m_actShow = visBar->addAction(QStringLiteral("显示"));
-    m_actShow->setToolTip(QStringLiteral("显示所选(还原选择中被隐藏的对象)"));
+    m_actShow = visBar->addAction(QCoreApplication::translate("OpenAutoPath", "显示"));
+    m_actShow->setToolTip(QCoreApplication::translate("OpenAutoPath", "显示所选(还原选择中被隐藏的对象)"));
     connect(m_actShow, &QAction::triggered, this, &MainWindow::showSelected);
-    registerShortcut(QStringLiteral("visibility.show"), QStringLiteral("显示"),
+    registerShortcut(QStringLiteral("visibility.show"), QCoreApplication::translate("OpenAutoPath", "显示"),
                      m_actShow, QKeySequence(Qt::Key_U));
 
-    m_actShowAll = visBar->addAction(QStringLiteral("全部显示"));
-    m_actShowAll->setToolTip(QStringLiteral("全部显示 (A)"));
+    m_actShowAll = visBar->addAction(QCoreApplication::translate("OpenAutoPath", "全部显示"));
+    m_actShowAll->setToolTip(QCoreApplication::translate("OpenAutoPath", "全部显示 (A)"));
     connect(m_actShowAll, &QAction::triggered, this, &MainWindow::showAll);
-    registerShortcut(QStringLiteral("visibility.show_all"), QStringLiteral("全部显示"),
+    registerShortcut(QStringLiteral("visibility.show_all"), QCoreApplication::translate("OpenAutoPath", "全部显示"),
                      m_actShowAll, QKeySequence(Qt::Key_A));
 
-    m_actUndo = visBar->addAction(QStringLiteral("撤销"));
+    m_actUndo = visBar->addAction(QCoreApplication::translate("OpenAutoPath", "撤销"));
     m_actUndo->setToolTip(
-        QStringLiteral("撤销上一次可见性或孔段工艺操作 (Ctrl+Z)"));
+        QCoreApplication::translate("OpenAutoPath", "撤销上一次可见性或孔段工艺操作 (Ctrl+Z)"));
     connect(m_actUndo, &QAction::triggered, this, &MainWindow::undoVisibility);
-    registerShortcut(QStringLiteral("edit.undo"), QStringLiteral("撤销"),
+    registerShortcut(QStringLiteral("edit.undo"), QCoreApplication::translate("OpenAutoPath", "撤销"),
                      m_actUndo, QKeySequence::Undo);
 
     appearanceMenu->addSeparator();
-    m_actShaded = appearanceMenu->addAction(QStringLiteral("着色"));
+    m_actShaded = appearanceMenu->addAction(QCoreApplication::translate("OpenAutoPath", "着色"));
     m_actShaded->setCheckable(true);
     m_actShaded->setChecked(true);   // 默认着色,与 SceneController 初始模式一致
-    m_actShaded->setToolTip(QStringLiteral("切换着色 / 线框 (T)"));
+    m_actShaded->setToolTip(QCoreApplication::translate("OpenAutoPath", "切换着色 / 线框 (T)"));
     connect(m_actShaded, &QAction::toggled, this, &MainWindow::toggleShaded);
-    registerShortcut(QStringLiteral("view.shaded"), QStringLiteral("着色 / 线框"),
+    registerShortcut(QStringLiteral("view.shaded"), QCoreApplication::translate("OpenAutoPath", "着色 / 线框"),
                      m_actShaded, QKeySequence(Qt::Key_T));
 
-    m_actEdges = appearanceMenu->addAction(QStringLiteral("边线"));
+    m_actEdges = appearanceMenu->addAction(QCoreApplication::translate("OpenAutoPath", "边线"));
     m_actEdges->setCheckable(true);
     m_actEdges->setChecked(true);
-    m_actEdges->setToolTip(QStringLiteral("在着色模型上叠加显示面的边线 (Ctrl+E)"));
+    m_actEdges->setToolTip(QCoreApplication::translate("OpenAutoPath", "在着色模型上叠加显示面的边线 (Ctrl+E)"));
     connect(m_actEdges, &QAction::toggled, this, &MainWindow::toggleEdges);
-    registerShortcut(QStringLiteral("view.edges"), QStringLiteral("普通边线"),
+    registerShortcut(QStringLiteral("view.edges"), QCoreApplication::translate("OpenAutoPath", "普通边线"),
                      m_actEdges, QKeySequence(Qt::CTRL | Qt::Key_E));
 
-    m_actConvexityEdges = appearanceMenu->addAction(QStringLiteral("凹凸边"));
+    m_actConvexityEdges = appearanceMenu->addAction(QCoreApplication::translate("OpenAutoPath", "凹凸边"));
     m_actConvexityEdges->setCheckable(true);
     m_actConvexityEdges->setToolTip(
-        QStringLiteral("凹边红色、光顺边蓝色、凸边绿色"));
+        QCoreApplication::translate("OpenAutoPath", "凹边红色、光顺边蓝色、凸边绿色"));
     connect(m_actConvexityEdges, &QAction::toggled,
             this, &MainWindow::toggleConvexityEdges);
 
@@ -746,7 +775,7 @@ void MainWindow::setupToolbars()
         m_displayMenu->addAction(m_actFeatureColors);
         m_actShowFeatureLegend =
             m_displayMenu->addAction(
-                QStringLiteral("显示结构颜色图例"));
+                QCoreApplication::translate("OpenAutoPath", "显示结构颜色图例"));
         m_actShowFeatureLegend->setCheckable(true);
         m_actShowFeatureLegend->setChecked(true);
         connect(m_actShowFeatureLegend, &QAction::toggled,
@@ -755,11 +784,11 @@ void MainWindow::setupToolbars()
     }
 
     // 选择模式工具栏(需求 §11.3 / §9.7 快捷键 1-4)。互斥单选,默认 Face。
-    QToolBar *modeBar = addToolBar(QStringLiteral("选择模式"));
+    QToolBar *modeBar = addToolBar(QCoreApplication::translate("OpenAutoPath", "选择模式"));
     modeBar->setObjectName(QStringLiteral("selectionModeToolbar"));
     m_modeToolbar = modeBar;
-    addToolbarToggle(modeBar, QStringLiteral("选择模式"));
-    modeBar->addWidget(new QLabel(QStringLiteral(" 模式 "), modeBar));
+    addToolbarToggle(modeBar, QCoreApplication::translate("OpenAutoPath", "选择模式"));
+    modeBar->addWidget(new QLabel(QCoreApplication::translate("OpenAutoPath", " 模式 "), modeBar));
     // QActionGroup(exclusive)保证任意时刻只有一个 mode 处于选中态:
     // 勾选某个会自动取消其它,杜绝多重选定。
     QActionGroup *modeGroup = new QActionGroup(this);
@@ -767,20 +796,20 @@ void MainWindow::setupToolbars()
     auto addMode = [&](const QString &text, const QString &key, auto slot) {
         QAction *a = modeBar->addAction(text);
         a->setCheckable(true);
-        a->setToolTip(text + QStringLiteral(" 选择 (") + key + ")");
+        a->setToolTip(text + QCoreApplication::translate("OpenAutoPath", " 选择 (") + key + ")");
         connect(a, &QAction::triggered, this, slot);
         modeGroup->addAction(a); // 纳入互斥组
         registerShortcut(QStringLiteral("selection.%1").arg(key),
-                         QStringLiteral("%1选择").arg(text), a, QKeySequence(key));
+                         QCoreApplication::translate("OpenAutoPath", "%1选择").arg(text), a, QKeySequence(key));
         return a;
     };
-    QAction *mFace = addMode(QStringLiteral("面"), "1", &MainWindow::setSelectionModeFace);
+    QAction *mFace = addMode(QCoreApplication::translate("OpenAutoPath", "面"), "1", &MainWindow::setSelectionModeFace);
     mFace->setToolTip(
         mFace->toolTip() +
-        QStringLiteral("\nShift+点击：累加选择整个识别特征"));
-    addMode(QStringLiteral("边"), "2", &MainWindow::setSelectionModeEdge);
-    addMode(QStringLiteral("线环"), "3", &MainWindow::setSelectionModeWire);
-    addMode(QStringLiteral("单元"), "4", &MainWindow::setSelectionModeUnit);
+        QCoreApplication::translate("OpenAutoPath", "\nShift+点击：累加选择整个识别特征"));
+    addMode(QCoreApplication::translate("OpenAutoPath", "边"), "2", &MainWindow::setSelectionModeEdge);
+    addMode(QCoreApplication::translate("OpenAutoPath", "线环"), "3", &MainWindow::setSelectionModeWire);
+    addMode(QCoreApplication::translate("OpenAutoPath", "单元"), "4", &MainWindow::setSelectionModeUnit);
     mFace->setChecked(true);
 }
 
@@ -811,15 +840,15 @@ void MainWindow::applyShortcut(const QString& id, const QKeySequence& sequence)
 
 void MainWindow::setupMouseBindings()
 {
-    registerMouseBinding(QStringLiteral("mouse.select"), QStringLiteral("选择 / 拾取"),
+    registerMouseBinding(QStringLiteral("mouse.select"), QCoreApplication::translate("OpenAutoPath", "选择 / 拾取"),
                          OcctView::MouseAction::Select, Qt::LeftButton);
-    registerMouseBinding(QStringLiteral("mouse.box_select"), QStringLiteral("框选"),
+    registerMouseBinding(QStringLiteral("mouse.box_select"), QCoreApplication::translate("OpenAutoPath", "框选"),
                          OcctView::MouseAction::BoxSelect, Qt::LeftButton);
-    registerMouseBinding(QStringLiteral("mouse.rotate"), QStringLiteral("旋转视图"),
+    registerMouseBinding(QStringLiteral("mouse.rotate"), QCoreApplication::translate("OpenAutoPath", "旋转视图"),
                          OcctView::MouseAction::Rotate, Qt::MiddleButton);
-    registerMouseBinding(QStringLiteral("mouse.pan"), QStringLiteral("平移视图"),
+    registerMouseBinding(QStringLiteral("mouse.pan"), QCoreApplication::translate("OpenAutoPath", "平移视图"),
                          OcctView::MouseAction::Pan, Qt::RightButton);
-    registerMouseBinding(QStringLiteral("mouse.context_menu"), QStringLiteral("3D 右键菜单"),
+    registerMouseBinding(QStringLiteral("mouse.context_menu"), QCoreApplication::translate("OpenAutoPath", "3D 右键菜单"),
                          OcctView::MouseAction::ContextMenu, Qt::RightButton);
 }
 
@@ -885,16 +914,16 @@ void MainWindow::showShortcutSettings()
     }
     for (auto it = keyboardUse.cbegin(); it != keyboardUse.cend(); ++it) {
         if (it.value().size() <= 1) continue;
-        QMessageBox::warning(this, QStringLiteral("快捷键冲突"),
-            QStringLiteral("%1 同时分配给：%2")
+        QMessageBox::warning(this, QCoreApplication::translate("OpenAutoPath", "快捷键冲突"),
+            QCoreApplication::translate("OpenAutoPath", "%1 同时分配给：%2")
                 .arg(QKeySequence(it.key()).toString(QKeySequence::NativeText),
                      it.value().join(QStringLiteral("、"))));
         return;
     }
     for (auto it = mouseIds.cbegin(); it != mouseIds.cend(); ++it) {
         if (isAllowedMouseSharing(it.value())) continue;
-        QMessageBox::warning(this, QStringLiteral("鼠标按键冲突"),
-            QStringLiteral("同一鼠标键只能分配一个单击动作和一个拖动动作：%1")
+        QMessageBox::warning(this, QCoreApplication::translate("OpenAutoPath", "鼠标按键冲突"),
+            QCoreApplication::translate("OpenAutoPath", "同一鼠标键只能分配一个单击动作和一个拖动动作：%1")
                 .arg(mouseLabels.value(it.key()).join(QStringLiteral("、"))));
         return;
     }
@@ -904,7 +933,7 @@ void MainWindow::showShortcutSettings()
         else
             applyShortcut(row.id, row.edited);
     }
-    statusBar()->showMessage(QStringLiteral("按键与鼠标设置已更新"));
+    statusBar()->showMessage(QCoreApplication::translate("OpenAutoPath", "按键与鼠标设置已更新"));
 }
 
 void MainWindow::navigateRelativeFile(int delta)
@@ -937,7 +966,7 @@ void MainWindow::setupDocks()
     m_camWorkflowDock->raise();
     m_playbackUi->dock().hide();
 
-    auto* workspaceBar = addToolBar(QStringLiteral("工作区"));
+    auto* workspaceBar = addToolBar(QCoreApplication::translate("OpenAutoPath", "工作区"));
     workspaceBar->setObjectName(QStringLiteral("workspaceToolbar"));
     workspaceBar->addAction(m_playbackUi->dock().toggleViewAction());
     m_toolbarMenu->addAction(workspaceBar->toggleViewAction());
@@ -967,19 +996,19 @@ void MainWindow::refreshCamWorkflowPanel()
         switch (m_machiningWorkspace->activePreview()) {
         case ActiveToolpathPreview::Hole:
             summary.activeProgramAvailable = m_machiningWorkspace->hasHoleProgram();
-            summary.activeProgramName = QStringLiteral("孔加工");
+            summary.activeProgramName = QCoreApplication::translate("OpenAutoPath", "孔加工");
             break;
         case ActiveToolpathPreview::Pocket:
             summary.activeProgramAvailable = m_machiningWorkspace->currentPocketResult() != nullptr;
-            summary.activeProgramName = QStringLiteral("槽腔");
+            summary.activeProgramName = QCoreApplication::translate("OpenAutoPath", "槽腔");
             break;
         case ActiveToolpathPreview::Profile:
             summary.activeProgramAvailable = m_machiningWorkspace->hasProfilePreview();
-            summary.activeProgramName = QStringLiteral("外轮廓");
+            summary.activeProgramName = QCoreApplication::translate("OpenAutoPath", "外轮廓");
             break;
         case ActiveToolpathPreview::SurfaceFinishing:
             summary.activeProgramAvailable = m_machiningWorkspace->hasFinishingPreview();
-            summary.activeProgramName = QStringLiteral("雕刻");
+            summary.activeProgramName = QCoreApplication::translate("OpenAutoPath", "雕刻");
             break;
         case ActiveToolpathPreview::None:
             break;
@@ -1010,15 +1039,15 @@ void MainWindow::refreshCamWorkflowPanel()
             tool.horizontalFeed > 0 && tool.verticalFeed > 0;
         summary.directToolReady = summary.directToolReady || ready;
         if (!summary.directToolSummary.isEmpty()) summary.directToolSummary += QLatin1Char('\n');
-        summary.directToolSummary += QStringLiteral("%1单刀：T%2 · Ø%3 mm")
+        summary.directToolSummary += QCoreApplication::translate("OpenAutoPath", "%1单刀：T%2 · Ø%3 mm")
             .arg(family).arg(tool.toolNumber).arg(tool.diameter, 0, 'f', 3);
         return ready;
     };
-    const bool holeToolAvailable = toolAvailable(QStringLiteral("孔"),
+    const bool holeToolAvailable = toolAvailable(QCoreApplication::translate("OpenAutoPath", "孔"),
         m_machiningWorkspace->holeToolSelectionMode(), m_machiningWorkspace->holeSingleTool());
-    const bool pocketToolAvailable = toolAvailable(QStringLiteral("槽腔"),
+    const bool pocketToolAvailable = toolAvailable(QCoreApplication::translate("OpenAutoPath", "槽腔"),
         m_machiningWorkspace->pocketToolSelectionMode(), m_machiningWorkspace->pocketSingleTool());
-    const bool profileToolAvailable = toolAvailable(QStringLiteral("外轮廓"),
+    const bool profileToolAvailable = toolAvailable(QCoreApplication::translate("OpenAutoPath", "外轮廓"),
         m_machiningWorkspace->profileToolSelectionMode(), m_machiningWorkspace->profileSingleTool());
     summary.holeGenerationReady =
         oap::app::holeToolpathGenerationAvailable(
@@ -1040,7 +1069,7 @@ void MainWindow::refreshCamWorkflowPanel()
         summary.engravingToolReady = engraving.manualTool.valid &&
             engraving.manualTool.toolNumber > 0 && engraving.manualTool.diameter > 0 &&
             engraving.manualTool.cuttingEdgeLength > 0;
-        summary.engravingToolSummary = QStringLiteral("雕刻单刀：T%1 · Ø%2 mm")
+        summary.engravingToolSummary = QCoreApplication::translate("OpenAutoPath", "雕刻单刀：T%1 · Ø%2 mm")
             .arg(engraving.manualTool.toolNumber).arg(engraving.manualTool.diameter, 0, 'f', 3);
     } else {
         const oap::tooling::ToolLibrary* engravingLibrary = activeToolLibrary();
@@ -1060,9 +1089,9 @@ void MainWindow::refreshCamWorkflowPanel()
                     tool.tool.type == oap::tooling::ToolType::EndMill ||
                     tool.tool.type == oap::tooling::ToolType::BullNose;
             });
-            summary.engravingToolSummary = QStringLiteral("雕刻刀库：%1").arg(engravingLibrary->name());
+            summary.engravingToolSummary = QCoreApplication::translate("OpenAutoPath", "雕刻刀库：%1").arg(engravingLibrary->name());
         } else {
-            summary.engravingToolSummary = QStringLiteral("雕刻刀库不可用，请在雕刻参数页选择刀库或设置单刀。");
+            summary.engravingToolSummary = QCoreApplication::translate("OpenAutoPath", "雕刻刀库不可用，请在雕刻参数页选择刀库或设置单刀。");
         }
     }
     summary.finishingGenerationReady = summary.hasModel && summary.setupFramesValid && !summary.busy;
@@ -1184,7 +1213,7 @@ void MainWindow::connectSignals()
 void MainWindow::resetViewLayout()
 {
     if (m_defaultViewLayoutState.isEmpty()) {
-        statusBar()->showMessage(QStringLiteral("默认视图布局尚未初始化"));
+        statusBar()->showMessage(QCoreApplication::translate("OpenAutoPath", "默认视图布局尚未初始化"));
         return;
     }
     setUpdatesEnabled(false);
@@ -1197,8 +1226,8 @@ void MainWindow::resetViewLayout()
         m_camWorkflowDock->raise();
     update();
     statusBar()->showMessage(
-        restored ? QStringLiteral("已恢复默认视图布局")
-                 : QStringLiteral("恢复默认视图布局失败"));
+        restored ? QCoreApplication::translate("OpenAutoPath", "已恢复默认视图布局")
+                 : QCoreApplication::translate("OpenAutoPath", "恢复默认视图布局失败"));
 }
 
 void MainWindow::showContextMenu(const QPoint &globalPos)
@@ -1206,13 +1235,13 @@ void MainWindow::showContextMenu(const QPoint &globalPos)
     if (model().faces.empty()) return;
     const bool hasSel = !currentSelectedFaceIds().empty();
     QMenu menu(this);
-    QAction *aHide = menu.addAction(QStringLiteral("隐藏所选"));
-    QAction *aOnly = menu.addAction(QStringLiteral("仅显示所选"));
-    QAction *aShow = menu.addAction(QStringLiteral("显示所选"));
+    QAction *aHide = menu.addAction(QCoreApplication::translate("OpenAutoPath", "隐藏所选"));
+    QAction *aOnly = menu.addAction(QCoreApplication::translate("OpenAutoPath", "仅显示所选"));
+    QAction *aShow = menu.addAction(QCoreApplication::translate("OpenAutoPath", "显示所选"));
     menu.addSeparator();
-    QAction *aInvert = menu.addAction(QStringLiteral("反显示"));
-    QAction *aAll = menu.addAction(QStringLiteral("全部显示"));
-    QAction *aClearSelection = menu.addAction(QStringLiteral("清除选择"));
+    QAction *aInvert = menu.addAction(QCoreApplication::translate("OpenAutoPath", "反显示"));
+    QAction *aAll = menu.addAction(QCoreApplication::translate("OpenAutoPath", "全部显示"));
+    QAction *aClearSelection = menu.addAction(QCoreApplication::translate("OpenAutoPath", "清除选择"));
     aHide->setEnabled(hasSel);
     aOnly->setEnabled(hasSel);
     aShow->setEnabled(hasSel && sceneController().hiddenCount() > 0);
@@ -1232,22 +1261,22 @@ void MainWindow::showContextMenu(const QPoint &globalPos)
     std::vector<KindItem> activeKinds;
     QAction* aClearType = nullptr;
     if (m_machiningWorkspace->activePreview() == ActiveToolpathPreview::SurfaceFinishing) {
-        statusBar()->showMessage(QStringLiteral("当前显示：雕刻加工刀路"));
+        statusBar()->showMessage(QCoreApplication::translate("OpenAutoPath", "当前显示：雕刻加工刀路"));
     } else if (m_machiningWorkspace->activePreview() == ActiveToolpathPreview::Profile) {
-        statusBar()->showMessage(QStringLiteral("当前显示：外轮廓刀路"));
+        statusBar()->showMessage(QCoreApplication::translate("OpenAutoPath", "当前显示：外轮廓刀路"));
     } else if (m_machiningWorkspace->activePreview() == ActiveToolpathPreview::Pocket) {
         QAction* sourceInfo = menu.addAction(
-            QStringLiteral("清腔刀路仅来自主外表面内环"));
+            QCoreApplication::translate("OpenAutoPath", "清腔刀路仅来自主外表面内环"));
         sourceInfo->setEnabled(false);
     } else if (m_machiningWorkspace->activePreview() == ActiveToolpathPreview::Hole) {
-        statusBar()->showMessage(QStringLiteral("当前显示：自动孔加工刀路"));
+        statusBar()->showMessage(QCoreApplication::translate("OpenAutoPath", "当前显示：自动孔加工刀路"));
     } else {
-        QMenu* typeMenu = menu.addMenu(QStringLiteral("设置特征类型"));
+        QMenu* typeMenu = menu.addMenu(QCoreApplication::translate("OpenAutoPath", "设置特征类型"));
         typeMenu->setEnabled(hasSel);
         activeKinds.assign(std::begin(kItems), std::end(kItems));
         for (const KindItem& item : activeKinds)
-            typeActs.push_back(typeMenu->addAction(QString::fromUtf8(item.label)));
-        aClearType = menu.addAction(QStringLiteral("清除特征类型"));
+            typeActs.push_back(typeMenu->addAction(QCoreApplication::translate("OpenAutoPath", item.label)));
+        aClearType = menu.addAction(QCoreApplication::translate("OpenAutoPath", "清除特征类型"));
         aClearType->setEnabled(hasSel);
     }
 
@@ -1283,15 +1312,15 @@ void MainWindow::setVisibilityActionsEnabled()
 void MainWindow::updateStatusBar()
 {
     const auto sel = currentSelectedFaceIds();
-    QString mode = QStringLiteral("面");
+    QString mode = QCoreApplication::translate("OpenAutoPath", "面");
     switch (m_view->selectionMode()) {
-        case OcctView::SelMode::Face: mode = QStringLiteral("面"); break;
-        case OcctView::SelMode::Edge: mode = QStringLiteral("边"); break;
-        case OcctView::SelMode::Wire: mode = QStringLiteral("线环"); break;
-        case OcctView::SelMode::Unit: mode = QStringLiteral("单元"); break;
+        case OcctView::SelMode::Face: mode = QCoreApplication::translate("OpenAutoPath", "面"); break;
+        case OcctView::SelMode::Edge: mode = QCoreApplication::translate("OpenAutoPath", "边"); break;
+        case OcctView::SelMode::Wire: mode = QCoreApplication::translate("OpenAutoPath", "线环"); break;
+        case OcctView::SelMode::Unit: mode = QCoreApplication::translate("OpenAutoPath", "单元"); break;
     }
     statusBar()->showMessage(
-        QStringLiteral("模式: %1   已选: %2 个面   已隐藏: %3 / %4 个面")
+        QCoreApplication::translate("OpenAutoPath", "模式: %1   已选: %2 个面   已隐藏: %3 / %4 个面")
             .arg(mode)
             .arg((int)sel.size())
             .arg((int)sceneController().hiddenCount())

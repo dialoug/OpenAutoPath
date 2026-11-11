@@ -1,6 +1,7 @@
 // ToolpathParameterSettings 实现（oap_app_workflow_cam）。
 // 当前刀路工艺参数的桌面端持久化，见 ToolpathParameterSettings.h。
 #include "app/workflows/project/ToolpathParameterSettings.h"
+#include <QCoreApplication>
 
 #include <cmath>
 
@@ -31,11 +32,11 @@ QString settingsStatusText(QSettings::Status status)
         case QSettings::NoError:
             return {};
         case QSettings::AccessError:
-            return QStringLiteral("没有权限读写本地刀路参数配置");
+            return QCoreApplication::translate("OpenAutoPath", "没有权限读写本地刀路参数配置");
         case QSettings::FormatError:
-            return QStringLiteral("本地刀路参数配置格式无效");
+            return QCoreApplication::translate("OpenAutoPath", "本地刀路参数配置格式无效");
     }
-    return QStringLiteral("本地刀路参数配置发生未知错误");
+    return QCoreApplication::translate("OpenAutoPath", "本地刀路参数配置发生未知错误");
 }
 
 // 以下 read* 均为字段级读取:键缺失时静默保留调用方现值,
@@ -520,10 +521,9 @@ bool ToolpathParameterSettingsStorage::load(
          version != kSchemaVersion)) {
         settings.endGroup();
         if (warningOrError) {
-            *warningOrError = QStringLiteral(
-                "本地刀路参数版本不受支持（读取到 %1，当前支持 %2），已使用程序默认值")
+            *warningOrError = QCoreApplication::translate("OpenAutoPath", "本地刀路参数版本不受支持（读取到 %1，当前支持 %2），已使用程序默认值")
                 .arg(versionOk ? QString::number(version)
-                               : QStringLiteral("无效值"))
+                               : QCoreApplication::translate("OpenAutoPath", "无效值"))
                 .arg(kSchemaVersion);
         }
         return false;
@@ -615,8 +615,7 @@ bool ToolpathParameterSettingsStorage::load(
     profileToolSelectionMode = loadedProfileToolSelectionMode;
     coolant = loadedCoolant;
     if (!invalidKeys.isEmpty() && warningOrError) {
-        *warningOrError = QStringLiteral(
-            "以下本地刀路参数无效，已分别回退到程序默认值：%1")
+        *warningOrError = QCoreApplication::translate("OpenAutoPath", "以下本地刀路参数无效，已分别回退到程序默认值：%1")
             .arg(invalidKeys.join(QStringLiteral(", ")));
     }
     return true;

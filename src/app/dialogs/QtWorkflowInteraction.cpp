@@ -1,6 +1,7 @@
 // QtWorkflowInteraction 实现:模态进度对话框 + 忙碌光标。
 // 进度由后台任务经快照回调驱动,轮询(30ms)驱动事件循环使取消按钮可用。
 #include "app/dialogs/QtWorkflowInteraction.h"
+#include <QCoreApplication>
 
 #include <algorithm>
 #include <limits>
@@ -68,7 +69,7 @@ void showModalProgress(
         ? 0
         : std::max(1, progressValue(request.initialTotal));
     QProgressDialog progress(
-        request.label, QStringLiteral("取消"),
+        request.label, QCoreApplication::translate("OpenAutoPath", "取消"),
         0, initialMaximum, parent);
     progress.setWindowTitle(request.title);
     progress.setWindowModality(Qt::WindowModal);
@@ -97,7 +98,7 @@ void showModalProgress(
                 nextLabel = snapshot.label;
         }
         if (request.queued && request.queued())
-            nextLabel = QStringLiteral("正在等待其他计算任务完成，可取消本次请求…");
+            nextLabel = QCoreApplication::translate("OpenAutoPath", "正在等待其他计算任务完成，可取消本次请求…");
         if (!cancellationSent && nextLabel != displayedLabel) {
             displayedLabel = nextLabel;
             progress.setLabelText(displayedLabel);

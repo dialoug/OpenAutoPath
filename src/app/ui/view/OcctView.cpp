@@ -1,5 +1,6 @@
 // OpenAutoPath — OcctView：在 QWidget 的原生窗口上承载 OpenCASCADE 的 V3d_View。
 #include "app/ui/view/OcctView.h"
+#include <QCoreApplication>
 #include "app/presentation/ToolpathSegmentsObject.h"
 
 #include <QMouseEvent>
@@ -65,13 +66,13 @@ QString toolpathSegmentDescription(
     QString kind;
     switch (segment.kind) {
         case HolePreviewSegmentKind::Cut:
-            kind = QStringLiteral("切削");
+            kind = QCoreApplication::translate("OpenAutoPath", "切削");
             break;
         case HolePreviewSegmentKind::Rapid:
-            kind = QStringLiteral("快移");
+            kind = QCoreApplication::translate("OpenAutoPath", "快移");
             break;
         case HolePreviewSegmentKind::Vertical:
-            kind = QStringLiteral("进/退刀");
+            kind = QCoreApplication::translate("OpenAutoPath", "进/退刀");
             break;
     }
 
@@ -82,38 +83,38 @@ QString toolpathSegmentDescription(
         : QStringLiteral(" · %1")
               .arg(QString::fromStdString(identity.commandName));
     details << (identity.moveIndex >= 0
-        ? QStringLiteral("刀路段 #%1 · %2%3")
+        ? QCoreApplication::translate("OpenAutoPath", "刀路段 #%1 · %2%3")
               .arg(identity.moveIndex + 1)
               .arg(kind, command)
-        : QStringLiteral("刀路段 · %1%2").arg(kind, command));
+        : QCoreApplication::translate("OpenAutoPath", "刀路段 · %1%2").arg(kind, command));
     if (!identity.operationId.empty()) {
-        details << QStringLiteral("工序：%1")
+        details << QCoreApplication::translate("OpenAutoPath", "工序：%1")
             .arg(QString::fromStdString(identity.operationId));
     }
     if (identity.primitiveIndex >= 0) {
-        QString primitive = QStringLiteral("图元 #%1")
+        QString primitive = QCoreApplication::translate("OpenAutoPath", "图元 #%1")
             .arg(identity.primitiveIndex + 1);
         if (identity.primitiveMoveIndex >= 0 &&
             identity.primitiveMoveCount > 0) {
-            primitive += QStringLiteral(" · 展开段 %1/%2")
+            primitive += QCoreApplication::translate("OpenAutoPath", " · 展开段 %1/%2")
                 .arg(identity.primitiveMoveIndex + 1)
                 .arg(identity.primitiveMoveCount);
         }
         details << primitive;
     }
     if (!identity.commandSummary.empty()) {
-        details << QStringLiteral("语义：%1")
+        details << QCoreApplication::translate("OpenAutoPath", "语义：%1")
             .arg(QString::fromStdString(identity.commandSummary));
     }
     QStringList source;
     if (!identity.featureName.empty())
         source << QString::fromStdString(identity.featureName);
     if (identity.sourceIndex >= 0)
-        source << QStringLiteral("源 #%1").arg(identity.sourceIndex + 1);
+        source << QCoreApplication::translate("OpenAutoPath", "源 #%1").arg(identity.sourceIndex + 1);
     if (identity.setupIndex >= 0)
-        source << QStringLiteral("装夹 #%1").arg(identity.setupIndex + 1);
+        source << QCoreApplication::translate("OpenAutoPath", "装夹 #%1").arg(identity.setupIndex + 1);
     if (!source.empty())
-        details << QStringLiteral("来源：%1").arg(source.join(QStringLiteral(" · ")));
+        details << QCoreApplication::translate("OpenAutoPath", "来源：%1").arg(source.join(QStringLiteral(" · ")));
 
     QStringList tool;
     if (identity.toolNumber >= 0)
@@ -123,28 +124,28 @@ QString toolpathSegmentDescription(
     if (!identity.toolType.empty())
         tool << QString::fromStdString(identity.toolType);
     if (!tool.empty())
-        details << QStringLiteral("刀具：%1").arg(tool.join(QStringLiteral(" · ")));
+        details << QCoreApplication::translate("OpenAutoPath", "刀具：%1").arg(tool.join(QStringLiteral(" · ")));
 
     QStringList process;
     if (identity.operationMoveIndex >= 0) {
-        process << QStringLiteral("工序内 #%1")
+        process << QCoreApplication::translate("OpenAutoPath", "工序内 #%1")
             .arg(identity.operationMoveIndex + 1);
     }
     if (identity.depthIndex >= 0)
-        process << QStringLiteral("深度层 %1").arg(identity.depthIndex + 1);
+        process << QCoreApplication::translate("OpenAutoPath", "深度层 %1").arg(identity.depthIndex + 1);
     if (identity.loopSequence >= 0)
-        process << QStringLiteral("环序 %1").arg(identity.loopSequence);
+        process << QCoreApplication::translate("OpenAutoPath", "环序 %1").arg(identity.loopSequence);
     if (identity.ring >= 0)
-        process << QStringLiteral("偏置环 %1").arg(identity.ring);
+        process << QCoreApplication::translate("OpenAutoPath", "偏置环 %1").arg(identity.ring);
     if (identity.feed > 0.0)
         process << QStringLiteral("F%1 mm/min").arg(identity.feed, 0, 'f', 1);
     if (!process.empty())
-        details << QStringLiteral("参数：%1").arg(process.join(QStringLiteral(" · ")));
+        details << QCoreApplication::translate("OpenAutoPath", "参数：%1").arg(process.join(QStringLiteral(" · ")));
 
     const double dx = segment.to.X() - segment.from.X();
     const double dy = segment.to.Y() - segment.from.Y();
     const double dz = segment.to.Z() - segment.from.Z();
-    details << QStringLiteral("方向：ΔX %1  ΔY %2  ΔZ %3  长度 %4 mm")
+    details << QCoreApplication::translate("OpenAutoPath", "方向：ΔX %1  ΔY %2  ΔZ %3  长度 %4 mm")
         .arg(dx, 0, 'f', 3)
         .arg(dy, 0, 'f', 3)
         .arg(dz, 0, 'f', 3)

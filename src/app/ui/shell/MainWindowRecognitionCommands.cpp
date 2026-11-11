@@ -164,12 +164,12 @@ void MainWindow::runInnerOuterStructureRecognition(
     // 完成交接后调用，此时仍保留忙碌态以避免用户触发其它操作。
     if (m_uiBusy && showCompletionDialog)
         return;
-    const QString title = QStringLiteral("内外环结构识别");
+    const QString title = QCoreApplication::translate("OpenAutoPath", "内外环结构识别");
     if (model().faces.empty() || model().units.empty()) {
         if (showCompletionDialog) {
             QMessageBox::information(
                 this, title,
-                QStringLiteral("请先打开并分析一个 STEP 文件。"));
+                QCoreApplication::translate("OpenAutoPath", "请先打开并分析一个 STEP 文件。"));
         }
         return;
     }
@@ -178,7 +178,7 @@ void MainWindow::runInnerOuterStructureRecognition(
     if (ownsLoadingState)
         setLoadingState(true);
     statusBar()->showMessage(
-        QStringLiteral("正在后台识别孔、通结构和三向槽腔…"));
+        QCoreApplication::translate("OpenAutoPath", "正在后台识别孔、通结构和三向槽腔…"));
 
     QElapsedTimer elapsed;
     elapsed.start();
@@ -191,8 +191,8 @@ void MainWindow::runInnerOuterStructureRecognition(
             m_recognitionWorkspace->start(request);
 
         QProgressDialog progress(
-            QStringLiteral("正在后台识别孔结构…"),
-            QStringLiteral("取消"), 0, 0, this);
+            QCoreApplication::translate("OpenAutoPath", "正在后台识别孔结构…"),
+            QCoreApplication::translate("OpenAutoPath", "取消"), 0, 0, this);
         progress.setWindowTitle(title);
         progress.setWindowModality(Qt::WindowModal);
         progress.setMinimumDuration(showCompletionDialog ? 0 : 300);
@@ -209,11 +209,10 @@ void MainWindow::runInnerOuterStructureRecognition(
                 m_recognitionWorkspace->progress(requestId);
             if (!cancellationSent && state.phase ==
                 oap::app::ThreeAxisRecognitionPhase::Queued) {
-                progress.setLabelText(QStringLiteral(
-                    "正在等待其他计算任务完成，可取消本次识别…"));
+                progress.setLabelText(QCoreApplication::translate("OpenAutoPath", "正在等待其他计算任务完成，可取消本次识别…"));
             } else if (!cancellationSent && state.phase ==
                        oap::app::ThreeAxisRecognitionPhase::RecognizingHoles) {
-                progress.setLabelText(QStringLiteral("正在后台识别孔结构…"));
+                progress.setLabelText(QCoreApplication::translate("OpenAutoPath", "正在后台识别孔结构…"));
             }
             if (state.phase ==
                 oap::app::ThreeAxisRecognitionPhase::TracingStructures) {
@@ -226,16 +225,14 @@ void MainWindow::runInnerOuterStructureRecognition(
                 progress.setValue(std::min(
                     maximum, static_cast<int>(state.completed)));
                 if (!cancellationSent) {
-                    progress.setLabelText(QStringLiteral(
-                        "正在后台识别通结构和三向槽腔…"));
+                    progress.setLabelText(QCoreApplication::translate("OpenAutoPath", "正在后台识别通结构和三向槽腔…"));
                 }
             }
             if (progress.wasCanceled() && !cancellationSent) {
                 cancellationSent = true;
                 m_recognitionWorkspace->cancel(requestId);
                 progress.setRange(0, 0);
-                progress.setLabelText(QStringLiteral(
-                    "正在取消，等待当前识别阶段安全结束…"));
+                progress.setLabelText(QCoreApplication::translate("OpenAutoPath", "正在取消，等待当前识别阶段安全结束…"));
             }
             if (m_recognitionWorkspace->ready(requestId))
                 waitLoop.quit();
@@ -251,16 +248,15 @@ void MainWindow::runInnerOuterStructureRecognition(
             m_recognitionWorkspace->take(requestId);
         if (!task) {
             const QString message =
-                QStringLiteral("结构识别结果已过期，未发布到场景。");
+                QCoreApplication::translate("OpenAutoPath", "结构识别结果已过期，未发布到场景。");
             statusBar()->showMessage(message);
         } else if (task->cancelled) {
-            statusBar()->showMessage(QStringLiteral(
-                "结构识别已取消，上一次有效结果保持不变。"));
+            statusBar()->showMessage(QCoreApplication::translate("OpenAutoPath", "结构识别已取消，上一次有效结果保持不变。"));
         } else if (!task->error.empty() || !task->wireTrace.ok()) {
             const std::string detail = !task->error.empty()
                 ? task->error : task->wireTrace.error;
-            const QString message = QStringLiteral("后台结构识别失败：\n%1")
-                .arg(QString::fromStdString(detail));
+            const QString message = QCoreApplication::translate("OpenAutoPath", "后台结构识别失败：\n%1")
+                .arg(QCoreApplication::translate("OpenAutoPathDiagnostic", QString::fromStdString(detail).toUtf8().constData()));
             statusBar()->showMessage(message);
             if (showCompletionDialog)
                 QMessageBox::warning(this, title, message);
@@ -271,14 +267,14 @@ void MainWindow::runInnerOuterStructureRecognition(
         }
     } catch (const std::exception& failure) {
         const QString message =
-            QStringLiteral("无法启动后台结构识别：\n") +
-            QString::fromLocal8Bit(failure.what());
+            QCoreApplication::translate("OpenAutoPath", "无法启动后台结构识别：\n") +
+            QCoreApplication::translate("OpenAutoPathDiagnostic", QString::fromLocal8Bit(failure.what()).toUtf8().constData());
         statusBar()->showMessage(message);
         if (showCompletionDialog)
             QMessageBox::warning(this, title, message);
     } catch (...) {
         const QString message =
-            QStringLiteral("无法启动后台结构识别：未知异常。");
+            QCoreApplication::translate("OpenAutoPath", "无法启动后台结构识别：未知异常。");
         statusBar()->showMessage(message);
         if (showCompletionDialog)
             QMessageBox::warning(this, title, message);
@@ -331,23 +327,20 @@ void MainWindow::setFeatureTypeForSelection(oap::FeatureKind kind)
             return;
         case oap::app::ManualRecognitionEditStatus::RequiresSingleFloor:
             QMessageBox::information(
-                this, QStringLiteral("人工槽/腔识别"),
-                QStringLiteral(
-                    "人工标记槽或腔时必须恰好选择一个平面，"
+                this, QCoreApplication::translate("OpenAutoPath", "人工槽/腔识别"),
+                QCoreApplication::translate("OpenAutoPath", "人工标记槽或腔时必须恰好选择一个平面，"
                     "该面将作为权威底面。"));
             return;
         case oap::app::ManualRecognitionEditStatus::InvalidFloor:
             QMessageBox::information(
-                this, QStringLiteral("人工槽/腔识别"),
-                QStringLiteral(
-                    "选中面 %1 不存在或不是平面，无法作为槽/腔底面。")
+                this, QCoreApplication::translate("OpenAutoPath", "人工槽/腔识别"),
+                QCoreApplication::translate("OpenAutoPath", "选中面 %1 不存在或不是平面，无法作为槽/腔底面。")
                     .arg(QString::fromStdString(edit.floorFaceId)));
             return;
         case oap::app::ManualRecognitionEditStatus::AmbiguousFloor:
             QMessageBox::information(
-                this, QStringLiteral("人工槽/腔识别"),
-                QStringLiteral(
-                    "选中面 %1 同时属于多个特征实例，"
+                this, QCoreApplication::translate("OpenAutoPath", "人工槽/腔识别"),
+                QCoreApplication::translate("OpenAutoPath", "选中面 %1 同时属于多个特征实例，"
                     "请先清理冲突后再指定底面。")
                     .arg(QString::fromStdString(edit.floorFaceId)));
             return;
@@ -360,29 +353,28 @@ void MainWindow::setFeatureTypeForSelection(oap::FeatureKind kind)
     for (const oap::app::ManualRecognitionWarning& warning : edit.warnings) {
         if (warning.kind ==
             oap::app::ManualRecognitionWarningKind::ConflictingFloor) {
-            warnings << QStringLiteral(
-                "%1: 扩展面组包含其他人工槽/腔的底面 %2，未创建")
+            warnings << QCoreApplication::translate("OpenAutoPath", "%1: 扩展面组包含其他人工槽/腔的底面 %2，未创建")
                 .arg(QString::fromStdString(warning.seedFaceId))
                 .arg(QString::fromStdString(warning.relatedFaceId));
         } else {
             warnings << QStringLiteral("%1: %2")
                 .arg(QString::fromStdString(warning.seedFaceId))
-                .arg(QString::fromStdString(warning.detail));
+                .arg(QCoreApplication::translate("OpenAutoPathDiagnostic", QString::fromStdString(warning.detail).toUtf8().constData()));
         }
     }
 
     if (!edit.updated()) {
         if (!warnings.isEmpty()) {
             QStringList log{
-                QStringLiteral("OpenAutoPath 腔清腔人工识别日志"),
-                QStringLiteral("时间: %1")
+                QCoreApplication::translate("OpenAutoPath", "OpenAutoPath 腔清腔人工识别日志"),
+                QCoreApplication::translate("OpenAutoPath", "时间: %1")
                     .arg(QDateTime::currentDateTime().toString(
                         Qt::ISODateWithMs)),
-                QStringLiteral("人工槽/腔未创建:")};
+                QCoreApplication::translate("OpenAutoPath", "人工槽/腔未创建:")};
             log << warnings;
-            writeProjectLog(QStringLiteral("腔清腔日志.txt"), log);
+            writeProjectLog(QCoreApplication::translate("OpenAutoPath", "腔清腔日志.txt"), log);
             QMessageBox::information(
-                this, QStringLiteral("人工槽/腔识别"),
+                this, QCoreApplication::translate("OpenAutoPath", "人工槽/腔识别"),
                 warnings.join(QLatin1Char('\n')));
         }
         return;
@@ -392,21 +384,20 @@ void MainWindow::setFeatureTypeForSelection(oap::FeatureKind kind)
     if (!m_machiningWorkspace->pocketPreviewActive() ||
         !edit.clearingKind) {
         QString message =
-            QStringLiteral("已更新 %1 个完整特征实例(人工复核)")
+            QCoreApplication::translate("OpenAutoPath", "已更新 %1 个完整特征实例(人工复核)")
                 .arg(edit.affectedInstanceCount);
         if (!warnings.isEmpty())
-            message += QStringLiteral(
-                "；部分底面无法扩展，详见腔清腔日志");
+            message += QCoreApplication::translate("OpenAutoPath", "；部分底面无法扩展，详见腔清腔日志");
         statusBar()->showMessage(message);
         if (!warnings.isEmpty()) {
             QStringList log{
-                QStringLiteral("OpenAutoPath 腔清腔人工识别日志"),
-                QStringLiteral("时间: %1")
+                QCoreApplication::translate("OpenAutoPath", "OpenAutoPath 腔清腔人工识别日志"),
+                QCoreApplication::translate("OpenAutoPath", "时间: %1")
                     .arg(QDateTime::currentDateTime().toString(
                         Qt::ISODateWithMs)),
-                QStringLiteral("底面种子扩展失败:")};
+                QCoreApplication::translate("OpenAutoPath", "底面种子扩展失败:")};
             log << warnings;
-            writeProjectLog(QStringLiteral("腔清腔日志.txt"), log);
+            writeProjectLog(QCoreApplication::translate("OpenAutoPath", "腔清腔日志.txt"), log);
         }
     }
 }
@@ -419,8 +410,7 @@ void MainWindow::clearFeatureTypeForSelection()
         return;
     refreshRecognitionDisplay();
     statusBar()->showMessage(
-        QStringLiteral(
-            "已清除 %1 个完整特征实例所含的 %2 个面(人工复核)")
+        QCoreApplication::translate("OpenAutoPath", "已清除 %1 个完整特征实例所含的 %2 个面(人工复核)")
             .arg(edit.affectedInstanceCount)
             .arg(edit.affectedFaceCount));
 }
@@ -460,24 +450,24 @@ void MainWindow::refreshFeatureLegend()
         {oap::FeatureKind::CountersinkHole, "沉孔"},
         {oap::FeatureKind::Slot, "槽"},
         {oap::FeatureKind::Pocket, "腔"}};
-    QString html = QStringLiteral("<b>内外环结构颜色</b>");
+    QString html = QCoreApplication::translate("OpenAutoPath", "<b>内外环结构颜色</b>");
     for (const auto& entry : entries) {
         appendEntry(
             html, oap::featureColor(entry.kind),
-            QString::fromUtf8(entry.name));
+            QCoreApplication::translate("OpenAutoPath", entry.name));
     }
     appendEntry(
         html, kColorThroughStructure,
-        QStringLiteral("通结构"));
+        QCoreApplication::translate("OpenAutoPath", "通结构"));
     appendEntry(
         html, kColorAxisZPlane,
-        QStringLiteral("Z 向内部平面"));
+        QCoreApplication::translate("OpenAutoPath", "Z 向内部平面"));
     appendEntry(
         html, kColorAxisYPlane,
-        QStringLiteral("Y 向内部平面"));
+        QCoreApplication::translate("OpenAutoPath", "Y 向内部平面"));
     appendEntry(
         html, kColorAxisXPlane,
-        QStringLiteral("X 向内部平面"));
+        QCoreApplication::translate("OpenAutoPath", "X 向内部平面"));
     m_featureLegend->setText(html);
     m_featureLegend->adjustSize();
     m_featureLegend->move(12, 12);
@@ -495,8 +485,8 @@ void MainWindow::toggleFeatureColors(bool on)
         applyRecognitionColors();
     m_view->view()->Redraw();
     refreshFeatureLegend();
-    statusBar()->showMessage(on ? QStringLiteral("已切换到内外环结构染色视图")
-                                : QStringLiteral("已切换到原始颜色视图"));
+    statusBar()->showMessage(on ? QCoreApplication::translate("OpenAutoPath", "已切换到内外环结构染色视图")
+                                : QCoreApplication::translate("OpenAutoPath", "已切换到原始颜色视图"));
 }
 
 void MainWindow::recognizeBaseFaces()
@@ -508,8 +498,8 @@ void MainWindow::recognizeBaseFaces()
             model(), stepIndexer());
     if (!recognized.installed) {
         QMessageBox::information(
-            this, QStringLiteral("识别基面"),
-            QStringLiteral("请先打开并分析一个 STEP 文件。"));
+            this, QCoreApplication::translate("OpenAutoPath", "识别基面"),
+            QCoreApplication::translate("OpenAutoPath", "请先打开并分析一个 STEP 文件。"));
         return;
     }
 
@@ -532,12 +522,12 @@ void MainWindow::recognizeBaseFaces()
     m_view->view()->Redraw();
 
     statusBar()->showMessage(
-        QStringLiteral("基面识别完成:共 %1 个基面(涂黑,已显示 %2 个)。")
+        QCoreApplication::translate("OpenAutoPath", "基面识别完成:共 %1 个基面(涂黑,已显示 %2 个)。")
             .arg(recognized.baseFaceCount)
             .arg(colored));
     QMessageBox::information(
-        this, QStringLiteral("识别基面"),
-        QStringLiteral("识别出 %1 个与包围盒紧贴的基面,已染黑显示。")
+        this, QCoreApplication::translate("OpenAutoPath", "识别基面"),
+        QCoreApplication::translate("OpenAutoPath", "识别出 %1 个与包围盒紧贴的基面,已染黑显示。")
             .arg(recognized.baseFaceCount));
 }
 void MainWindow::showFeatureBoxes()
@@ -546,8 +536,8 @@ void MainWindow::showFeatureBoxes()
         return;
     if (model().faces.empty() || model().units.empty())
     {
-        QMessageBox::information(this, QStringLiteral("显示包围盒"),
-                                 QStringLiteral("请先打开并分析一个 STEP 文件。"));
+        QMessageBox::information(this, QCoreApplication::translate("OpenAutoPath", "显示包围盒"),
+                                 QCoreApplication::translate("OpenAutoPath", "请先打开并分析一个 STEP 文件。"));
         return;
     }
     if (m_view->context().IsNull())
@@ -580,5 +570,5 @@ void MainWindow::showFeatureBoxes()
     m_view->view()->Redraw();
 
     statusBar()->showMessage(
-        QStringLiteral("已显示 %1 个包围盒(特征识别所用逐体 AABB,线框叠加)。").arg(drawn));
+        QCoreApplication::translate("OpenAutoPath", "已显示 %1 个包围盒(特征识别所用逐体 AABB,线框叠加)。").arg(drawn));
 }

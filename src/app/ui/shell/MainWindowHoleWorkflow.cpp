@@ -1,5 +1,6 @@
 // MainWindow 自动孔加工、孔树与覆盖审计命令。
 #include "MainWindow.h"
+#include <QCoreApplication>
 
 #include "app/orchestration/DesktopWorkspaceCoordinator.h"
 #include "app/ui/panels/CamWorkflowPanel.h"
@@ -60,7 +61,7 @@ void MainWindow::clearHoleStageHighlights()
         m_view->view()->Redraw();
     }
     statusBar()->showMessage(
-        QStringLiteral("已清除全部 %1 个孔段高亮。").arg(clearedCount));
+        QCoreApplication::translate("OpenAutoPath", "已清除全部 %1 个孔段高亮。").arg(clearedCount));
 }
 
 void MainWindow::generateOrUpdateHolePaths()
@@ -140,7 +141,7 @@ void MainWindow::locateHoleCoverageSource(int sourceHoleIndex)
         m_machiningWorkspace->recognizedHoleSource(sourceHoleIndex);
     if (!source) {
         statusBar()->showMessage(
-            QStringLiteral("孔段 %1 没有可用的识别源映射")
+            QCoreApplication::translate("OpenAutoPath", "孔段 %1 没有可用的识别源映射")
                 .arg(sourceHoleIndex + 1));
         return;
     }
@@ -161,27 +162,27 @@ void MainWindow::locateHoleCoverageSource(int sourceHoleIndex)
 
     const QString setup =
         source->hole.setupFace == oap::MoldSetupFace::Unresolved
-        ? QStringLiteral("未解析装夹")
-        : QStringLiteral("%1 装夹面").arg(
+        ? QCoreApplication::translate("OpenAutoPath", "未解析装夹")
+        : QCoreApplication::translate("OpenAutoPath", "%1 装夹面").arg(
               QString::fromLatin1(
                   oap::moldSetupFaceName(source->hole.setupFace)));
     const double diameter = 2.0 * source->hole.radius;
     const double depth = source->hole.entry.Distance(source->hole.bottom);
     const QString diameterText = std::isfinite(diameter) && diameter > 0.0
         ? QString::number(diameter, 'f', 3)
-        : QStringLiteral("无效");
+        : QCoreApplication::translate("OpenAutoPath", "无效");
     const QString depthText = std::isfinite(depth)
         ? QString::number(depth, 'f', 3)
-        : QStringLiteral("无效");
+        : QCoreApplication::translate("OpenAutoPath", "无效");
     QString locationStatus =
-        QStringLiteral("已定位孔段 %1：%2 · Ø%3 mm · 深度 %4 mm · %5")
+        QCoreApplication::translate("OpenAutoPath", "已定位孔段 %1：%2 · Ø%3 mm · 深度 %4 mm · %5")
             .arg(sourceHoleIndex + 1)
-            .arg(QString::fromUtf8(featureKindZh(source->hole.kind)))
+            .arg(QCoreApplication::translate("OpenAutoPath",featureKindZh(source->hole.kind)))
             .arg(diameterText)
             .arg(depthText)
             .arg(setup);
     if (locationFaceIds.empty())
-        locationStatus += QStringLiteral("（无源面映射，仅按孔轴定位）");
+        locationStatus += QCoreApplication::translate("OpenAutoPath", "（无源面映射，仅按孔轴定位）");
 
     highlightFaces(locationFaceIds, {});
 

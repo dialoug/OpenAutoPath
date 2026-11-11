@@ -121,7 +121,7 @@ void MainWindow::loadFile(const QString &path)
     if (m_view->context().IsNull()) {
         m_pendingViewerLoadPath = path;
         statusBar()->showMessage(
-            QStringLiteral("三维视图初始化后将自动加载 STEP 文件。"));
+            QCoreApplication::translate("OpenAutoPath", "三维视图初始化后将自动加载 STEP 文件。"));
         return;
     }
     m_pendingViewerLoadPath.clear();
@@ -131,7 +131,7 @@ void MainWindow::loadFile(const QString &path)
     if (!m_documentWorkspace ||
         !m_documentWorkspace->beginLoad(path)) {
         statusBar()->showMessage(
-            QStringLiteral("无法提交 STEP 后台分析请求。"));
+            QCoreApplication::translate("OpenAutoPath", "无法提交 STEP 后台分析请求。"));
         return;
     }
 
@@ -171,7 +171,7 @@ void MainWindow::setLoadingState(bool loading)
         const QString pending = m_documentWorkspace
             ? m_documentWorkspace->pendingPath() : QString{};
         const QString path = pending.isEmpty() ? currentPath() : pending;
-        statusBar()->showMessage(QStringLiteral("正在加载 %1 ...").arg(path));
+        statusBar()->showMessage(QCoreApplication::translate("OpenAutoPath", "正在加载 %1 ...").arg(path));
     } else {
         QApplication::restoreOverrideCursor();
         if (m_fileList) m_fileList->setEnabled(true);
@@ -209,7 +209,7 @@ void MainWindow::onAnalysisPreview(std::shared_ptr<AnalysisLoadPreview> preview)
             const auto center = preview->bounds.center();
             m_view->setModelCenter(center[0], center[1], center[2]);
         }
-        statusBar()->showMessage(QStringLiteral("模型预览已显示，正在分析精确几何；完成后可加工。"));
+        statusBar()->showMessage(QCoreApplication::translate("OpenAutoPath", "模型预览已显示，正在分析精确几何；完成后可加工。"));
         qDebug() << "[OpenAutoPath] preview_visible_ms=" << m_documentLoadTimer.elapsed()
                  << " worker_preview_ready_ms=" << preview->elapsedMillis;
     } catch (...) {
@@ -230,19 +230,19 @@ void MainWindow::onAnalysisFinished(
         finishLoadingState(requestedPath);
         const char* message = failure.GetMessageString();
         QMessageBox::critical(
-            this, QStringLiteral("加载失败"),
-            QStringLiteral("显示分析结果时发生 OCCT 异常：\n") +
-                QString::fromLocal8Bit(message ? message : "OCCT failure"));
+            this, QCoreApplication::translate("OpenAutoPath", "加载失败"),
+            QCoreApplication::translate("OpenAutoPath", "显示分析结果时发生 OCCT 异常：\n") +
+                QCoreApplication::translate("OpenAutoPathDiagnostic", QString::fromLocal8Bit(message ? message : "OCCT failure").toUtf8().constData()));
     } catch (const std::exception& failure) {
         finishLoadingState(requestedPath);
         QMessageBox::critical(
-            this, QStringLiteral("加载失败"),
-            QStringLiteral("显示分析结果时发生异常：\n") +
-                QString::fromLocal8Bit(failure.what()));
+            this, QCoreApplication::translate("OpenAutoPath", "加载失败"),
+            QCoreApplication::translate("OpenAutoPath", "显示分析结果时发生异常：\n") +
+                QCoreApplication::translate("OpenAutoPathDiagnostic", QString::fromLocal8Bit(failure.what()).toUtf8().constData()));
     } catch (...) {
         finishLoadingState(requestedPath);
-        QMessageBox::critical(this, QStringLiteral("加载失败"),
-                              QStringLiteral("显示分析结果时发生未知异常。"));
+        QMessageBox::critical(this, QCoreApplication::translate("OpenAutoPath", "加载失败"),
+                              QCoreApplication::translate("OpenAutoPath", "显示分析结果时发生未知异常。"));
     }
 }
 
@@ -295,7 +295,7 @@ void MainWindow::handleAnalysisFinished(
     if (completion.status == oap::app::DocumentLoadStatus::Failed) {
         if (!completion.message.isEmpty()) {
             QMessageBox::critical(
-                this, QStringLiteral("错误"), completion.message);
+                this, QCoreApplication::translate("OpenAutoPath", "错误"), completion.message);
         }
         finishLoadingState(completion.requestedPath);
         return;
@@ -303,7 +303,7 @@ void MainWindow::handleAnalysisFinished(
     if (completion.status == oap::app::DocumentLoadStatus::Warning) {
         if (!completion.message.isEmpty()) {
             QMessageBox::warning(
-                this, QStringLiteral("分析"), completion.message);
+                this, QCoreApplication::translate("OpenAutoPath", "分析"), completion.message);
         }
         finishLoadingState(completion.requestedPath);
         return;
@@ -316,7 +316,7 @@ void MainWindow::handleAnalysisFinished(
         m_view->setModelCenter(center[0], center[1], center[2]);
     }
     setWindowTitle(completion.fromCache
-        ? QStringLiteral("OpenAutoPath — ") + path + QStringLiteral("  [缓存]")
+        ? QStringLiteral("OpenAutoPath — ") + path + QCoreApplication::translate("OpenAutoPath", "  [缓存]")
         : QStringLiteral("OpenAutoPath — ") + path);
 
     // 按面建立 AIS 对象(逐面回查 XDE 颜色),之后即可按 face/unit 粒度隐藏。
@@ -344,11 +344,11 @@ void MainWindow::handleAnalysisFinished(
     m_view->setFaceSelectionEnabled(true);
     if (completion.fromCache) {
         statusBar()->showMessage(
-            QStringLiteral("已从缓存加载:%1 个单元,%2 个面")
+            QCoreApplication::translate("OpenAutoPath", "已从缓存加载:%1 个单元,%2 个面")
                 .arg(model().units.size()).arg(model().faces.size()));
     } else {
         statusBar()->showMessage(
-            QStringLiteral("已加载:%1 个单元,%2 个面")
+            QCoreApplication::translate("OpenAutoPath", "已加载:%1 个单元,%2 个面")
                 .arg(model().units.size()).arg(model().faces.size()));
     }
 
@@ -362,30 +362,30 @@ void MainWindow::handleAnalysisFinished(
 void MainWindow::openStep()
 {
     QString path = QFileDialog::getOpenFileName(
-        this, QStringLiteral("打开 STEP 文件"), QString(),
-        QStringLiteral("STEP 文件 (*.stp *.step *.STP *.STEP);;所有文件 (*.*)"));
+        this, QCoreApplication::translate("OpenAutoPath", "打开 STEP 文件"), QString(),
+        QCoreApplication::translate("OpenAutoPath", "STEP 文件 (*.stp *.step *.STP *.STEP);;所有文件 (*.*)"));
     loadFile(path);
 }
 
 void MainWindow::openFolder()
 {
-    const QString dir = QFileDialog::getExistingDirectory(this, QStringLiteral("打开 STEP 文件所在文件夹"));
+    const QString dir = QFileDialog::getExistingDirectory(this, QCoreApplication::translate("OpenAutoPath", "打开 STEP 文件所在文件夹"));
     if (dir.isEmpty()) return;
 
     const int count = m_fileList->setFolder(dir);
     updateFileNavigationActions();
     if (count == 0) {
-        QMessageBox::information(this, QStringLiteral("打开文件夹"),
-            QStringLiteral("该文件夹中未找到 .stp/.step 文件:\n") + dir);
+        QMessageBox::information(this, QCoreApplication::translate("OpenAutoPath", "打开文件夹"),
+            QCoreApplication::translate("OpenAutoPath", "该文件夹中未找到 .stp/.step 文件:\n") + dir);
         return;
     }
-    statusBar()->showMessage(QStringLiteral("在 %2 中找到 %1 个 STEP 文件").arg(count).arg(dir));
+    statusBar()->showMessage(QCoreApplication::translate("OpenAutoPath", "在 %2 中找到 %1 个 STEP 文件").arg(count).arg(dir));
 
     // 询问是否批量建立缓存。已缓存文件由 worker 自动跳过。
     if (m_uiBusy) return;
     const QMessageBox::StandardButton ans = QMessageBox::question(
-        this, QStringLiteral("打开文件夹"),
-        QStringLiteral("在该文件夹找到 %1 个 STEP 文件。\n现在为它们建立缓存吗?已缓存的文件会自动跳过。")
+        this, QCoreApplication::translate("OpenAutoPath", "打开文件夹"),
+        QCoreApplication::translate("OpenAutoPath", "在该文件夹找到 %1 个 STEP 文件。\n现在为它们建立缓存吗?已缓存的文件会自动跳过。")
             .arg(count),
         QMessageBox::Yes | QMessageBox::No, QMessageBox::Yes);
     if (ans != QMessageBox::Yes) return;
@@ -395,9 +395,9 @@ void MainWindow::openFolder()
 
     // 模态进度对话框:运行期间阻塞主界面,可随时取消(在文件边界生效)。
     m_cacheBuildDialog = new QProgressDialog(
-        QStringLiteral("准备建立缓存…"), QStringLiteral("取消"), 0, paths.size(), this);
+        QCoreApplication::translate("OpenAutoPath", "准备建立缓存…"), QCoreApplication::translate("OpenAutoPath", "取消"), 0, paths.size(), this);
     m_cacheBuildDialog->setWindowTitle(
-        QStringLiteral("建立缓存"));
+        QCoreApplication::translate("OpenAutoPath", "建立缓存"));
     m_cacheBuildDialog->setWindowModality(
         Qt::ApplicationModal);
     m_cacheBuildDialog->setAutoClose(false);
@@ -412,7 +412,7 @@ void MainWindow::openFolder()
             m_documentWorkspace->requestCancelCacheBuild();
         if (m_cacheBuildDialog) {
             m_cacheBuildDialog->setLabelText(
-                QStringLiteral("正在取消…"));
+                QCoreApplication::translate("OpenAutoPath", "正在取消…"));
         }
     });
 
@@ -423,11 +423,11 @@ void MainWindow::openFolder()
         m_cacheBuildDialog->deleteLater();
         m_cacheBuildDialog = nullptr;
         statusBar()->showMessage(
-            QStringLiteral("无法提交 STEP 缓存构建请求。"));
+            QCoreApplication::translate("OpenAutoPath", "无法提交 STEP 缓存构建请求。"));
         return;
     }
     setLoadingState(true);
-    statusBar()->showMessage(QStringLiteral("正在建立缓存…"));
+    statusBar()->showMessage(QCoreApplication::translate("OpenAutoPath", "正在建立缓存…"));
 }
 
 void MainWindow::onCacheBuildProgress(
@@ -446,7 +446,7 @@ void MainWindow::onCacheBuildProgress(
     if (!currentFile.isEmpty()) {
         const QString name = QFileInfo(currentFile).fileName();
         m_cacheBuildDialog->setLabelText(
-            QStringLiteral("正在处理 (%1/%2): %3")
+            QCoreApplication::translate("OpenAutoPath", "正在处理 (%1/%2): %3")
                 .arg(done + 1).arg(total).arg(name));
     }
     m_cacheBuildDialog->setValue(done);
@@ -467,9 +467,9 @@ void MainWindow::onCacheBuildFinished(
     if (closing)
         return;
 
-    QString msg = QStringLiteral("新建 %1 个,跳过 %2 个(已缓存)").arg(built).arg(skipped);
-    if (failed > 0) msg += QStringLiteral(",失败 %1 个").arg(failed);
-    if (cancelled) msg += QStringLiteral("。\n(已取消,剩余文件未处理)");
-    QMessageBox::information(this, QStringLiteral("建立缓存"), msg);
+    QString msg = QCoreApplication::translate("OpenAutoPath", "新建 %1 个,跳过 %2 个(已缓存)").arg(built).arg(skipped);
+    if (failed > 0) msg += QCoreApplication::translate("OpenAutoPath", ",失败 %1 个").arg(failed);
+    if (cancelled) msg += QCoreApplication::translate("OpenAutoPath", "。\n(已取消,剩余文件未处理)");
+    QMessageBox::information(this, QCoreApplication::translate("OpenAutoPath", "建立缓存"), msg);
     statusBar()->showMessage(msg);
 }

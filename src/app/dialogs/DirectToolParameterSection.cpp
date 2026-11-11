@@ -1,4 +1,5 @@
 #include "app/dialogs/DirectToolParameterSection.h"
+#include <QCoreApplication>
 
 #include <QComboBox>
 #include <QDoubleSpinBox>
@@ -14,27 +15,27 @@ DirectToolParameterSection::DirectToolParameterSection(QFormLayout& form, QWidge
 {
     m_mode = new QComboBox(&parent);
     m_mode->setObjectName(prefix + "ToolMode");
-    m_mode->addItem(QStringLiteral("活动刀库自动选刀"), static_cast<int>(ToolSelectionMode::AutomaticLibrary));
-    m_mode->addItem(QStringLiteral("手动单刀（直接填写）"), static_cast<int>(ToolSelectionMode::SingleTool));
+    m_mode->addItem(QCoreApplication::translate("OpenAutoPath", "活动刀库自动选刀"), static_cast<int>(ToolSelectionMode::AutomaticLibrary));
+    m_mode->addItem(QCoreApplication::translate("OpenAutoPath", "手动单刀（直接填写）"), static_cast<int>(ToolSelectionMode::SingleTool));
     m_mode->setCurrentIndex(m_mode->findData(static_cast<int>(initialMode)));
-    form.addRow(QStringLiteral("刀具来源"), m_mode);
+    form.addRow(QCoreApplication::translate("OpenAutoPath", "刀具来源"), m_mode);
     m_type = new QComboBox(&parent);
     m_type->setObjectName(prefix + "ToolType");
-    if (allowDrill) m_type->addItem(QStringLiteral("钻头"), "drill");
-    m_type->addItem(QStringLiteral("平底立铣刀"), "end_mill");
+    if (allowDrill) m_type->addItem(QCoreApplication::translate("OpenAutoPath", "钻头"), "drill");
+    m_type->addItem(QCoreApplication::translate("OpenAutoPath", "平底立铣刀"), "end_mill");
     if (!allowDrill) {
-        m_type->addItem(QStringLiteral("球刀"), "ball_end_mill");
-        m_type->addItem(QStringLiteral("圆鼻刀"), "bull_nose");
-        m_type->setToolTip(QStringLiteral("球刀和圆鼻刀可生成分层刀路；槽底、根部可能保留余料，请通过 IPW 检查。"));
+        m_type->addItem(QCoreApplication::translate("OpenAutoPath", "球刀"), "ball_end_mill");
+        m_type->addItem(QCoreApplication::translate("OpenAutoPath", "圆鼻刀"), "bull_nose");
+        m_type->setToolTip(QCoreApplication::translate("OpenAutoPath", "球刀和圆鼻刀可生成分层刀路；槽底、根部可能保留余料，请通过 IPW 检查。"));
     }
     const int typeIndex = m_type->findData(QString::fromStdString(initialTool.toolType));
     m_type->setCurrentIndex(typeIndex >= 0 ? typeIndex : 0);
-    form.addRow(QStringLiteral("单刀类型"), m_type);
+    form.addRow(QCoreApplication::translate("OpenAutoPath", "单刀类型"), m_type);
     m_number = new QSpinBox(&parent);
     m_number->setObjectName(prefix + "ToolNumber");
     m_number->setRange(1, 9999);
     m_number->setValue(initialTool.toolNumber > 0 ? initialTool.toolNumber : 1);
-    form.addRow(QStringLiteral("单刀刀号 T"), m_number);
+    form.addRow(QCoreApplication::translate("OpenAutoPath", "单刀刀号 T"), m_number);
     const auto number = [&](const char* name, const QString& label, double value,
                             double minimum, double maximum, const QString& unit = QStringLiteral(" mm")) {
         auto* field = new QDoubleSpinBox(&parent);
@@ -48,19 +49,19 @@ DirectToolParameterSection::DirectToolParameterSection(QFormLayout& form, QWidge
         return field;
     };
     const auto positive = [](double value, double fallback) { return value > 0 ? value : fallback; };
-    m_diameter = number("ToolDiameter", QStringLiteral("单刀直径"), positive(initialTool.diameter, 6), 0.001, 1000);
-    m_corner = number("ToolCornerRadius", QStringLiteral("单刀圆角半径"), positive(initialTool.cornerRadius, 0.5), 0.001, 500);
-    m_length = number("ToolLength", QStringLiteral("单刀刃长"), positive(initialTool.cuttingEdgeLength, 30), 0.001, 10000);
-    m_spindle = number("ToolSpindle", QStringLiteral("单刀主轴转速"), positive(initialTool.spindleSpeed, 8000), 1, 1000000, " rpm");
-    m_feed = number("ToolFeed", QStringLiteral("单刀切削进给"), positive(initialTool.horizontalFeed, 600), 1, 1000000, " mm/min");
-    m_plunge = number("ToolPlunge", QStringLiteral("单刀进刀进给"), positive(initialTool.verticalFeed, 150), 1, 1000000, " mm/min");
-    m_tip = number("ToolTipAngle", QStringLiteral("单刀钻尖角"), positive(initialTool.tipAngle, 118), 1, 179, QStringLiteral("°"));
-    m_overall = number("ToolOverall", QStringLiteral("单刀总长 / 伸出（可选）"), initialTool.overallLength, 0, 10000);
-    m_shank = number("ToolShank", QStringLiteral("单刀刀杆直径（可选）"), initialTool.shankDiameter, 0, 1000);
-    m_holderDiameter = number("ToolHolderDiameter", QStringLiteral("单刀刀柄直径（可选）"), initialTool.holderDiameter, 0, 1000);
-    m_holderLength = number("ToolHolderLength", QStringLiteral("单刀刀柄长度（可选）"), initialTool.holderLength, 0, 10000);
-    m_spindleDiameter = number("ToolSpindleDiameter", QStringLiteral("单刀主轴包络直径（可选）"), initialTool.spindleEnvelopeDiameter, 0, 10000);
-    m_spindleLength = number("ToolSpindleLength", QStringLiteral("单刀主轴包络长度（可选）"), initialTool.spindleEnvelopeLength, 0, 10000);
+    m_diameter = number("ToolDiameter", QCoreApplication::translate("OpenAutoPath", "单刀直径"), positive(initialTool.diameter, 6), 0.001, 1000);
+    m_corner = number("ToolCornerRadius", QCoreApplication::translate("OpenAutoPath", "单刀圆角半径"), positive(initialTool.cornerRadius, 0.5), 0.001, 500);
+    m_length = number("ToolLength", QCoreApplication::translate("OpenAutoPath", "单刀刃长"), positive(initialTool.cuttingEdgeLength, 30), 0.001, 10000);
+    m_spindle = number("ToolSpindle", QCoreApplication::translate("OpenAutoPath", "单刀主轴转速"), positive(initialTool.spindleSpeed, 8000), 1, 1000000, " rpm");
+    m_feed = number("ToolFeed", QCoreApplication::translate("OpenAutoPath", "单刀切削进给"), positive(initialTool.horizontalFeed, 600), 1, 1000000, " mm/min");
+    m_plunge = number("ToolPlunge", QCoreApplication::translate("OpenAutoPath", "单刀进刀进给"), positive(initialTool.verticalFeed, 150), 1, 1000000, " mm/min");
+    m_tip = number("ToolTipAngle", QCoreApplication::translate("OpenAutoPath", "单刀钻尖角"), positive(initialTool.tipAngle, 118), 1, 179, QStringLiteral("°"));
+    m_overall = number("ToolOverall", QCoreApplication::translate("OpenAutoPath", "单刀总长 / 伸出（可选）"), initialTool.overallLength, 0, 10000);
+    m_shank = number("ToolShank", QCoreApplication::translate("OpenAutoPath", "单刀刀杆直径（可选）"), initialTool.shankDiameter, 0, 1000);
+    m_holderDiameter = number("ToolHolderDiameter", QCoreApplication::translate("OpenAutoPath", "单刀刀柄直径（可选）"), initialTool.holderDiameter, 0, 1000);
+    m_holderLength = number("ToolHolderLength", QCoreApplication::translate("OpenAutoPath", "单刀刀柄长度（可选）"), initialTool.holderLength, 0, 10000);
+    m_spindleDiameter = number("ToolSpindleDiameter", QCoreApplication::translate("OpenAutoPath", "单刀主轴包络直径（可选）"), initialTool.spindleEnvelopeDiameter, 0, 10000);
+    m_spindleLength = number("ToolSpindleLength", QCoreApplication::translate("OpenAutoPath", "单刀主轴包络长度（可选）"), initialTool.spindleEnvelopeLength, 0, 10000);
     const auto refresh = [this, &form] {
         const bool single = mode() == ToolSelectionMode::SingleTool;
         for (QWidget* widget : std::initializer_list<QWidget*>{m_type, m_number, m_diameter, m_length,
@@ -91,15 +92,15 @@ QString DirectToolParameterSection::validationError() const
     const double radius = type == "ball_end_mill" ? m_diameter->value() * 0.5
         : type == "bull_nose" ? m_corner->value() : 0.0;
     if (type == "bull_nose" && !(radius > 0.0 && radius < m_diameter->value() * 0.5))
-        return QStringLiteral("圆鼻刀圆角半径须大于零且小于刀具半径。");
+        return QCoreApplication::translate("OpenAutoPath", "圆鼻刀圆角半径须大于零且小于刀具半径。");
     if (m_length->value() < radius)
-        return QStringLiteral("单刀刃长不能小于球头或圆角高度。");
+        return QCoreApplication::translate("OpenAutoPath", "单刀刃长不能小于球头或圆角高度。");
     if (m_overall->value() > 0 && m_overall->value() < m_length->value())
-        return QStringLiteral("单刀总长 / 伸出不能小于刃长；未填写时可保持 0。");
+        return QCoreApplication::translate("OpenAutoPath", "单刀总长 / 伸出不能小于刃长；未填写时可保持 0。");
     if ((m_holderDiameter->value() > 0) != (m_holderLength->value() > 0))
-        return QStringLiteral("单刀刀柄直径与长度需同时填写，或同时保留 0。");
+        return QCoreApplication::translate("OpenAutoPath", "单刀刀柄直径与长度需同时填写，或同时保留 0。");
     if ((m_spindleDiameter->value() > 0) != (m_spindleLength->value() > 0))
-        return QStringLiteral("单刀主轴包络直径与长度需同时填写，或同时保留 0。");
+        return QCoreApplication::translate("OpenAutoPath", "单刀主轴包络直径与长度需同时填写，或同时保留 0。");
     return {};
 }
 

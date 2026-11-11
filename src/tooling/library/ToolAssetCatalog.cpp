@@ -2,6 +2,7 @@
 // FreeCAD 式刀具资产目录：库引用、资产增删改与快照一致性维护，见
 // ToolAssetCatalog.h。
 #include "tooling/library/ToolAssetCatalog.h"
+#include <QCoreApplication>
 
 #include <algorithm>
 #include <utility>
@@ -123,7 +124,7 @@ bool ToolAssetCatalog::addLibrary(ToolLibrary library,
         *identifiersMigrated = false;
     if (libraryById(library.id())) {
         if (error)
-            *error = QStringLiteral("刀库 ID 已存在：%1").arg(library.id());
+            *error = QCoreApplication::translate("OpenAutoPath", "刀库 ID 已存在：%1").arg(library.id());
         return false;
     }
 
@@ -238,7 +239,7 @@ bool ToolAssetCatalog::removeLibrary(const QString& libraryId, QString* error)
         m_libraries.end());
     if (m_libraries.size() == oldSize) {
         if (error)
-            *error = QStringLiteral("刀库不存在：%1").arg(libraryId);
+            *error = QCoreApplication::translate("OpenAutoPath", "刀库不存在：%1").arg(libraryId);
         return false;
     }
     return true;
@@ -262,7 +263,7 @@ bool ToolAssetCatalog::removeAsset(const QString& assetId, QString* error)
 {
     if (!m_assets.contains(assetId)) {
         if (error)
-            *error = QStringLiteral("刀具资产不存在：%1").arg(assetId);
+            *error = QCoreApplication::translate("OpenAutoPath", "刀具资产不存在：%1").arg(assetId);
         return false;
     }
     ToolAssetCatalog candidate = *this;
@@ -285,12 +286,12 @@ bool ToolAssetCatalog::attachAsset(const QString& libraryId,
     const ToolBit* tool = assetById(assetId);
     if (!library) {
         if (error)
-            *error = QStringLiteral("刀库不存在：%1").arg(libraryId);
+            *error = QCoreApplication::translate("OpenAutoPath", "刀库不存在：%1").arg(libraryId);
         return false;
     }
     if (!tool) {
         if (error)
-            *error = QStringLiteral("刀具资产不存在：%1").arg(assetId);
+            *error = QCoreApplication::translate("OpenAutoPath", "刀具资产不存在：%1").arg(assetId);
         return false;
     }
     return library->upsertTool(*tool, error);
@@ -303,7 +304,7 @@ bool ToolAssetCatalog::detachAsset(const QString& libraryId,
     ToolLibrary* library = libraryById(libraryId);
     if (!library) {
         if (error)
-            *error = QStringLiteral("刀库不存在：%1").arg(libraryId);
+            *error = QCoreApplication::translate("OpenAutoPath", "刀库不存在：%1").arg(libraryId);
         return false;
     }
     return library->removeTool(assetId, error);
@@ -364,7 +365,7 @@ QStringList ToolAssetCatalog::validationErrors() const
     for (auto it = m_assets.cbegin(); it != m_assets.cend(); ++it) {
         if (it.key() != it.value().id) {
             errors.push_back(
-                QStringLiteral("资产映射键与刀具 ID 不一致：%1").arg(it.key()));
+                QCoreApplication::translate("OpenAutoPath", "资产映射键与刀具 ID 不一致：%1").arg(it.key()));
         }
         QString assetError;
         if (!validateAsset(it.value(), &assetError))
@@ -376,25 +377,25 @@ QStringList ToolAssetCatalog::validationErrors() const
         libraryIds[library.id()] += 1;
         const QStringList libraryErrors = library.validationErrors();
         for (const QString& item : libraryErrors) {
-            errors.push_back(QStringLiteral("刀库“%1”：%2")
+            errors.push_back(QCoreApplication::translate("OpenAutoPath", "刀库“%1”：%2")
                                  .arg(library.name(), item));
         }
         for (const ToolBit& tool : library.tools()) {
             const ToolBit* canonical = assetById(tool.id);
             if (!canonical) {
                 errors.push_back(
-                    QStringLiteral("刀库“%1”引用了不存在的资产：%2")
+                    QCoreApplication::translate("OpenAutoPath", "刀库“%1”引用了不存在的资产：%2")
                         .arg(library.name(), tool.id));
             } else if (!sameToolAsset(*canonical, tool)) {
                 errors.push_back(
-                    QStringLiteral("刀库“%1”的刀具快照与全局资产不一致：%2")
+                    QCoreApplication::translate("OpenAutoPath", "刀库“%1”的刀具快照与全局资产不一致：%2")
                         .arg(library.name(), tool.id));
             }
         }
     }
     for (auto it = libraryIds.cbegin(); it != libraryIds.cend(); ++it) {
         if (it.value() > 1)
-            errors.push_back(QStringLiteral("刀库 ID 重复：%1").arg(it.key()));
+            errors.push_back(QCoreApplication::translate("OpenAutoPath", "刀库 ID 重复：%1").arg(it.key()));
     }
     return errors;
 }

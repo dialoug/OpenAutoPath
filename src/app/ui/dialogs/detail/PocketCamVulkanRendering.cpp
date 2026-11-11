@@ -1,4 +1,5 @@
 #include "app/ui/dialogs/detail/PocketCamVulkanWidget.h"
+#include <QCoreApplication>
 #include "app/ui/dialogs/detail/PocketCamVulkanDexel.h"
 #include <rhi/qrhi.h>
 #include <QFile>
@@ -85,7 +86,7 @@ void PocketCamVulkanWidget::initialize(QRhiCommandBuffer*)
     // QRhiWidget can recreate its resources when reparented or its backing RHI changes.
     releaseResources();
     if (!rhi() || rhi()->backend() != QRhi::Vulkan || !renderTarget()) {
-        m_error = QStringLiteral("未能创建 Vulkan 渲染设备。");
+        m_error = QCoreApplication::translate("OpenAutoPath", "未能创建 Vulkan 渲染设备。");
         return;
     }
     m_renderer.reset(new Renderer);
@@ -96,25 +97,25 @@ void PocketCamVulkanWidget::initialize(QRhiCommandBuffer*)
     renderer.color.reset(rhi()->newTexture(QRhiTexture::RGBA8, size, 1, QRhiTexture::RenderTarget));
     renderer.depth.reset(rhi()->newTexture(QRhiTexture::D32F, size, 1, QRhiTexture::RenderTarget));
     if (!renderer.color->create() || !renderer.depth->create()) {
-        m_error = QStringLiteral("Vulkan 后处理纹理创建失败。"); return;
+        m_error = QCoreApplication::translate("OpenAutoPath", "Vulkan 后处理纹理创建失败。"); return;
     }
     renderer.sceneTarget.reset(rhi()->newTextureRenderTarget(
         QRhiTextureRenderTargetDescription(QRhiColorAttachment(renderer.color.get()), renderer.depth.get())));
     renderer.scenePass.reset(renderer.sceneTarget->newCompatibleRenderPassDescriptor());
     renderer.sceneTarget->setRenderPassDescriptor(renderer.scenePass.get());
-    if (!renderer.sceneTarget->create()) { m_error = QStringLiteral("Vulkan 离屏目标创建失败。"); return; }
+    if (!renderer.sceneTarget->create()) { m_error = QCoreApplication::translate("OpenAutoPath", "Vulkan 离屏目标创建失败。"); return; }
     for (int slot = 0; slot < 5; ++slot) {
         renderer.uniforms[slot].reset(rhi()->newBuffer(QRhiBuffer::Dynamic, QRhiBuffer::UniformBuffer, uniformBytes));
-        if (!renderer.uniforms[slot]->create()) { m_error = QStringLiteral("Vulkan 常量缓冲创建失败。"); return; }
+        if (!renderer.uniforms[slot]->create()) { m_error = QCoreApplication::translate("OpenAutoPath", "Vulkan 常量缓冲创建失败。"); return; }
         renderer.bindings[slot].reset(rhi()->newShaderResourceBindings());
         renderer.bindings[slot]->setBindings({QRhiShaderResourceBinding::uniformBuffer(
             0, QRhiShaderResourceBinding::VertexStage | QRhiShaderResourceBinding::FragmentStage,
             renderer.uniforms[slot].get())});
-        if (!renderer.bindings[slot]->create()) { m_error = QStringLiteral("Vulkan 着色器资源绑定失败。"); return; }
+        if (!renderer.bindings[slot]->create()) { m_error = QCoreApplication::translate("OpenAutoPath", "Vulkan 着色器资源绑定失败。"); return; }
     }
     const auto vertex = shader(":/cam/scene.vert.qsb");
     const auto fragment = shader(":/cam/scene.frag.qsb");
-    if (!vertex.isValid() || !fragment.isValid()) { m_error = QStringLiteral("Vulkan 着色器资源缺失或无效。"); return; }
+    if (!vertex.isValid() || !fragment.isValid()) { m_error = QCoreApplication::translate("OpenAutoPath", "Vulkan 着色器资源缺失或无效。"); return; }
     const auto pipeline = [&](bool lines, bool blended, bool hidden = false) {
         std::unique_ptr<QRhiGraphicsPipeline> result(rhi()->newGraphicsPipeline());
         result->setShaderStages({{QRhiShaderStage::Vertex, vertex}, {QRhiShaderStage::Fragment, fragment}});
@@ -154,17 +155,17 @@ void PocketCamVulkanWidget::initialize(QRhiCommandBuffer*)
         QRhiSampler::None, QRhiSampler::ClampToEdge, QRhiSampler::ClampToEdge));
     renderer.postUniform.reset(rhi()->newBuffer(QRhiBuffer::Dynamic, QRhiBuffer::UniformBuffer, 32));
     if (!renderer.colorSampler->create() || !renderer.depthSampler->create() || !renderer.postUniform->create()) {
-        m_error = QStringLiteral("Vulkan 后处理资源创建失败。"); return;
+        m_error = QCoreApplication::translate("OpenAutoPath", "Vulkan 后处理资源创建失败。"); return;
     }
     renderer.postBindings.reset(rhi()->newShaderResourceBindings());
     renderer.postBindings->setBindings({
         QRhiShaderResourceBinding::uniformBuffer(0, QRhiShaderResourceBinding::FragmentStage, renderer.postUniform.get()),
         QRhiShaderResourceBinding::sampledTexture(1, QRhiShaderResourceBinding::FragmentStage, renderer.color.get(), renderer.colorSampler.get()),
         QRhiShaderResourceBinding::sampledTexture(2, QRhiShaderResourceBinding::FragmentStage, renderer.depth.get(), renderer.depthSampler.get())});
-    if (!renderer.postBindings->create()) { m_error = QStringLiteral("Vulkan 后处理绑定失败。"); return; }
+    if (!renderer.postBindings->create()) { m_error = QCoreApplication::translate("OpenAutoPath", "Vulkan 后处理绑定失败。"); return; }
     const auto postVertex = shader(":/cam/post.vert.qsb"), postFragment = shader(":/cam/post.frag.qsb");
     if (!postVertex.isValid() || !postFragment.isValid()) {
-        m_error = QStringLiteral("Vulkan 后处理着色器无效。"); return;
+        m_error = QCoreApplication::translate("OpenAutoPath", "Vulkan 后处理着色器无效。"); return;
     }
     renderer.post.reset(rhi()->newGraphicsPipeline());
     renderer.post->setShaderStages({{QRhiShaderStage::Vertex, postVertex}, {QRhiShaderStage::Fragment, postFragment}});
@@ -172,7 +173,7 @@ void PocketCamVulkanWidget::initialize(QRhiCommandBuffer*)
     renderer.post->setRenderPassDescriptor(renderer.pass);
     renderer.post->setSampleCount(renderTarget()->sampleCount());
     m_renderReady = renderer.solid && renderer.transparent && renderer.lines && renderer.hiddenLines && renderer.post->create();
-    if (!m_renderReady) m_error = QStringLiteral("Vulkan 图形管线创建失败。");
+    if (!m_renderReady) m_error = QCoreApplication::translate("OpenAutoPath", "Vulkan 图形管线创建失败。");
     if (m_renderReady && m_gpuSurface && m_initial && m_initial->valid()) {
         renderer.dexel = std::make_unique<PocketCamVulkanDexel>();
         const auto stock = m_gpuPlayback || !m_stock ? m_initial : m_stock;
@@ -222,7 +223,7 @@ void PocketCamVulkanWidget::render(QRhiCommandBuffer* commands)
     if (!uploaded) {
         updates->release();
         m_renderReady = false;
-        m_error = QStringLiteral("Vulkan 网格上传失败，可能超过显存或缓冲预算。");
+        m_error = QCoreApplication::translate("OpenAutoPath", "Vulkan 网格上传失败，可能超过显存或缓冲预算。");
         return;
     }
     const QMatrix4x4 viewProjection = rhi()->clipSpaceCorrMatrix() * cameraMatrix();

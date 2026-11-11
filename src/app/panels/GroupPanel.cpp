@@ -1,5 +1,6 @@
 // GroupPanel 实现 — 参见 GroupPanel.h。
 #include "GroupPanel.h"
+#include <QCoreApplication>
 
 #include "StickyTreeWidget.h"
 #include "app/workflows/shared/UnitDisplayGrouping.h"
@@ -34,7 +35,7 @@ GroupPanel::GroupPanel(QWidget* parent) : QWidget(parent)
     layout->setContentsMargins(0, 0, 0, 0);
 
     m_tree = new StickyTreeWidget(this);
-    m_tree->setHeaderLabels({QStringLiteral("分组 / 单元 / 面"), QStringLiteral("数量"), QStringLiteral("类型")});
+    m_tree->setHeaderLabels({QCoreApplication::translate("OpenAutoPath", "分组 / 单元 / 面"), QCoreApplication::translate("OpenAutoPath", "数量"), QCoreApplication::translate("OpenAutoPath", "类型")});
     m_tree->header()->setSectionResizeMode(0, QHeaderView::Stretch);
     m_tree->setColumnWidth(1, kCountColumnWidth);
     m_tree->setColumnWidth(2, kTypeColumnWidth);
@@ -103,7 +104,7 @@ void GroupPanel::setModel(const oap::Model* model)
                   });
 
         auto* gItem = new QTreeWidgetItem(m_tree);
-        gItem->setText(0, QString::fromStdString(*key));
+        gItem->setText(0, QCoreApplication::translate("OpenAutoPath", key->c_str()));
         gItem->setText(1, QString::number((int)units.size())); // 组内 unit 数
         gItem->setData(0, kRoleKind, QStringLiteral("group"));
 
@@ -114,7 +115,7 @@ void GroupPanel::setModel(const oap::Model* model)
                 : QString::fromStdString(u->unit_id + "  " + u->decoded_name);
             uItem->setText(0, uname);
             uItem->setText(1, QString::number((int)u->face_ids.size())); // 面数
-            uItem->setText(2, QString::fromStdString(u->unit_geometry_class));
+            uItem->setText(2, QCoreApplication::translate("OpenAutoPathLabel", (u->unit_geometry_class).c_str()));
             uItem->setData(0, kRoleId, QString::fromStdString(u->unit_id));
             uItem->setData(0, kRoleKind, QStringLiteral("unit"));
 
@@ -123,7 +124,7 @@ void GroupPanel::setModel(const oap::Model* model)
                 fItem->setText(0, QString::fromStdString(fid));
                 auto it = faceType.find(fid);
                 fItem->setText(2, it != faceType.end()
-                                      ? QString::fromStdString(it->second) : QString());
+                                      ? QCoreApplication::translate("OpenAutoPathLabel", (it->second).c_str()) : QString());
                 fItem->setData(0, kRoleId, QString::fromStdString(fid));
                 fItem->setData(0, kRoleKind, QStringLiteral("face"));
             }

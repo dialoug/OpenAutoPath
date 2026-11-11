@@ -1,4 +1,5 @@
 #include "app/workflows/simulation/StockSimulationUseCases.h"
+#include <QCoreApplication>
 
 #include "manufacturing/job/MachiningJobStorage.h"
 #include "manufacturing/program/MachiningProgramAssembler.h"
@@ -15,7 +16,7 @@ bool prepareProjectPlayback(const manufacturing::MachiningJob& job,
 {
     auto assembled = manufacturing::MachiningProgramAssembler().assemble(job, includedOperationIds);
     if (!assembled.ok()) {
-        error = QStringLiteral("项目动画无法组装当前有效工序。");
+        error = QCoreApplication::translate("OpenAutoPath", "项目动画无法组装当前有效工序。");
         return false;
     }
     auto operations = std::make_shared<std::vector<toolpath::PocketToolpathOperation>>();
@@ -32,12 +33,12 @@ bool prepareProjectPlayback(const manufacturing::MachiningJob& job,
             return item.operation.id == mapping.formalOperationId;
         });
         if (!setup || node == nodes.end()) {
-            error = QStringLiteral("项目动画缺少正式工序或装夹映射。");
+            error = QCoreApplication::translate("OpenAutoPath", "项目动画缺少正式工序或装夹映射。");
             return false;
         }
         const auto parent = job.runtime().ipwCheckpoints.find(node->parentStateKey);
         if (!parent || !parent->dexelStock || !parent->dexelStock->valid()) {
-            error = QStringLiteral("工序 %1 缺少加工前 IPW 检查点。").arg(QString::fromStdString(mapping.formalOperationId));
+            error = QCoreApplication::translate("OpenAutoPath", "工序 %1 缺少加工前 IPW 检查点。").arg(QString::fromStdString(mapping.formalOperationId));
             return false;
         }
         if (!input.initialIpwStock) input.initialIpwStock = parent->dexelStock;
@@ -61,7 +62,7 @@ bool prepareProjectPlayback(const manufacturing::MachiningJob& job,
                 const auto found = std::find_if(batch->operations.begin(), batch->operations.end(),
                     [&](const auto& item) { return item.operationId == carrier.operationId; });
                 if (found == batch->operations.end()) {
-                    error = QStringLiteral("项目动画缺少雕刻刀路参数。");
+                    error = QCoreApplication::translate("OpenAutoPath", "项目动画缺少雕刻刀路参数。");
                     return false;
                 }
                 params = found->result.toolpathParams();
@@ -75,7 +76,7 @@ bool prepareProjectPlayback(const manufacturing::MachiningJob& job,
                 const auto found = std::find_if(batch->machining.operations.begin(), batch->machining.operations.end(),
                     [&](const auto& item) { return item.operationId == carrier.operationId; });
                 if (found == batch->machining.operations.end()) {
-                    error = QStringLiteral("项目动画缺少孔工序的实际刀具轮廓。");
+                    error = QCoreApplication::translate("OpenAutoPath", "项目动画缺少孔工序的实际刀具轮廓。");
                     return false;
                 }
                 profile = manufacturing::ipw::holeDexelToolProfile(*found, batch->effectiveParams);
@@ -121,7 +122,7 @@ ProjectStockSimulationUseCaseResult ProjectStockSimulationUseCase::execute(
 {
     ProjectStockSimulationUseCaseResult result;
     if (!request.session || !request.coordinator || !request.job || request.targetShape.IsNull()) {
-        result.error = QStringLiteral("加工项目 IPW 请求不完整。");
+        result.error = QCoreApplication::translate("OpenAutoPath", "加工项目 IPW 请求不完整。");
         return result;
     }
     QString error;
@@ -137,7 +138,7 @@ ProjectStockSimulationUseCaseResult ProjectStockSimulationUseCase::execute(
             request.settings.source.stepPath.toUtf8().toStdString());
         if (!loaded.ok()) {
             result.failure = PocketStockSimulationFailure::StockLoadFailed;
-            result.error = QString::fromStdString(loaded.message);
+            result.error = QCoreApplication::translate("OpenAutoPathDiagnostic", QString::fromStdString(loaded.message).toUtf8().constData());
             return result;
         }
         initialStock = loaded.shape;
@@ -145,13 +146,13 @@ ProjectStockSimulationUseCaseResult ProjectStockSimulationUseCase::execute(
             request.settings.source.stepPath, &error);
         if (!error.isEmpty() || importedFingerprint.isEmpty()) {
             result.failure = PocketStockSimulationFailure::StockLoadFailed;
-            result.error = error.isEmpty() ? QStringLiteral("无法计算毛坯 STEP 指纹。") : error;
+            result.error = error.isEmpty() ? QCoreApplication::translate("OpenAutoPath", "无法计算毛坯 STEP 指纹。") : error;
             return result;
         }
     }
     if (initialStock.IsNull()) {
         result.failure = PocketStockSimulationFailure::PreparationFailed;
-        result.error = QStringLiteral("无法构造项目初始毛坯。");
+        result.error = QCoreApplication::translate("OpenAutoPath", "无法构造项目初始毛坯。");
         return result;
     }
     result.preparation = StockSimulationWorkflowController::prepareProject(
@@ -187,28 +188,28 @@ ProjectStockSimulationUseCaseResult ProjectStockSimulationUseCase::execute(
     }
     if (result.runResult.cancelled) {
         result.failure = PocketStockSimulationFailure::Cancelled;
-        result.error = QStringLiteral("加工项目 IPW 已取消。");
+        result.error = QCoreApplication::translate("OpenAutoPath", "加工项目 IPW 已取消。");
         return result;
     }
     if (result.runResult.failed || !result.runResult.execution.complete()) {
         result.failure = PocketStockSimulationFailure::EmptyResult;
-        result.error = QString::fromStdString(result.runResult.errorMessage);
+        result.error = QCoreApplication::translate("OpenAutoPathDiagnostic", QString::fromStdString(result.runResult.errorMessage).toUtf8().constData());
         if (result.error.isEmpty())
-            result.error = QStringLiteral("加工项目 IPW 未完整完成。");
+            result.error = QCoreApplication::translate("OpenAutoPath", "加工项目 IPW 未完整完成。");
         return result;
     }
     StockSimulationWorkflowController::installProjectResult(
         *request.session, *request.job, result.preparation, result.runResult);
     if (!request.session->hasPocketSimulation()) {
         result.failure = PocketStockSimulationFailure::EmptyResult;
-        result.error = QStringLiteral("加工项目 IPW 没有可显示的检查点。");
+        result.error = QCoreApplication::translate("OpenAutoPath", "加工项目 IPW 没有可显示的检查点。");
         return result;
     }
     result.summary = StockSimulationWorkflowController::projectSummary(
         *request.session, *request.job, result.preparation, result.runResult);
     if (request.engravingOnly) {
-        result.summary.prepend(QStringLiteral("雕刻 IPW（含前序材料准备）｜"));
-        result.camInput.title = QStringLiteral("雕刻 IPW — 刀具动画");
+        result.summary.prepend(QCoreApplication::translate("OpenAutoPath", "雕刻 IPW（含前序材料准备）｜"));
+        result.camInput.title = QCoreApplication::translate("OpenAutoPath", "雕刻 IPW — 刀具动画");
     }
     result.camInput.stock = initialStock;
     result.camInput.target = request.targetShape;
@@ -218,8 +219,8 @@ ProjectStockSimulationUseCaseResult ProjectStockSimulationUseCase::execute(
     if (!prepareProjectPlayback(*request.job, result.preparation.ipwOptions,
             result.camInput, result.playbackError, result.preparation.includedOperationIds,
             request.engravingOnly, request.settings.selectedSetup) && result.playbackError.isEmpty())
-        result.playbackError = QStringLiteral("项目没有可播放的工序。");
-    result.warning = QStringLiteral("IPW 为材料去除仿真；不替代刀柄、夹具及机床连续运动碰撞验证。");
+        result.playbackError = QCoreApplication::translate("OpenAutoPath", "项目没有可播放的工序。");
+    result.warning = QCoreApplication::translate("OpenAutoPath", "IPW 为材料去除仿真；不替代刀柄、夹具及机床连续运动碰撞验证。");
     result.failure = PocketStockSimulationFailure::None;
     return result;
 }

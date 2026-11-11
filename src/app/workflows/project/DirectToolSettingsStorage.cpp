@@ -1,4 +1,5 @@
 #include "DirectToolSettingsStorage.h"
+#include <QCoreApplication>
 #include "detail/ToolContextSettingsJson.h"
 #include <QJsonDocument>
 #include <QSettings>
@@ -17,7 +18,7 @@ bool DirectToolSettingsStorage::load(QSettings& settings, toolpath::ToolpathTool
         !detail::decodeToolContext(object.value("hole").toObject(), h) ||
         !detail::decodeToolContext(object.value("pocket").toObject(), p) ||
         !detail::decodeToolContext(object.value("profile").toObject(), r)) {
-        if (error) *error = QStringLiteral("单刀配置无效，已保留当前刀具参数。");
+        if (error) *error = QCoreApplication::translate("OpenAutoPath", "单刀配置无效，已保留当前刀具参数。");
         return false;
     }
     hole = std::move(h); pocket = std::move(p); profile = std::move(r);
@@ -32,7 +33,7 @@ bool DirectToolSettingsStorage::save(QSettings& settings, const toolpath::Toolpa
     settings.setValue(key, QJsonDocument(object).toJson(QJsonDocument::Compact));
     settings.sync();
     if (settings.status() == QSettings::NoError) return true;
-    if (error) *error = QStringLiteral("无法保存单刀配置。");
+    if (error) *error = QCoreApplication::translate("OpenAutoPath", "无法保存单刀配置。");
     return false;
 }
 bool DirectToolSettingsStorage::loadDefault(toolpath::ToolpathToolContext& hole,

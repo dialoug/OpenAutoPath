@@ -346,6 +346,14 @@ oap_configure_cam_rhi(oap_app_cam_renderer)
 
 add_executable(OpenAutoPathApp WIN32 ${OAP_APP_SOURCES})
 set_target_properties(OpenAutoPathApp PROPERTIES AUTOMOC ON)
+qt_add_resources(OpenAutoPathApp "app_translations"
+    PREFIX "/i18n"
+    BASE "resources/i18n"
+    FILES resources/i18n/en.json
+          resources/i18n/diagnostics_zh_CN.json
+          resources/i18n/logs_zh_CN.json
+          resources/i18n/labels.json
+          resources/i18n/qt/qtbase_zh_CN.ts)
 target_link_libraries(OpenAutoPathApp PRIVATE
     Qt6::Widgets
     Qt6::Gui

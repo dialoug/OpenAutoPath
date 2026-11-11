@@ -3,6 +3,7 @@
 // 再弹出 PocketCamDialog 执行逐工序播放;返回 false 仅表示场景无法准备或
 // 对话框无法启动。
 #include "app/ui/dialogs/PocketCamSimulatorDialog.h"
+#include <QCoreApplication>
 #include "app/ui/dialogs/detail/PocketCamDialog.h"
 #include "app/ui/dialogs/detail/PocketCamRenderSupport.h"
 
@@ -38,7 +39,7 @@ bool showPocketCamSimulatorDialog(
     if (!prepared.ok()) {
         if (errorMessage) {
             *errorMessage =
-                QString::fromStdString(prepared.error);
+                QCoreApplication::translate("OpenAutoPathDiagnostic", QString::fromStdString(prepared.error).toUtf8().constData());
         }
         return false;
     }
@@ -46,8 +47,7 @@ bool showPocketCamSimulatorDialog(
     if (!input.initialIpwStock ||
         !input.initialIpwStock->valid()) {
         if (errorMessage) {
-            *errorMessage = QStringLiteral(
-                "加工仿真缺少有效的初始 IPW 检查点；"
+            *errorMessage = QCoreApplication::translate("OpenAutoPath", "加工仿真缺少有效的初始 IPW 检查点；"
                 "已取消显示阶段的重复毛坯栅格化。");
         }
         return false;
@@ -55,8 +55,7 @@ bool showPocketCamSimulatorDialog(
     if (!input.options.authoritativeIpwPlayback && !input.initialIpwStock->axisAligned(
             prepared.scene.outwardToolAxis)) {
         if (errorMessage) {
-            *errorMessage = QStringLiteral(
-                "OpenGL GPU Multi-Dexel 初始 IPW 的刀轴与仿真场景不一致。");
+            *errorMessage = QCoreApplication::translate("OpenAutoPath", "OpenGL GPU Multi-Dexel 初始 IPW 的刀轴与仿真场景不一致。");
         }
         return false;
     }
@@ -109,8 +108,7 @@ bool showPocketCamSimulatorDialog(
             if (!input.finalIpwDisplayMeshFingerprint.empty() &&
                 actualFingerprint !=
                     input.finalIpwDisplayMeshFingerprint) {
-                finalStockWarning = QStringLiteral(
-                    "主视口与 OpenGL 的统一 IPW 网格指纹不一致，"
+                finalStockWarning = QCoreApplication::translate("OpenAutoPath", "主视口与 OpenGL 的统一 IPW 网格指纹不一致，"
                     "已拒绝该共享网格。");
             } else {
                 finalStock = meshTriangulation(
@@ -123,8 +121,7 @@ bool showPocketCamSimulatorDialog(
         }
         if (finalStock.empty() && input.finalIpwStock) {
             if (!finalStockError.isEmpty()) {
-                finalStockWarning = QStringLiteral(
-                    "共享 IPW 网格无法转换，已从材料检查点重建：%1")
+                finalStockWarning = QCoreApplication::translate("OpenAutoPath", "共享 IPW 网格无法转换，已从材料检查点重建：%1")
                     .arg(finalStockError);
                 finalStockError.clear();
             }
@@ -141,10 +138,9 @@ bool showPocketCamSimulatorDialog(
             } else {
                 finalStockError =
                     displayMeshError.empty()
-                    ? QStringLiteral(
-                          "无法生成统一 IPW 最终显示网格。")
-                    : QString::fromStdString(
-                          displayMeshError);
+                    ? QCoreApplication::translate("OpenAutoPath", "无法生成统一 IPW 最终显示网格。")
+                    : QCoreApplication::translate("OpenAutoPathDiagnostic", QString::fromStdString(
+                          displayMeshError).toUtf8().constData());
             }
         }
     };
@@ -177,7 +173,7 @@ bool showPocketCamSimulatorDialog(
             prepareOpenGlMesh();
             if (!finalStockWarning.isEmpty()) warnings.push_back(finalStockWarning.toStdString());
             if (!finalStockError.isEmpty()) warnings.push_back(
-                (QStringLiteral("最终 IPW 网格不可用，完成帧将继续显示 GPU Multi-Dexel：") + finalStockError).toStdString());
+                (QCoreApplication::translate("OpenAutoPath", "最终 IPW 网格不可用，完成帧将继续显示 GPU Multi-Dexel：") + finalStockError).toStdString());
         }
         // Each backend owns a separate top-level window/RHI lifetime. Do not
         // mix QOpenGLWidget and a Vulkan QRhiWidget in an initialized window.
@@ -191,7 +187,7 @@ bool showPocketCamSimulatorDialog(
         if (dialog.exec() != PocketCamDialog::SwitchBackend) break;
         backend = dialog.requestedBackend();
         if (!dialog.fallbackReason().isEmpty())
-            warnings.push_back((QStringLiteral("Vulkan 显示失败，已回退 OpenGL：") + dialog.fallbackReason()).toStdString());
+            warnings.push_back((QCoreApplication::translate("OpenAutoPath", "Vulkan 显示失败，已回退 OpenGL：") + dialog.fallbackReason()).toStdString());
         else settings.setValue("simulation/renderBackend", backend == PocketCamBackend::Vulkan ? "vulkan" : "opengl");
     }
     return true;

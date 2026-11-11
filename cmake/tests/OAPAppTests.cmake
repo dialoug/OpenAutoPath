@@ -167,3 +167,19 @@ oap_add_smoke_test(single_tool_workflow
     LIBRARIES OAP::AppMachining OAP::AppWorkflowSimulation
     LABELS app-workflow fast high-risk
     TIMEOUT 180)
+
+oap_add_smoke_test(language
+    SOURCES tests/smoke/app/language_smoke.cpp
+    LIBRARIES OAP::AppDialogs OAP::ToolLibrary Qt6::Widgets
+    ARGS "${CMAKE_CURRENT_SOURCE_DIR}"
+    LABELS app-workflow fast ui i18n
+    TIMEOUT 30
+    ENVIRONMENT "QT_QPA_PLATFORM=offscreen" "QT_PLUGIN_PATH=${OAP_QT_PLUGIN_DIR}")
+qt_add_resources(oap_test_language "language_test_translations"
+    PREFIX "/i18n"
+    BASE "resources/i18n"
+    FILES resources/i18n/en.json
+          resources/i18n/diagnostics_zh_CN.json
+          resources/i18n/logs_zh_CN.json
+          resources/i18n/labels.json
+          resources/i18n/qt/qtbase_zh_CN.ts)

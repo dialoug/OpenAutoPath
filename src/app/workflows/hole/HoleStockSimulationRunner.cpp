@@ -1,4 +1,5 @@
 #include "toolpath/core/HeavyJobScheduler.h"
+#include <QCoreApplication>
 // 通过共享重计算队列执行毛坯读取和布尔减料，通过交互端口发布进度。
 #include "app/workflows/hole/HoleStockSimulationRunner.h"
 
@@ -135,15 +136,15 @@ QString stageLabel(RunStage stage)
 {
     switch (stage) {
         case RunStage::LoadingStock:
-            return QStringLiteral("正在后台读取真实毛坯 STEP…");
+            return QCoreApplication::translate("OpenAutoPath", "正在后台读取真实毛坯 STEP…");
         case RunStage::Simulating:
-            return QStringLiteral("正在后台执行孔加工顺序减料…");
+            return QCoreApplication::translate("OpenAutoPath", "正在后台执行孔加工顺序减料…");
         case RunStage::Inspecting:
-            return QStringLiteral("正在计算毛坯缺料、剩余余量和过切区域…");
+            return QCoreApplication::translate("OpenAutoPath", "正在计算毛坯缺料、剩余余量和过切区域…");
         case RunStage::Attributing:
-            return QStringLiteral("正在把过切增量归因到具体孔工序…");
+            return QCoreApplication::translate("OpenAutoPath", "正在把过切增量归因到具体孔工序…");
     }
-    return QStringLiteral("正在执行孔毛胚仿真…");
+    return QCoreApplication::translate("OpenAutoPath", "正在执行孔毛胚仿真…");
 }
 
 } // namespace
@@ -335,11 +336,11 @@ HoleStockSimulationRunResult simulateHoleStockWithProgress(
 
     // 主线程通过交互端口轮询后台任务；取消请求写入共享原子标志。
     WorkflowProgressRequest progressRequest;
-    progressRequest.title = QStringLiteral("孔毛胚仿真");
+    progressRequest.title = QCoreApplication::translate("OpenAutoPath", "孔毛胚仿真");
     progressRequest.label =
         stageLabel(stage.load(std::memory_order_relaxed));
     progressRequest.cancellingLabel =
-        QStringLiteral("正在取消，等待当前 STEP/布尔操作结束…");
+        QCoreApplication::translate("OpenAutoPath", "正在取消，等待当前 STEP/布尔操作结束…");
     progressRequest.initialTotal = total.load(std::memory_order_relaxed);
     progressRequest.snapshot = [&] {
         return WorkflowProgressSnapshot{
@@ -546,11 +547,11 @@ HoleOpenGlSimulationResult prepareHoleOpenGlWithProgress(
     toolpath::HeavyJobWaitGuard waitGuard(future, cancellation);
 
     WorkflowProgressRequest progressRequest;
-    progressRequest.title = QStringLiteral("孔 OpenGL 仿真");
+    progressRequest.title = QCoreApplication::translate("OpenAutoPath", "孔 OpenGL 仿真");
     progressRequest.label =
-        QStringLiteral("正在后台构建孔加工 GPU Multi-Dexel 材料状态…");
+        QCoreApplication::translate("OpenAutoPath", "正在后台构建孔加工 GPU Multi-Dexel 材料状态…");
     progressRequest.cancellingLabel =
-        QStringLiteral("正在取消孔 OpenGL 材料准备…");
+        QCoreApplication::translate("OpenAutoPath", "正在取消孔 OpenGL 材料准备…");
     progressRequest.initialTotal = total;
     progressRequest.snapshot = [&] {
         const std::size_t current =
@@ -558,10 +559,10 @@ HoleOpenGlSimulationResult prepareHoleOpenGlWithProgress(
         return WorkflowProgressSnapshot{
             current, total,
             current == 0u
-                ? QStringLiteral("正在栅格化孔加工前 IPW…")
+                ? QCoreApplication::translate("OpenAutoPath", "正在栅格化孔加工前 IPW…")
                 : buildsFinalStock && current < total
-                    ? QStringLiteral("正在栅格化孔加工后 IPW…")
-                    : QStringLiteral("孔 OpenGL 材料状态已准备完成")};
+                    ? QCoreApplication::translate("OpenAutoPath", "正在栅格化孔加工后 IPW…")
+                    : QCoreApplication::translate("OpenAutoPath", "孔 OpenGL 材料状态已准备完成")};
     };
     progressRequest.queued = [cancellation] { return toolpath::heavyJobScheduler().isPending(cancellation); };
     progressRequest.ready = [&future] {

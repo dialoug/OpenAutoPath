@@ -2,6 +2,7 @@
 // categoryForFile 从文件名推断(项目号前缀/数字/其他),组内按自然顺序排序;
 // 相邻文件导航 activateRelativeFile 供 MainWindow 的 W/S 快捷键使用。
 #include "app/ui/panels/FileListPanel.h"
+#include <QCoreApplication>
 
 #include <QCollator>
 #include <QDir>
@@ -60,15 +61,15 @@ QString leadingLetters(const QString& token)
 QString categoryForFile(const QFileInfo& info)
 {
     const QStringList parts = info.completeBaseName().split(QStringLiteral("__"));
-    if (parts.size() < 3) return QStringLiteral("其他");
+    if (parts.size() < 3) return QCoreApplication::translate("OpenAutoPath", "其他");
     const QString part = parts[1].trimmed();
     const QString source = parts[2].trimmed();
-    if (part.isEmpty() || source.isEmpty()) return QStringLiteral("其他");
+    if (part.isEmpty() || source.isEmpty()) return QCoreApplication::translate("OpenAutoPath", "其他");
     const QString partProject = projectKey(part);
     if (!partProject.isEmpty() &&
         QString::compare(partProject, projectKey(source), Qt::CaseInsensitive) == 0)
         return partProject;
-    if (isLooseNumeric(part)) return QStringLiteral("数字");
+    if (isLooseNumeric(part)) return QCoreApplication::translate("OpenAutoPath", "数字");
 
     const QString prefix = leadingLetters(part);
     static const QStringList known{
@@ -78,7 +79,7 @@ QString categoryForFile(const QFileInfo& info)
         QStringLiteral("B"), QStringLiteral("U")};
     for (const QString& value : known)
         if (QString::compare(prefix, value, Qt::CaseInsensitive) == 0) return value;
-    return QStringLiteral("其他");
+    return QCoreApplication::translate("OpenAutoPath", "其他");
 }
 
 int categoryRank(const QString& category)
@@ -90,8 +91,8 @@ int categoryRank(const QString& category)
         QStringLiteral("UB"), QStringLiteral("UP")};
     const int index = fixed.indexOf(category);
     if (index >= 0) return index;
-    if (category == QStringLiteral("数字")) return 10000;
-    if (category == QStringLiteral("其他")) return 10001;
+    if (category == QCoreApplication::translate("OpenAutoPath", "数字")) return 10000;
+    if (category == QCoreApplication::translate("OpenAutoPath", "其他")) return 10001;
     return 5000;
 }
 
@@ -109,13 +110,13 @@ FileListPanel::FileListPanel(QWidget* parent) : QWidget(parent)
     auto* layout = new QVBoxLayout(this);
     layout->setContentsMargins(4, 4, 4, 4);
     layout->setSpacing(4);
-    m_header = new QLabel(QStringLiteral("未打开文件夹"), this);
+    m_header = new QLabel(QCoreApplication::translate("OpenAutoPath", "未打开文件夹"), this);
     m_header->setWordWrap(true);
     m_header->setStyleSheet(QStringLiteral("color:#888; font-size:11px;"));
     layout->addWidget(m_header);
 
     m_tree = new QTreeWidget(this);
-    m_tree->setHeaderLabels({QStringLiteral("分类 / 文件"), QStringLiteral("数量")});
+    m_tree->setHeaderLabels({QCoreApplication::translate("OpenAutoPath", "分类 / 文件"), QCoreApplication::translate("OpenAutoPath", "数量")});
     m_tree->setAlternatingRowColors(true);
     m_tree->setHorizontalScrollBarPolicy(Qt::ScrollBarAlwaysOff);
     m_tree->setTextElideMode(Qt::ElideRight);
@@ -171,7 +172,7 @@ int FileListPanel::setFolder(const QString& dir)
     }
     m_tree->expandToDepth(0);
     fitColumnsToViewport(m_tree->header()->sectionSize(1));
-    m_header->setText(QStringLiteral("%1\n共 %2 个 STEP 文件")
+    m_header->setText(QCoreApplication::translate("OpenAutoPath", "%1\n共 %2 个 STEP 文件")
                           .arg(QDir::toNativeSeparators(dir)).arg(files.size()));
     return files.size();
 }

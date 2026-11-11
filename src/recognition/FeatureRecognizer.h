@@ -60,6 +60,10 @@ struct HoleGeometryRecognitionResult {
 // 特征识别器：对已索引模型运行孔识别，并支持按选中面做孔几何识别。
 class FeatureRecognizer {
 public:
+    // Optional process-wide presentation sink. Install before starting workers;
+    // reset after workers stop. The core keeps a stderr fallback and no Qt dependency.
+    using DiagnosticHandler = void (*)(const char* prefix, const char* detail);
+    static void setDiagnosticHandler(DiagnosticHandler handler) noexcept;
     // 对已索引的 model 运行孔识别。槽、腔等类别只保留人工标记与下游加工支持。
     RecognitionResult recognize(const Model& model, const StepIndexer& indexer);
 

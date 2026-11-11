@@ -1,6 +1,7 @@
 // IpwVisualAcceptanceCapture 实现（oap_app_presentation）。
 // 可选的 IPW/OpenGL 视觉验收证据的 OCCT 视口捕获，见 IpwVisualAcceptanceCapture.h。
 #include "app/presentation/IpwVisualAcceptanceCapture.h"
+#include <QCoreApplication>
 
 #include <algorithm>
 
@@ -25,13 +26,11 @@ IpwVisualAcceptanceCapture::capture(
     QDir directory(request.directory);
     result.directory = directory.absolutePath();
     if (!QDir().mkpath(result.directory)) {
-        result.warnings << QStringLiteral(
-            "无法创建 IPW 视觉验收目录：%1").arg(result.directory);
+        result.warnings << QCoreApplication::translate("OpenAutoPath", "无法创建 IPW 视觉验收目录：%1").arg(result.directory);
         return result;
     }
     if (request.view.IsNull()) {
-        result.warnings << QStringLiteral(
-            "OCCT 视图不可用，无法导出 IPW 验收图。");
+        result.warnings << QCoreApplication::translate("OpenAutoPath", "OCCT 视图不可用，无法导出 IPW 验收图。");
         return result;
     }
 
@@ -42,8 +41,7 @@ IpwVisualAcceptanceCapture::capture(
     result.finalViewportSaved =
         request.view->Dump(encodedViewportPath.constData());
     if (!result.finalViewportSaved) {
-        result.warnings << QStringLiteral(
-            "OCCT IPW 验收图导出失败：%1").arg(viewportPath);
+        result.warnings << QCoreApplication::translate("OpenAutoPath", "OCCT IPW 验收图导出失败：%1").arg(viewportPath);
     }
 
     result.roiRequested = request.camera.valid;
@@ -114,8 +112,7 @@ IpwVisualAcceptanceCapture::capture(
         request.context->Erase(request.ipwPresentation, Standard_False);
     request.context->UpdateCurrentViewer();
     if (!result.roiSaved) {
-        result.warnings << QStringLiteral(
-            "OCCT 槽腔 ROI 验收图导出失败。");
+        result.warnings << QCoreApplication::translate("OpenAutoPath", "OCCT 槽腔 ROI 验收图导出失败。");
     }
     return result;
 }

@@ -279,6 +279,7 @@ oap_module_sources(oap_app_dialogs OAP_APP_DIALOG_SOURCES
 
 oap_module_sources(OpenAutoPathApp OAP_APP_SOURCES
     src/app/ui/shell/MainWindowFinishing.cpp
+    src/app/ui/LanguageSettings.h
     src/app/ui/main.cpp
     src/app/ui/shell/MainWindow.cpp
     src/app/ui/shell/MainWindowDocument.cpp

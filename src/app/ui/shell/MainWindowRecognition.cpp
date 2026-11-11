@@ -1,5 +1,6 @@
 // MainWindow 识别适配器:把工作区值写入 Qt 控件。
 #include "MainWindow.h"
+#include <QCoreApplication>
 
 #include "app/ui/view/OcctView.h"
 #include "app/panels/FeaturePanel.h"
@@ -19,7 +20,7 @@ bool MainWindow::presentThreeAxisWireTraceResult(
     bool showCompletionDialog,
     qint64 elapsedMillis)
 {
-    const QString title = QStringLiteral("内外环结构识别");
+    const QString title = QCoreApplication::translate("OpenAutoPath", "内外环结构识别");
     const oap::app::RecognitionInstallResult installed =
         m_recognitionWorkspace->installThreeAxisResult(
             recognition, std::move(useCaseResult),

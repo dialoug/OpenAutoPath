@@ -13,6 +13,8 @@ OpenAutoPath 是一个基于 **C++20、Qt 和 Open CASCADE（OCCT）** 的 CAD/C
 [CI 与发布记录](https://github.com/dialoug/OpenAutoPath/actions) ·
 [问题反馈](https://github.com/dialoug/OpenAutoPath/issues)
 
+界面支持简体中文（默认）和英语。在 **视图 → 语言 → 英语** 中切换，重新启动后生效；英文界面可通过 **View → Language → Simplified Chinese** 切回中文。语言选择会保存在本机，翻译资源已内置，无需单独安装。
+
 ## 可以做什么
 
 | 功能 | 当前能力 |

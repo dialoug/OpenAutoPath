@@ -1,5 +1,6 @@
 // StockSimulationCoordinator 实现：仿真生命周期、显示管道与发布门禁。
 #include "app/workflows/simulation/StockSimulationCoordinator.h"
+#include <QCoreApplication>
 
 #include "app/workflows/simulation/IpwDisplayMeshController.h"
 #include "toolpath/core/HeavyJobScheduler.h"
@@ -141,15 +142,15 @@ StockSimulationCoordinator::evaluateDisplayResult(
         publication.disposition =
             IpwDisplayPublicationDisposition::Cancelled;
         publication.status =
-            QStringLiteral("IPW 显示网格生成已取消。");
+            QCoreApplication::translate("OpenAutoPath", "IPW 显示网格生成已取消。");
         return publication;
     }
     if (!result.ok()) {
         publication.disposition =
             IpwDisplayPublicationDisposition::Failed;
         publication.error = result.error.empty()
-            ? QStringLiteral("IPW 派生显示网格生成失败。")
-            : QString::fromStdString(result.error);
+            ? QCoreApplication::translate("OpenAutoPath", "IPW 派生显示网格生成失败。")
+            : QCoreApplication::translate("OpenAutoPathDiagnostic", QString::fromStdString(result.error).toUtf8().constData());
         publication.status = publication.error;
         return publication;
     }
@@ -187,40 +188,37 @@ StockSimulationCoordinator::evaluateDisplayResult(
     const IpwDisplayCacheStats cacheStats = m_displayCache->stats();
     if (!isIpwSurfaceDisplayMode(result.displayMode)) {
         if (result.displayMode == IpwOcctDisplayMode::BRepSnapshot) {
-            publication.status = QStringLiteral(
-                "%1%2已发布为 BRep 实体；后台重建 %3 ms。")
+            publication.status = QCoreApplication::translate("OpenAutoPath", "%1%2已发布为 BRep 实体；后台重建 %3 ms。")
                 .arg(transientFrame
-                    ? QStringLiteral("IPW 临时帧：")
-                    : QStringLiteral("IPW 检查点："))
+                    ? QCoreApplication::translate("OpenAutoPath", "IPW 临时帧：")
+                    : QCoreApplication::translate("OpenAutoPath", "IPW 检查点："))
                 .arg(displayModeText(result.displayMode))
                 .arg(result.metrics.milliseconds, 0, 'f', 1);
         } else {
             const IpwDisplayPrimitiveGeometry& geometry =
                 *result.primitiveGeometry;
             const QString sampling = geometry.samplingStride > 1
-                ? QStringLiteral("，按 ×%1 采样")
+                ? QCoreApplication::translate("OpenAutoPath", "，按 ×%1 采样")
                       .arg(geometry.samplingStride)
                 : QString();
-            publication.status = QStringLiteral(
-                "%1%2：显示 %3/%4 个图元%5；后台生成 %6 ms%7。")
+            publication.status = QCoreApplication::translate("OpenAutoPath", "%1%2：显示 %3/%4 个图元%5；后台生成 %6 ms%7。")
                 .arg(transientFrame
-                    ? QStringLiteral("IPW 临时帧：")
-                    : QStringLiteral("IPW 检查点："))
+                    ? QCoreApplication::translate("OpenAutoPath", "IPW 临时帧：")
+                    : QCoreApplication::translate("OpenAutoPath", "IPW 检查点："))
                 .arg(displayModeText(result.displayMode))
                 .arg(geometry.displayedPrimitiveCount)
                 .arg(geometry.sourcePrimitiveCount)
                 .arg(sampling)
                 .arg(result.metrics.milliseconds, 0, 'f', 1)
                 .arg(transientFrame
-                    ? QStringLiteral("，已去除 %1 mm³")
+                    ? QCoreApplication::translate("OpenAutoPath", "，已去除 %1 mm³")
                           .arg(result.removedVolume, 0, 'f', 3)
                     : QString());
         }
         return publication;
     }
     if (transientFrame) {
-        publication.status = QStringLiteral(
-            "IPW 临时帧 %1/%2：去除 %3 mm³，"
+        publication.status = QCoreApplication::translate("OpenAutoPath", "IPW 临时帧 %1/%2：去除 %3 mm³，"
             "命中 %4 个 tile、变化 %5 个单元；"
             "材料更新 %6 ms，网格 %7 ms。")
             .arg(result.completedMoveCount)
@@ -232,12 +230,11 @@ StockSimulationCoordinator::evaluateDisplayResult(
             .arg(result.metrics.milliseconds, 0, 'f', 1);
     } else if (result.key.kind ==
                IpwDisplayArtifactKind::StockCheckpoint) {
-        publication.status = QStringLiteral(
-            "IPW 检查点网格：%1 个三角形，%2，后台生成 %3 ms；"
+        publication.status = QCoreApplication::translate("OpenAutoPath", "IPW 检查点网格：%1 个三角形，%2，后台生成 %3 ms；"
             "缓存 %4/%5 MiB。")
             .arg(result.metrics.triangleCount)
-            .arg(publication.cached ? QStringLiteral("已缓存")
-                                    : QStringLiteral("超过预算，未缓存"))
+            .arg(publication.cached ? QCoreApplication::translate("OpenAutoPath", "已缓存")
+                                    : QCoreApplication::translate("OpenAutoPath", "超过预算，未缓存"))
             .arg(result.metrics.milliseconds, 0, 'f', 1)
             .arg(cacheStats.residentBytes / (1024.0 * 1024.0),
                  0, 'f', 1)
@@ -245,26 +242,23 @@ StockSimulationCoordinator::evaluateDisplayResult(
                  0, 'f', 0);
     } else if (result.key.kind ==
                IpwDisplayArtifactKind::FeatureAllowance) {
-        publication.status = QStringLiteral(
-            "特征 %1 加工后余量：%2 个三角形，余量体积 %3 mm³；后台生成 %4 ms。")
+        publication.status = QCoreApplication::translate("OpenAutoPath", "特征 %1 加工后余量：%2 个三角形，余量体积 %3 mm³；后台生成 %4 ms。")
             .arg(QString::fromStdString(result.key.variant))
             .arg(result.metrics.triangleCount)
             .arg(result.metrics.intervalVolume, 0, 'f', 3)
             .arg(result.metrics.milliseconds, 0, 'f', 1);
     } else if (result.key.kind ==
                IpwDisplayArtifactKind::OperationOvercut) {
-        publication.status = QStringLiteral(
-            "工序 %1 过切网格：%2 个三角形，显示体积 %3 mm³，"
+        publication.status = QCoreApplication::translate("OpenAutoPath", "工序 %1 过切网格：%2 个三角形，显示体积 %3 mm³，"
             "%4；后台生成 %5 ms。")
             .arg(QString::fromStdString(result.key.variant))
             .arg(result.metrics.triangleCount)
             .arg(result.metrics.intervalVolume, 0, 'f', 3)
-            .arg(publication.cached ? QStringLiteral("已缓存")
-                                    : QStringLiteral("超过预算，未缓存"))
+            .arg(publication.cached ? QCoreApplication::translate("OpenAutoPath", "已缓存")
+                                    : QCoreApplication::translate("OpenAutoPath", "超过预算，未缓存"))
             .arg(result.metrics.milliseconds, 0, 'f', 1);
     } else {
-        publication.status = QStringLiteral(
-            "Z-map 差异网格：%1 个三角形，显示体积 %2 mm³，"
+        publication.status = QCoreApplication::translate("OpenAutoPath", "Z-map 差异网格：%1 个三角形，显示体积 %2 mm³，"
             "轴向误差 ≤%3 mm，平面步长 ×%4（误差上界 ≤%5 mm），"
             "%6；后台生成 %7 ms。")
             .arg(result.metrics.triangleCount)
@@ -272,8 +266,8 @@ StockSimulationCoordinator::evaluateDisplayResult(
             .arg(result.metrics.maximumAxialError, 0, 'f', 3)
             .arg(result.metrics.planarDecimationStride)
             .arg(result.metrics.planarErrorUpperBound, 0, 'f', 3)
-            .arg(publication.cached ? QStringLiteral("已缓存")
-                                    : QStringLiteral("超过预算，未缓存"))
+            .arg(publication.cached ? QCoreApplication::translate("OpenAutoPath", "已缓存")
+                                    : QCoreApplication::translate("OpenAutoPath", "超过预算，未缓存"))
             .arg(result.metrics.milliseconds, 0, 'f', 1);
     }
     return publication;
@@ -284,55 +278,54 @@ QString StockSimulationCoordinator::displayModeText(
 {
     switch (mode) {
         case IpwOcctDisplayMode::SurfaceWithEdges:
-            return QStringLiteral("带网格表面");
+            return QCoreApplication::translate("OpenAutoPath", "带网格表面");
         case IpwOcctDisplayMode::SurfaceShaded:
-            return QStringLiteral("无边线着色表面");
+            return QCoreApplication::translate("OpenAutoPath", "无边线着色表面");
         case IpwOcctDisplayMode::SurfaceWireframe:
-            return QStringLiteral("纯三角线框");
+            return QCoreApplication::translate("OpenAutoPath", "纯三角线框");
         case IpwOcctDisplayMode::DexelColumns:
-            return QStringLiteral("Dexel 材料柱");
+            return QCoreApplication::translate("OpenAutoPath", "Dexel 材料柱");
         case IpwOcctDisplayMode::IntervalEndpoints:
-            return QStringLiteral("区间端点点云");
+            return QCoreApplication::translate("OpenAutoPath", "区间端点点云");
         case IpwOcctDisplayMode::IntervalPrisms:
-            return QStringLiteral("材料体素柱");
+            return QCoreApplication::translate("OpenAutoPath", "材料体素柱");
         case IpwOcctDisplayMode::MidSection:
-            return QStringLiteral("W 向中剖面");
+            return QCoreApplication::translate("OpenAutoPath", "W 向中剖面");
         case IpwOcctDisplayMode::BRepSnapshot:
-            return QStringLiteral("BRep 实体");
+            return QCoreApplication::translate("OpenAutoPath", "BRep 实体");
         case IpwOcctDisplayMode::Off:
-            return QStringLiteral("关闭");
+            return QCoreApplication::translate("OpenAutoPath", "关闭");
     }
-    return QStringLiteral("未知形式");
+    return QCoreApplication::translate("OpenAutoPath", "未知形式");
 }
 
 QString StockSimulationCoordinator::displayRequestStatus(
     const IpwDisplayMeshRequest& request)
 {
-    QString artifactName = QStringLiteral("IPW 派生");
+    QString artifactName = QCoreApplication::translate("OpenAutoPath", "IPW 派生");
     switch (request.key.kind) {
         case IpwDisplayArtifactKind::StockCheckpoint:
-            artifactName = QStringLiteral("IPW 检查点");
+            artifactName = QCoreApplication::translate("OpenAutoPath", "IPW 检查点");
             break;
         case IpwDisplayArtifactKind::InitialMissing:
-            artifactName = QStringLiteral("初始缺料");
+            artifactName = QCoreApplication::translate("OpenAutoPath", "初始缺料");
             break;
         case IpwDisplayArtifactKind::RemainingAllowance:
-            artifactName = QStringLiteral("剩余余量");
+            artifactName = QCoreApplication::translate("OpenAutoPath", "剩余余量");
             break;
         case IpwDisplayArtifactKind::FeatureAllowance:
-            artifactName = QStringLiteral("特征加工后余量");
+            artifactName = QCoreApplication::translate("OpenAutoPath", "特征加工后余量");
             break;
         case IpwDisplayArtifactKind::Overcut:
-            artifactName = QStringLiteral("过切");
+            artifactName = QCoreApplication::translate("OpenAutoPath", "过切");
             break;
         case IpwDisplayArtifactKind::OperationOvercut:
-            artifactName = QStringLiteral("逐工序过切");
+            artifactName = QCoreApplication::translate("OpenAutoPath", "逐工序过切");
             break;
     }
     if (request.transientSource)
-        artifactName = QStringLiteral("IPW 逐移动临时帧");
-    return QStringLiteral(
-        "正在后台生成%1的%2；可继续操作，切换视图会取消本次请求…")
+        artifactName = QCoreApplication::translate("OpenAutoPath", "IPW 逐移动临时帧");
+    return QCoreApplication::translate("OpenAutoPath", "正在后台生成%1的%2；可继续操作，切换视图会取消本次请求…")
         .arg(artifactName)
         .arg(displayModeText(request.displayMode));
 }

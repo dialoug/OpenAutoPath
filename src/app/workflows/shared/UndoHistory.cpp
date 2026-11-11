@@ -1,6 +1,7 @@
 // UndoHistory 实现（oap_app_workflow_base）。
 // 主窗口会话撤销历史：按时间统一保存可见性和加工 Job 操作，见 UndoHistory.h。
 #include "app/workflows/shared/UndoHistory.h"
+#include <QCoreApplication>
 
 #include <utility>
 
@@ -12,7 +13,7 @@ void CommandHistory::pushVisibility(
     UndoRecord record;
     record.kind = UndoRecord::Kind::Visibility;
     record.hiddenFaces = std::move(hiddenFaces);
-    record.description = QStringLiteral("可见性更改");
+    record.description = QCoreApplication::translate("OpenAutoPath", "可见性更改");
     push(std::move(record));
 }
 

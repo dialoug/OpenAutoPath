@@ -1,6 +1,7 @@
 // HoleStockGeometryBuilder 实现（oap_app_workflow_cam）。
 // 孔仿真毛坯/目标体的无状态构建器，见 HoleStockGeometryBuilder.h。
 #include "app/workflows/hole/HoleStockGeometryBuilder.h"
+#include <QCoreApplication>
 
 #include "toolpath/core/simulation/StockBoxBuilder.h"
 
@@ -26,11 +27,11 @@ HoleStockGeometryBuilder::buildInitialStock(
     if (!std::isfinite(marginX) || !std::isfinite(marginY) ||
         !std::isfinite(marginZ) || marginX < 0.0 || marginY < 0.0 ||
         marginZ < 0.0) {
-        result.error = "毛坯余量必须是有限的非负数。";
+        result.error = QCoreApplication::translate("OpenAutoPath", "毛坯余量必须是有限的非负数。").toStdString();
         return result;
     }
     if (units.empty()) {
-        result.error = "当前模型没有可用于构造毛坯的单元。";
+        result.error = QCoreApplication::translate("OpenAutoPath", "当前模型没有可用于构造毛坯的单元。").toStdString();
         return result;
     }
 
@@ -55,7 +56,7 @@ HoleStockGeometryBuilder::buildInitialStock(
             modelBounds, fallbackShape, marginX, marginY, marginZ);
         if (!built.ok()) {
             result.error =
-                "无法从当前模型总包围盒构造有效实体毛坯：" +
+                QCoreApplication::translate("OpenAutoPath", "无法从当前模型总包围盒构造有效实体毛坯：").toStdString() +
                 built.message + "。";
             return result;
         }
@@ -99,8 +100,8 @@ HoleStockGeometryBuilder::buildInitialStock(
     }
     if (result.solidCount == 0) {
         std::ostringstream message;
-        message << "当前模型的 " << units.size()
-                << " 个单元均无法构造实体毛坯。";
+        message << QCoreApplication::translate("OpenAutoPath", "当前模型的 ").toStdString() << units.size()
+                << QCoreApplication::translate("OpenAutoPath", " 个单元均无法构造实体毛坯。").toStdString();
         if (!failures.empty()) {
             message << ' ';
             for (std::size_t index = 0; index < failures.size(); ++index) {
@@ -142,7 +143,7 @@ HoleStockGeometryBuilder::buildTargetShape(
         append(fallbackSolids);
     if (result.solidCount == 0) {
         result.error =
-            "无法找到孔操作所属的封闭目标实体，不能执行毛坯差异检查。";
+            QCoreApplication::translate("OpenAutoPath", "无法找到孔操作所属的封闭目标实体，不能执行毛坯差异检查。").toStdString();
         return result;
     }
     result.shape = solids;

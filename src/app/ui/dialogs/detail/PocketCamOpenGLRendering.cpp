@@ -1,4 +1,5 @@
 #include "app/ui/dialogs/detail/PocketCamOpenGLWidget.h"
+#include <QCoreApplication>
 
 #include <algorithm>
 #include <array>
@@ -15,8 +16,7 @@ void PocketCamOpenGLWidget::initializeGL()
 {
     if (!context() || !context()->isValid() ||
         !initializeOpenGLFunctions()) {
-        m_error = QStringLiteral(
-            "OpenGL 3.3 Core 上下文初始化失败");
+        m_error = QCoreApplication::translate("OpenAutoPath", "OpenGL 3.3 Core 上下文初始化失败");
         m_gpuReady = false;
         return;
     }
@@ -255,19 +255,18 @@ void PocketCamOpenGLWidget::initializeGL()
 
     if (!compileProgram(
             m_plainProgram, plainVertex, fragment,
-            QStringLiteral("普通网格")) ||
+            QCoreApplication::translate("OpenAutoPath", "普通网格")) ||
         !compileProgram(
             m_lineProgram, lineVertex, lineFragment,
-            QStringLiteral("刀路线")) ||
+            QCoreApplication::translate("OpenAutoPath", "刀路线")) ||
         !compileProgram(
             m_postProgram, postVertex, postFragment,
-            QStringLiteral("SSAO 后处理"))) {
+            QCoreApplication::translate("OpenAutoPath", "SSAO 后处理"))) {
         return;
     }
     if (!initializeGpuDexelPrograms()) {
         if (m_error.isEmpty()) {
-            m_error = QStringLiteral(
-                "GPU Multi-Dexel 初始化失败：需要 OpenGL 4.3、Compute Shader 和 SSBO 支持");
+            m_error = QCoreApplication::translate("OpenAutoPath", "GPU Multi-Dexel 初始化失败：需要 OpenGL 4.3、Compute Shader 和 SSBO 支持");
         }
         m_gpuReady = false;
         return;
@@ -293,8 +292,8 @@ void PocketCamOpenGLWidget::initializeGL()
     if (m_gpuReady &&
         (!m_initialGpuStock ||
          !uploadPlaybackStock(*m_initialGpuStock))) {
-        m_error = QStringLiteral("初始 IPW 材料无法上传到 GPU Multi-Dexel：%1")
-            .arg(m_error.isEmpty() ? QStringLiteral("缺少有效材料或网格超过上传预算") : m_error);
+        m_error = QCoreApplication::translate("OpenAutoPath", "初始 IPW 材料无法上传到 GPU Multi-Dexel：%1")
+            .arg(m_error.isEmpty() ? QCoreApplication::translate("OpenAutoPath", "缺少有效材料或网格超过上传预算") : m_error);
         m_gpuReady = false;
     }
 }
@@ -319,7 +318,7 @@ void PocketCamOpenGLWidget::paintGL()
             GL_DEPTH_BUFFER_BIT);
         return;
     }
-    beginOpenGlStage(QStringLiteral("OpenGL 帧"));
+    beginOpenGlStage(QCoreApplication::translate("OpenAutoPath", "OpenGL 帧"));
     if (!m_gpuDexelReady &&
         m_waitingForOperationBaseline) {
         glBindFramebuffer(
@@ -334,8 +333,7 @@ void PocketCamOpenGLWidget::paintGL()
     if (!m_gpuDexelReady && !m_usePlaybackMesh &&
         (!m_initialGpuStock ||
          !uploadPlaybackStock(*m_initialGpuStock))) {
-        m_error = QStringLiteral(
-            "回退播放时无法恢复 GPU Multi-Dexel 初始材料");
+        m_error = QCoreApplication::translate("OpenAutoPath", "回退播放时无法恢复 GPU Multi-Dexel 初始材料");
         glBindFramebuffer(
             GL_FRAMEBUFFER,
             defaultFramebufferObject());
@@ -375,7 +373,7 @@ void PocketCamOpenGLWidget::paintGL()
     glViewport(0, 0, pixelWidth, pixelHeight);
     clearSceneFramebuffer();
     if (!checkOpenGlStage(
-            QStringLiteral("OpenGL 帧缓冲设置与清屏"))) {
+            QCoreApplication::translate("OpenAutoPath", "OpenGL 帧缓冲设置与清屏"))) {
         return;
     }
     renderScene(viewProjection);
@@ -599,7 +597,7 @@ bool PocketCamOpenGLWidget::compileProgram(
         !program.addShaderFromSourceCode(
             QOpenGLShader::Fragment, fragment) ||
         !program.link()) {
-        m_error = QStringLiteral("%1着色器编译失败：%2")
+        m_error = QCoreApplication::translate("OpenAutoPath", "%1着色器编译失败：%2")
             .arg(label, program.log());
         return false;
     }

@@ -1,5 +1,6 @@
 // FeaturePanel 实现 — 参见 FeaturePanel.h。
 #include "FeaturePanel.h"
+#include <QCoreApplication>
 
 #include "StickyTreeWidget.h"
 
@@ -39,7 +40,7 @@ FeaturePanel::FeaturePanel(QWidget* parent) : QWidget(parent)
     layout->setContentsMargins(0, 0, 0, 0);
 
     m_tree = new StickyTreeWidget(this);
-    m_tree->setHeaderLabels({QStringLiteral("特征 / 面"), QStringLiteral("数量")});
+    m_tree->setHeaderLabels({QCoreApplication::translate("OpenAutoPath", "特征 / 面"), QCoreApplication::translate("OpenAutoPath", "数量")});
     m_tree->header()->setSectionResizeMode(0, QHeaderView::Stretch);
     m_tree->setColumnWidth(1, 60);
     m_tree->setSelectionMode(QAbstractItemView::ExtendedSelection); // Ctrl/Shift 多选
@@ -106,7 +107,7 @@ void FeaturePanel::appendRecognitionResult(
     auto holeGroup = [&]() -> QTreeWidgetItem* {
         if (!holesRoot) {
             holesRoot = new QTreeWidgetItem(parent);
-            holesRoot->setText(0, QStringLiteral("孔"));
+            holesRoot->setText(0, QCoreApplication::translate("OpenAutoPath", "孔"));
             holesRoot->setData(0, kRoleKind, QStringLiteral("group"));
         }
         return holesRoot;
@@ -122,7 +123,7 @@ void FeaturePanel::appendRecognitionResult(
             isHole ? holeGroup() : parent;
         // 类别节点:Count 列显示该类别的"结构实例数"。
         auto* cat = new QTreeWidgetItem(categoryParent);
-        cat->setText(0, QString::fromUtf8(kindLabel(k)));
+        cat->setText(0, QCoreApplication::translate("OpenAutoPath",kindLabel(k)));
         cat->setText(1, QString::number((int)it->second.size()));
         cat->setData(0, kRoleKind, QStringLiteral("group"));
         // 每个实例一个节点:命名 "<类别> <序号>",下挂其组成面;Count 列为面数。
@@ -143,12 +144,12 @@ void FeaturePanel::appendRecognitionResult(
             QString floorBadge;
             if (inst->manual && !inst->floorFaceId.empty() &&
                 (k == oap::FeatureKind::Slot || k == oap::FeatureKind::Pocket)) {
-                floorBadge = QStringLiteral(" · 底面 %1")
+                floorBadge = QCoreApplication::translate("OpenAutoPath", " · 底面 %1")
                                  .arg(QString::fromStdString(inst->floorFaceId));
             }
             node->setText(0, QStringLiteral("%1%2 %3")
                                   .arg(prefix)
-                                  .arg(QString::fromUtf8(kindLabel(k)))
+                                  .arg(QCoreApplication::translate("OpenAutoPath",kindLabel(k)))
                                   .arg(idx++) + floorBadge + strategyBadge);
             node->setText(1, QString::number((int)inst->faceIds.size()));
             node->setData(0, kRoleKind, QStringLiteral("group"));
@@ -189,8 +190,8 @@ void FeaturePanel::appendWireTraceFeatureSubsets(
     };
     const auto featureLabel = [](oap::AxisWireTraceFeatureKind kind) {
         return kind == oap::AxisWireTraceFeatureKind::BlindSlot
-                   ? QStringLiteral("盲槽")
-                   : QStringLiteral("盲腔");
+                   ? QCoreApplication::translate("OpenAutoPath", "盲槽")
+                   : QCoreApplication::translate("OpenAutoPath", "盲腔");
     };
     struct RootGroup {
         std::string axisLabel;
@@ -214,7 +215,7 @@ void FeaturePanel::appendWireTraceFeatureSubsets(
     for (const RootGroup& group : rootGroups) {
         auto* root = new QTreeWidgetItem(parent);
         root->setText(
-            0, QStringLiteral("%1向根面 %2")
+            0, QCoreApplication::translate("OpenAutoPath", "%1向根面 %2")
                    .arg(QString::fromStdString(group.axisLabel),
                         QString::fromStdString(group.rootFaceId)));
         root->setText(1, QString::number(static_cast<int>(group.subsets.size())));
@@ -232,18 +233,17 @@ void FeaturePanel::appendWireTraceFeatureSubsets(
                 subset->mergedSourceCount > 1) {
                 ++mergedPocketOrdinal;
                 node->setText(
-                    0, QStringLiteral(
-                           "连通盲腔 %1 · 合并 %2 个原始子集")
+                    0, QCoreApplication::translate("OpenAutoPath", "连通盲腔 %1 · 合并 %2 个原始子集")
                            .arg(mergedPocketOrdinal)
                            .arg(static_cast<qulonglong>(
                                subset->mergedSourceCount)));
             } else {
                 ++ordinal;
                 node->setText(
-                    0, QStringLiteral("%1环特征子集 %2 · %3")
+                    0, QCoreApplication::translate("OpenAutoPath", "%1环特征子集 %2 · %3")
                            .arg(subset->fromInnerWire
-                                    ? QStringLiteral("内")
-                                    : QStringLiteral("外"))
+                                    ? QCoreApplication::translate("OpenAutoPath", "内")
+                                    : QCoreApplication::translate("OpenAutoPath", "外"))
                            .arg(ordinal)
                            .arg(featureLabel(subset->featureKind)));
             }
@@ -273,7 +273,7 @@ void FeaturePanel::setInnerOuterStructureResult(
 
     if (!throughStructureFaceIds.empty()) {
         auto* throughRoot = new QTreeWidgetItem(m_tree);
-        throughRoot->setText(0, QStringLiteral("通结构"));
+        throughRoot->setText(0, QCoreApplication::translate("OpenAutoPath", "通结构"));
         throughRoot->setText(
             1, QString::number(
                    static_cast<int>(
@@ -301,7 +301,7 @@ void FeaturePanel::setInnerOuterStructureResult(
     if (!wireTraceSubsets.empty()) {
         auto* wireRoot = new QTreeWidgetItem(m_tree);
         wireRoot->setText(
-            0, QStringLiteral("内外环结构"));
+            0, QCoreApplication::translate("OpenAutoPath", "内外环结构"));
         wireRoot->setText(
             1, QString::number(
                    static_cast<int>(

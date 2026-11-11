@@ -1,5 +1,6 @@
 // MainWindow 毛坯与 IPW 仿真命令编排。
 #include "MainWindow.h"
+#include <QCoreApplication>
 #include "app/ui/panels/CamWorkflowPanel.h"
 
 #include "app/presentation/IpwVisualAcceptanceCapture.h"
@@ -70,11 +71,11 @@ bool MainWindow::buildHoleInitialStock(double marginX, double marginY,
     for (const std::string& warning : built.warnings) {
         qWarning().noquote()
             << "[OpenAutoPath]"
-            << QString::fromStdString(warning);
+            << QCoreApplication::translate("OpenAutoPathDiagnostic", QString::fromStdString(warning).toUtf8().constData());
     }
     stock = built.shape;
     stockBlockCount = built.solidCount;
-    error = QString::fromStdString(built.error);
+    error = QCoreApplication::translate("OpenAutoPathDiagnostic", QString::fromStdString(built.error).toUtf8().constData());
     return built.ok();
 }
 
@@ -111,7 +112,7 @@ bool MainWindow::buildHoleTargetShape(TopoDS_Shape& target,
             selectedSolids, fallbackSolids);
     target = built.shape;
     targetSolidCount = built.solidCount;
-    error = QString::fromStdString(built.error);
+    error = QCoreApplication::translate("OpenAutoPathDiagnostic", QString::fromStdString(built.error).toUtf8().constData());
     return built.ok();
 }
 
@@ -154,8 +155,8 @@ void MainWindow::simulateHoleStock()
     if (!ensureHoleProgram() ||
         !m_machiningWorkspace->hasHolePreviewParams()) {
         QMessageBox::information(
-            this, QStringLiteral("孔毛胚仿真"),
-            QStringLiteral("未能生成可仿真的有效孔加工程序。"));
+            this, QCoreApplication::translate("OpenAutoPath", "孔毛胚仿真"),
+            QCoreApplication::translate("OpenAutoPath", "未能生成可仿真的有效孔加工程序。"));
         return;
     }
 
@@ -239,12 +240,12 @@ void MainWindow::simulateHoleStock()
 
 void MainWindow::showHoleOpenGlSimulator()
 {
-    const QString title = QStringLiteral("孔 OpenGL 仿真");
+    const QString title = QCoreApplication::translate("OpenAutoPath", "孔 OpenGL 仿真");
     const oap::toolpath::HoleToolpathBatch* holeResult =
         m_machiningWorkspace->holeProgram();
     if (!holeResult || holeResult->machining.operations.empty()) {
         QMessageBox::information(
-            this, title, QStringLiteral("当前没有可播放的孔加工程序。"));
+            this, title, QCoreApplication::translate("OpenAutoPath", "当前没有可播放的孔加工程序。"));
         return;
     }
 
@@ -255,7 +256,7 @@ void MainWindow::showHoleOpenGlSimulator()
     }
     if (setupFaces.empty()) {
         QMessageBox::information(
-            this, title, QStringLiteral("孔程序没有有效的装夹面。"));
+            this, title, QCoreApplication::translate("OpenAutoPath", "孔程序没有有效的装夹面。"));
         return;
     }
 
@@ -274,7 +275,7 @@ void MainWindow::showHoleOpenGlSimulator()
     if (setupLabels.size() > 1) {
         bool accepted = false;
         const QString selected = QInputDialog::getItem(
-            this, title, QStringLiteral("选择要模拟的固定轴装夹面"),
+            this, title, QCoreApplication::translate("OpenAutoPath", "选择要模拟的固定轴装夹面"),
             setupLabels, 0, false, &accepted);
         if (!accepted)
             return;
@@ -306,19 +307,19 @@ void MainWindow::showHoleOpenGlSimulator()
             makeWorkflowInteraction().showProgress,
             std::move(request));
     if (prepared.cancelled) {
-        statusBar()->showMessage(QStringLiteral("孔 OpenGL 仿真已取消"));
+        statusBar()->showMessage(QCoreApplication::translate("OpenAutoPath", "孔 OpenGL 仿真已取消"));
         return;
     }
     if (!prepared.ok()) {
         error = prepared.error.empty()
-            ? QStringLiteral("无法构建孔 OpenGL 仿真输入。")
-            : QString::fromStdString(prepared.error);
+            ? QCoreApplication::translate("OpenAutoPath", "无法构建孔 OpenGL 仿真输入。")
+            : QCoreApplication::translate("OpenAutoPathDiagnostic", QString::fromStdString(prepared.error).toUtf8().constData());
         QMessageBox::warning(this, title, error);
         return;
     }
     if (!prepared.warning.empty()) {
         statusBar()->showMessage(
-            QString::fromStdString(prepared.warning));
+            QCoreApplication::translate("OpenAutoPathDiagnostic", QString::fromStdString(prepared.warning).toUtf8().constData()));
     }
 
     prepared.input.interaction.rotationMode =
@@ -333,18 +334,17 @@ void MainWindow::showHoleOpenGlSimulator()
         m_view->mouseButton(OcctView::MouseAction::Pan);
 
     statusBar()->showMessage(
-        QStringLiteral(
-            "正在启动孔 OpenGL 仿真：%1 道工序，网格 %2 mm，%3 个目标实体")
+        QCoreApplication::translate("OpenAutoPath", "正在启动孔 OpenGL 仿真：%1 道工序，网格 %2 mm，%3 个目标实体")
             .arg(prepared.input.operations.size())
             .arg(prepared.gridResolution, 0, 'f', 3)
             .arg(targetSolidCount));
     if (!oap::app::showPocketCamSimulatorDialog(
             this, std::move(prepared.input), &error)) {
         QMessageBox::warning(this, title, error);
-        statusBar()->showMessage(QStringLiteral("孔 OpenGL 仿真启动失败"));
+        statusBar()->showMessage(QCoreApplication::translate("OpenAutoPath", "孔 OpenGL 仿真启动失败"));
         return;
     }
-    statusBar()->showMessage(QStringLiteral("孔 OpenGL 仿真已关闭"));
+    statusBar()->showMessage(QCoreApplication::translate("OpenAutoPath", "孔 OpenGL 仿真已关闭"));
 }
 
 void MainWindow::simulatePocketStock()
@@ -357,9 +357,8 @@ void MainWindow::simulatePocketStock()
     if (model().faces.empty() ||
         !m_recognitionWorkspace->hasResult()) {
         QMessageBox::information(
-            this, QStringLiteral("腔毛胚仿真"),
-            QStringLiteral(
-                "请先打开 STEP 文件并执行内外环结构识别。"));
+            this, QCoreApplication::translate("OpenAutoPath", "腔毛胚仿真"),
+            QCoreApplication::translate("OpenAutoPath", "请先打开 STEP 文件并执行内外环结构识别。"));
         return;
     }
     if (!m_machiningWorkspace->hasPocketPreviewParams() ||
@@ -372,9 +371,8 @@ void MainWindow::simulatePocketStock()
     if (!m_machiningWorkspace->hasPocketPreviewParams() ||
         !m_machiningWorkspace->currentPocketResult()) {
         QMessageBox::information(
-            this, QStringLiteral("腔毛胚仿真"),
-            QStringLiteral(
-                "请先执行“显示腔清腔”，生成并验证当前腔刀路。"));
+            this, QCoreApplication::translate("OpenAutoPath", "腔毛胚仿真"),
+            QCoreApplication::translate("OpenAutoPath", "请先执行“显示腔清腔”，生成并验证当前腔刀路。"));
         return;
     }
 
@@ -394,7 +392,7 @@ void MainWindow::simulatePocketStock()
     if (!buildHoleTargetShape(
             targetShape, targetSolidCount, error)) {
         QMessageBox::warning(
-            this, QStringLiteral("腔毛胚仿真"), error);
+            this, QCoreApplication::translate("OpenAutoPath", "腔毛胚仿真"), error);
         return;
     }
 
@@ -408,16 +406,15 @@ void MainWindow::simulatePocketStock()
             settings.source.sourceMode == 0,
             generatedInitialStock, stockBlockCount, error)) {
         QMessageBox::warning(
-            this, QStringLiteral("腔毛胚仿真"), error);
+            this, QCoreApplication::translate("OpenAutoPath", "腔毛胚仿真"), error);
         return;
     }
 
     QString jobCaptureError;
     if (!synchronizePocketJobFromResult(jobCaptureError)) {
         QMessageBox::warning(
-            this, QStringLiteral("统一 IPW 腔加工仿真"),
-            QStringLiteral(
-                "当前腔刀路无法捕获到加工项目：\n%1")
+            this, QCoreApplication::translate("OpenAutoPath", "统一 IPW 腔加工仿真"),
+            QCoreApplication::translate("OpenAutoPath", "当前腔刀路无法捕获到加工项目：\n%1")
                 .arg(jobCaptureError));
         return;
     }
@@ -453,7 +450,7 @@ void MainWindow::simulatePocketStock()
     }
     if (!simulated.ok()) {
         QMessageBox::warning(
-            this, QStringLiteral("统一 IPW 腔加工仿真"),
+            this, QCoreApplication::translate("OpenAutoPath", "统一 IPW 腔加工仿真"),
             simulated.error);
         statusBar()->showMessage(simulated.error);
         return;
@@ -461,7 +458,7 @@ void MainWindow::simulatePocketStock()
     if (!simulated.warning.isEmpty()) {
         QMessageBox::warning(
             this,
-            QStringLiteral("统一 IPW 派生审计未完成"),
+            QCoreApplication::translate("OpenAutoPath", "统一 IPW 派生审计未完成"),
             simulated.warning);
     }
 
@@ -472,8 +469,7 @@ void MainWindow::simulatePocketStock()
     if (ipwOcctDisplayEnabled) {
         if (!showPocketIpwTimeline()) {
             statusBar()->showMessage(
-                QStringLiteral(
-                    "已保留统一 IPW 最终检查点；%1")
+                QCoreApplication::translate("OpenAutoPath", "已保留统一 IPW 最终检查点；%1")
                     .arg(ipwSummary));
             return;
         }
@@ -482,12 +478,10 @@ void MainWindow::simulatePocketStock()
         statusBar()->showMessage(
             m_stockSimulationWorkspace->displayMode() ==
                     oap::app::IpwOcctDisplayMode::Off
-            ? QStringLiteral(
-                  "Multi-Dexel 主视口显示已关闭；"
+            ? QCoreApplication::translate("OpenAutoPath", "Multi-Dexel 主视口显示已关闭；"
                   "仅保留材料检查点和审计结果。%1")
                   .arg(ipwSummary)
-            : QStringLiteral(
-                  "当前表面形式需要三角化；"
+            : QCoreApplication::translate("OpenAutoPath", "当前表面形式需要三角化；"
                   "仅保留材料检查点和审计结果。%1")
                   .arg(ipwSummary));
     }
@@ -528,35 +522,33 @@ void MainWindow::simulatePocketStock()
             statusBar()->showMessage(captured.warnings.back());
     }
     statusBar()->showMessage(
-        QStringLiteral(
-            "正在启动 FreeCAD CAM OpenGL 仿真：%1 道工序，"
+        QCoreApplication::translate("OpenAutoPath", "正在启动 FreeCAD CAM OpenGL 仿真：%1 道工序，"
             "%2 个目标实体")
             .arg(input.operations.size())
             .arg(targetSolidCount));
     if (!oap::app::showPocketCamSimulatorDialog(
             this, std::move(input), &error)) {
         QMessageBox::warning(
-            this, QStringLiteral("腔毛胚仿真"), error);
+            this, QCoreApplication::translate("OpenAutoPath", "腔毛胚仿真"), error);
         statusBar()->showMessage(
-            QStringLiteral("FreeCAD CAM 仿真启动失败"));
+            QCoreApplication::translate("OpenAutoPath", "FreeCAD CAM 仿真启动失败"));
         return;
     }
     statusBar()->showMessage(
-        QStringLiteral(
-            "FreeCAD CAM 交互预览已关闭；%1")
+        QCoreApplication::translate("OpenAutoPath", "FreeCAD CAM 交互预览已关闭；%1")
             .arg(ipwSummary));
 }
 
 void MainWindow::simulateProfileStock()
 {
-    const QString title = QStringLiteral("外轮廓 IPW 仿真");
+    const QString title = QCoreApplication::translate("OpenAutoPath", "外轮廓 IPW 仿真");
     if (m_uiBusy)
         return;
     if (model().faces.empty() ||
         !m_recognitionWorkspace->hasResult()) {
         QMessageBox::information(
             this, title,
-            QStringLiteral("请先打开 STEP 文件并执行 CAM 特征识别。"));
+            QCoreApplication::translate("OpenAutoPath", "请先打开 STEP 文件并执行 CAM 特征识别。"));
         return;
     }
     if (!m_machiningWorkspace->profilePreviewMatchesCurrentParameters() ||
@@ -567,8 +559,7 @@ void MainWindow::simulateProfileStock()
         !m_machiningWorkspace->hasProfilePreview()) {
         QMessageBox::information(
             this, title,
-            QStringLiteral(
-                "请先执行“生成 / 更新外轮廓刀路”，生成并通过安全校验。"));
+            QCoreApplication::translate("OpenAutoPath", "请先执行“生成 / 更新外轮廓刀路”，生成并通过安全校验。"));
         return;
     }
 
@@ -577,7 +568,7 @@ void MainWindow::simulateProfileStock()
             m_machiningWorkspace->profilePreviewOperations(),
             QFileInfo(currentPath()).absolutePath());
     const auto edited = oap::app::editPocketStockSimulationSettings(
-        this, initial, QStringLiteral("外轮廓"), false);
+        this, initial, QCoreApplication::translate("OpenAutoPath", "外轮廓"), false);
     if (!edited)
         return;
     const oap::app::PocketStockSimulationDialogState settings = *edited;
@@ -614,8 +605,7 @@ void MainWindow::simulateProfileStock()
             capture, &captureError)) {
         QMessageBox::warning(
             this, title,
-            QStringLiteral(
-                "当前外轮廓刀路无法捕获到加工项目：\n%1")
+            QCoreApplication::translate("OpenAutoPath", "当前外轮廓刀路无法捕获到加工项目：\n%1")
                 .arg(captureError));
         return;
     }
@@ -656,7 +646,7 @@ void MainWindow::simulateProfileStock()
     }
     if (!simulated.warning.isEmpty()) {
         QMessageBox::warning(
-            this, QStringLiteral("外轮廓 IPW 派生审计未完成"),
+            this, QCoreApplication::translate("OpenAutoPath", "外轮廓 IPW 派生审计未完成"),
             simulated.warning);
     }
 
@@ -667,8 +657,7 @@ void MainWindow::simulateProfileStock()
         // 时间线关闭后自动回到最终材料检查点。
         if (!showPocketIpwTimeline()) {
             statusBar()->showMessage(
-                QStringLiteral(
-                    "已保留外轮廓 IPW 最终检查点；%1")
+                QCoreApplication::translate("OpenAutoPath", "已保留外轮廓 IPW 最终检查点；%1")
                     .arg(summary));
             return;
         }
@@ -713,19 +702,18 @@ void MainWindow::simulateProfileStock()
             statusBar()->showMessage(captured.warnings.back());
     }
     statusBar()->showMessage(
-        QStringLiteral(
-            "正在启动外轮廓 IPW 交互仿真：%1 道工序，%2 个目标实体")
+        QCoreApplication::translate("OpenAutoPath", "正在启动外轮廓 IPW 交互仿真：%1 道工序，%2 个目标实体")
             .arg(input.operations.size())
             .arg(targetSolidCount));
     if (!oap::app::showPocketCamSimulatorDialog(
             this, std::move(input), &error)) {
         QMessageBox::warning(this, title, error);
         statusBar()->showMessage(
-            QStringLiteral("外轮廓 IPW 交互仿真启动失败"));
+            QCoreApplication::translate("OpenAutoPath", "外轮廓 IPW 交互仿真启动失败"));
         return;
     }
     statusBar()->showMessage(
-        QStringLiteral("外轮廓 IPW 交互预览已关闭；%1")
+        QCoreApplication::translate("OpenAutoPath", "外轮廓 IPW 交互预览已关闭；%1")
             .arg(summary));
 }
 

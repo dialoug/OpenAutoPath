@@ -1,5 +1,6 @@
 // ShortcutSettingsDialog 实现 — 参见 ShortcutSettingsDialog.h。
 #include "app/ui/dialogs/ShortcutSettingsDialog.h"
+#include <QCoreApplication>
 
 #include <QAbstractItemView>
 #include <QComboBox>
@@ -16,24 +17,24 @@ namespace {
 QString mouseButtonText(Qt::MouseButton button)
 {
     switch (button) {
-        case Qt::LeftButton: return QStringLiteral("左键");
-        case Qt::RightButton: return QStringLiteral("右键");
-        case Qt::MiddleButton: return QStringLiteral("中键");
-        case Qt::BackButton: return QStringLiteral("侧键1");
-        case Qt::ForwardButton: return QStringLiteral("侧键2");
-        default: return QStringLiteral("无");
+        case Qt::LeftButton: return QCoreApplication::translate("OpenAutoPath", "左键");
+        case Qt::RightButton: return QCoreApplication::translate("OpenAutoPath", "右键");
+        case Qt::MiddleButton: return QCoreApplication::translate("OpenAutoPath", "中键");
+        case Qt::BackButton: return QCoreApplication::translate("OpenAutoPath", "侧键1");
+        case Qt::ForwardButton: return QCoreApplication::translate("OpenAutoPath", "侧键2");
+        default: return QCoreApplication::translate("OpenAutoPath", "无");
     }
 }
 
 void fillMouseCombo(QComboBox* combo, Qt::MouseButton current)
 {
     for (const auto& item : std::initializer_list<std::pair<QString, Qt::MouseButton>>{
-             {QStringLiteral("无"), Qt::NoButton},
-             {QStringLiteral("左键"), Qt::LeftButton},
-             {QStringLiteral("右键"), Qt::RightButton},
-             {QStringLiteral("中键"), Qt::MiddleButton},
-             {QStringLiteral("侧键1"), Qt::BackButton},
-             {QStringLiteral("侧键2"), Qt::ForwardButton}})
+             {QCoreApplication::translate("OpenAutoPath", "无"), Qt::NoButton},
+             {QCoreApplication::translate("OpenAutoPath", "左键"), Qt::LeftButton},
+             {QCoreApplication::translate("OpenAutoPath", "右键"), Qt::RightButton},
+             {QCoreApplication::translate("OpenAutoPath", "中键"), Qt::MiddleButton},
+             {QCoreApplication::translate("OpenAutoPath", "侧键1"), Qt::BackButton},
+             {QCoreApplication::translate("OpenAutoPath", "侧键2"), Qt::ForwardButton}})
         combo->addItem(item.first, int(item.second));
     const int index = combo->findData(int(current));
     if (index >= 0) combo->setCurrentIndex(index);
@@ -43,12 +44,12 @@ void fillMouseCombo(QComboBox* combo, Qt::MouseButton current)
 ShortcutSettingsDialog::ShortcutSettingsDialog(const std::vector<Row>& rows, QWidget* parent)
     : QDialog(parent), m_rows(rows)
 {
-    setWindowTitle(QStringLiteral("修改按键"));
+    setWindowTitle(QCoreApplication::translate("OpenAutoPath", "修改按键"));
     resize(620, 420);
     auto* layout = new QVBoxLayout(this);
     auto* table = new QTableWidget(int(m_rows.size()), 3, this);
     table->setHorizontalHeaderLabels(
-        {QStringLiteral("操作"), QStringLiteral("当前按键"), QStringLiteral("修改按键")});
+        {QCoreApplication::translate("OpenAutoPath", "操作"), QCoreApplication::translate("OpenAutoPath", "当前按键"), QCoreApplication::translate("OpenAutoPath", "修改按键")});
     table->verticalHeader()->setVisible(false);
     table->setSelectionMode(QAbstractItemView::NoSelection);
     table->setEditTriggers(QAbstractItemView::NoEditTriggers);
@@ -77,13 +78,13 @@ ShortcutSettingsDialog::ShortcutSettingsDialog(const std::vector<Row>& rows, QWi
     }
     layout->addWidget(table);
     auto* hint = new QLabel(
-        QStringLiteral("同一鼠标键最多绑定一个单击动作和一个拖动动作，例如左键可同时用于拾取和框选。"),
+        QCoreApplication::translate("OpenAutoPath", "同一鼠标键最多绑定一个单击动作和一个拖动动作，例如左键可同时用于拾取和框选。"),
         this);
     hint->setWordWrap(true);
     layout->addWidget(hint);
 
     auto* row = new QHBoxLayout;
-    auto* reset = new QPushButton(QStringLiteral("全部恢复默认"), this);
+    auto* reset = new QPushButton(QCoreApplication::translate("OpenAutoPath", "全部恢复默认"), this);
     connect(reset, &QPushButton::clicked, this, [this] {
         for (size_t i = 0; i < m_rows.size(); ++i) {
             if (m_rows[i].kind == RowKind::MouseButton) {

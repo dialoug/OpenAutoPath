@@ -14,6 +14,8 @@ are built and tested on Linux and macOS, but desktop release packages are not ye
 [CI and release runs](https://github.com/dialoug/OpenAutoPath/actions) ·
 [Report an issue](https://github.com/dialoug/OpenAutoPath/issues)
 
+Interface languages: Simplified Chinese (default) and English. In the default Chinese interface, select **视图 → 语言 → 英语**, then restart the application. In English, the menu is **View → Language**. The preference is saved locally; translations are embedded in the executable.
+
 ## Features
 
 | Feature | Current capabilities |

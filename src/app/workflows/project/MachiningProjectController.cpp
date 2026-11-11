@@ -1,6 +1,7 @@
 // MachiningProjectController 实现（oap_app_workflow_cam）。
 // 不依赖 MainWindow 状态的 .oapjob 初始化、捕获与加载，见 MachiningProjectController.h。
 #include "MachiningProjectController.h"
+#include <QCoreApplication>
 
 #include <algorithm>
 #include <utility>
@@ -42,7 +43,7 @@ QString validationMessage(
     const toolpath::ToolpathValidationReport& report,
     int maximumIssues = 5)
 {
-    QString message = QString::fromStdString(report.summary());
+    QString message = QCoreApplication::translate("OpenAutoPathDiagnostic", QString::fromStdString(report.summary()).toUtf8().constData());
     const int issueCount = static_cast<int>(report.issues.size());
     const int displayedCount = std::min(maximumIssues, issueCount);
     int appended = 0;
@@ -68,14 +69,14 @@ QString validationMessage(
                         .arg(issue.moveIndex);
                 }
                 message += QStringLiteral(": ") +
-                    QString::fromStdString(issue.message);
+                    QCoreApplication::translate("OpenAutoPathDiagnostic", QString::fromStdString(issue.message).toUtf8().constData());
                 ++appended;
             }
         };
     appendSeverity(toolpath::ToolpathIssueSeverity::Error);
     appendSeverity(toolpath::ToolpathIssueSeverity::Warning);
     if (issueCount > appended) {
-        message += QStringLiteral("\n... %1 more issue(s)")
+        message += QCoreApplication::translate("OpenAutoPath", "\n……另有 %1 个问题")
             .arg(issueCount - appended);
     }
     return message;
@@ -99,7 +100,7 @@ bool MachiningProjectController::ensureDefinition(
     if (error)
         error->clear();
     if (context.sourcePath.isEmpty()) {
-        assignError(error, QStringLiteral("当前零件路径为空。"));
+        assignError(error, QCoreApplication::translate("OpenAutoPath", "当前零件路径为空。"));
         return false;
     }
     QString fingerprintError;
@@ -165,7 +166,7 @@ bool MachiningProjectController::capturePocketOperations(
         error->clear();
     if (!request.operations || request.operations->empty() ||
         !request.effectiveParams || !request.setupFrames) {
-        assignError(error, QStringLiteral("当前没有可捕获的槽腔预览。"));
+        assignError(error, QCoreApplication::translate("OpenAutoPath", "当前没有可捕获的槽腔预览。"));
         return false;
     }
     auto candidate = job;
@@ -229,7 +230,7 @@ bool MachiningProjectController::capturePocketOperations(
     std::string captureError;
     if (!manufacturing::PocketMachiningJobService().capture(
             candidate, capture, &captureError)) {
-        assignError(error, QString::fromStdString(captureError));
+        assignError(error, QCoreApplication::translate("OpenAutoPathDiagnostic", QString::fromStdString(captureError).toUtf8().constData()));
         return false;
     }
     job = std::move(candidate);
@@ -245,7 +246,7 @@ bool MachiningProjectController::captureProfilePreview(
     if (!request.operations || request.operations->empty() ||
         !request.effectiveParams ||
         !request.setupFrames) {
-        assignError(error, QStringLiteral("当前没有可捕获的外轮廓预览。"));
+        assignError(error, QCoreApplication::translate("OpenAutoPath", "当前没有可捕获的外轮廓预览。"));
         return false;
     }
     if (!ensureDefinition(job, request.definition, error))
@@ -280,7 +281,7 @@ bool MachiningProjectController::captureProfilePreview(
             }
             assignError(
                 error,
-                QStringLiteral("外轮廓工序缺少可持久化的根 outer wire 来源。"));
+                QCoreApplication::translate("OpenAutoPath", "外轮廓工序缺少可持久化的根 outer wire 来源。"));
             return false;
         }
         manufacturing::ProfileTargetReference target;
@@ -304,7 +305,7 @@ bool MachiningProjectController::captureProfilePreview(
     std::string captureError;
     if (!manufacturing::ProfileMachiningJobService().capture(
             job, capture, &captureError)) {
-        assignError(error, QString::fromStdString(captureError));
+        assignError(error, QCoreApplication::translate("OpenAutoPathDiagnostic", QString::fromStdString(captureError).toUtf8().constData()));
         return false;
     }
     return true;
@@ -318,7 +319,7 @@ bool MachiningProjectController::synchronizeForSave(
     QString* error)
 {
     if (!request.setupFrames) {
-        assignError(error, QStringLiteral("装夹工作坐标为空。"));
+        assignError(error, QCoreApplication::translate("OpenAutoPath", "装夹工作坐标为空。"));
         return false;
     }
     if (!ensureDefinition(job, request.definition, error))
@@ -339,7 +340,7 @@ bool MachiningProjectController::synchronizeForSave(
     if (!manufacturing::MachiningJobApplicationService::synchronizeForSave(
             job, synchronization, &synchronizationError)) {
         assignError(
-            error, QString::fromStdString(synchronizationError));
+            error, QCoreApplication::translate("OpenAutoPathDiagnostic", QString::fromStdString(synchronizationError).toUtf8().constData()));
         return false;
     }
     return true;
@@ -362,7 +363,7 @@ MachiningProjectController::loadAndRegenerate(
         !request.indexer || !request.setupFrames ||
         request.currentSourcePath.isEmpty()) {
         result.failure = MachiningProjectLoadFailure::PartRequired;
-        result.error = QStringLiteral("请先打开加工项目引用的零件：\n%1")
+        result.error = QCoreApplication::translate("OpenAutoPath", "请先打开加工项目引用的零件：\n%1")
             .arg(QString::fromUtf8(definition.part.sourcePath));
         return result;
     }
@@ -373,7 +374,7 @@ MachiningProjectController::loadAndRegenerate(
             request.currentSourcePath, &fingerprintError);
     if (!fingerprintError.isEmpty()) {
         result.failure = MachiningProjectLoadFailure::PartFingerprint;
-        result.error = QStringLiteral("无法校验当前零件：\n%1")
+        result.error = QCoreApplication::translate("OpenAutoPath", "无法校验当前零件：\n%1")
             .arg(fingerprintError);
         return result;
     }
@@ -381,8 +382,7 @@ MachiningProjectController::loadAndRegenerate(
         currentFingerprint.toStdString() !=
             definition.part.sourceFingerprint) {
         result.failure = MachiningProjectLoadFailure::PartFingerprint;
-        result.error = QStringLiteral(
-            "当前 STEP 与加工项目中的零件指纹不一致。\n"
+        result.error = QCoreApplication::translate("OpenAutoPath", "当前 STEP 与加工项目中的零件指纹不一致。\n"
             "项目引用：%1\n当前零件：%2")
             .arg(QString::fromUtf8(definition.part.sourcePath),
                  request.currentSourcePath);
@@ -407,12 +407,12 @@ MachiningProjectLoadResult MachiningProjectController::regenerateJob(
     if (!request.model || request.model->faces.empty() ||
         !request.indexer || !request.setupFrames) {
         result.failure = MachiningProjectLoadFailure::PartRequired;
-        result.error = QStringLiteral("重建加工项目需要当前零件、拓扑索引和装夹坐标。");
+        result.error = QCoreApplication::translate("OpenAutoPath", "重建加工项目需要当前零件、拓扑索引和装夹坐标。");
         return result;
     }
     if (!job.validationErrors().empty()) {
         result.failure = MachiningProjectLoadFailure::File;
-        result.error = QString::fromStdString(job.validationErrors().front());
+        result.error = QCoreApplication::translate("OpenAutoPathDiagnostic", QString::fromStdString(job.validationErrors().front()).toUtf8().constData());
         return result;
     }
     result.job = std::move(job);
@@ -428,7 +428,7 @@ MachiningProjectLoadResult MachiningProjectController::regenerateJob(
         !result.hasProfileDefinitions && !result.hasFinishingDefinitions) {
         result.failure = MachiningProjectLoadFailure::EmptyProject;
         result.error =
-            QStringLiteral("加工项目中没有孔、槽腔、外轮廓或雕刻加工工序。");
+            QCoreApplication::translate("OpenAutoPath", "加工项目中没有孔、槽腔、外轮廓或雕刻加工工序。");
         return result;
     }
 
@@ -464,9 +464,9 @@ MachiningProjectLoadResult MachiningProjectController::regenerateJob(
             !result.holes.validation.ok()) {
             result.failure = MachiningProjectLoadFailure::HoleRegeneration;
             const QString detail = result.holes.validation.issues.empty()
-                ? QStringLiteral("项目中没有可重建的有效孔工序。")
+                ? QCoreApplication::translate("OpenAutoPath", "项目中没有可重建的有效孔工序。")
                 : validationMessage(result.holes.validation);
-            result.error = QStringLiteral("孔加工 Job 重建失败：\n%1")
+            result.error = QCoreApplication::translate("OpenAutoPath", "孔加工 Job 重建失败：\n%1")
                 .arg(detail);
             return result;
         }
@@ -481,10 +481,9 @@ MachiningProjectLoadResult MachiningProjectController::regenerateJob(
             !result.pockets.validation.ok()) {
             result.failure = MachiningProjectLoadFailure::PocketRegeneration;
             const QString detail = result.pockets.validation.issues.empty()
-                ? QStringLiteral(
-                      "稳定面或根内环引用无法重建有效槽腔工序。")
+                ? QCoreApplication::translate("OpenAutoPath", "稳定面或根内环引用无法重建有效槽腔工序。")
                 : validationMessage(result.pockets.validation);
-            result.error = QStringLiteral("槽腔 Job 重建失败：\n%1")
+            result.error = QCoreApplication::translate("OpenAutoPath", "槽腔 Job 重建失败：\n%1")
                 .arg(detail);
             return result;
         }
@@ -502,8 +501,7 @@ MachiningProjectLoadResult MachiningProjectController::regenerateJob(
             result.profiles.operations.empty() || !validation.ok()) {
             result.failure =
                 MachiningProjectLoadFailure::ProfileRegeneration;
-            result.error = QStringLiteral(
-                "外轮廓 Job 重建失败：稳定根面或 outer wire 引用无法生成有效刀路。");
+            result.error = QCoreApplication::translate("OpenAutoPath", "外轮廓 Job 重建失败：稳定根面或 outer wire 引用无法生成有效刀路。");
             return result;
         }
     }
@@ -519,7 +517,7 @@ MachiningProjectLoadResult MachiningProjectController::regenerateJob(
         if (result.finishing.cancelled || !result.finishing.validation.ok() ||
             (hasEnabledFinishing && !result.job.currentFinishingResult())) {
             result.failure = MachiningProjectLoadFailure::SurfaceFinishingRegeneration;
-            result.error = QStringLiteral("雕刻加工重建失败：%1")
+            result.error = QCoreApplication::translate("OpenAutoPath", "雕刻加工重建失败：%1")
                 .arg(validationMessage(result.finishing.validation));
             return result;
         }
@@ -534,7 +532,7 @@ MachiningProjectLoadResult MachiningProjectController::restoreSnapshot(
     const std::vector<std::string> errors = job.validationErrors();
     if (!errors.empty()) {
         result.failure = MachiningProjectLoadFailure::File;
-        result.error = QString::fromStdString(errors.front());
+        result.error = QCoreApplication::translate("OpenAutoPathDiagnostic", QString::fromStdString(errors.front()).toUtf8().constData());
         return result;
     }
     result.hasHoleDefinitions =

@@ -1,6 +1,7 @@
 // RecognitionSelectionUiController 实现（oap_app_recognition_ui）。
 // 模型/识别/选择 dock 族与面板回调，见 RecognitionSelectionUiController.h。
 #include "app/ui/recognition/RecognitionSelectionUiController.h"
+#include <QCoreApplication>
 
 #include "app/panels/FeaturePanel.h"
 #include "app/panels/GroupPanel.h"
@@ -17,7 +18,7 @@ RecognitionSelectionUiController::RecognitionSelectionUiController(
     : QObject(&window)
 {
     m_resultPanel = new ResultPanel(&window);
-    m_analysisDock = new QDockWidget(QStringLiteral("模型"), &window);
+    m_analysisDock = new QDockWidget(QCoreApplication::translate("OpenAutoPath", "模型"), &window);
     m_analysisDock->setObjectName(QStringLiteral("analysisDock"));
     m_analysisDock->setWidget(m_resultPanel);
     m_analysisDock->setAllowedAreas(
@@ -25,7 +26,7 @@ RecognitionSelectionUiController::RecognitionSelectionUiController(
     window.addDockWidget(Qt::RightDockWidgetArea, m_analysisDock);
 
     m_featurePanel = new FeaturePanel(&window);
-    m_featureDock = new QDockWidget(QStringLiteral("特征"), &window);
+    m_featureDock = new QDockWidget(QCoreApplication::translate("OpenAutoPath", "特征"), &window);
     m_featureDock->setObjectName(QStringLiteral("featureDock"));
     m_featureDock->setWidget(m_featurePanel);
     m_featureDock->setAllowedAreas(
@@ -34,7 +35,7 @@ RecognitionSelectionUiController::RecognitionSelectionUiController(
     window.tabifyDockWidget(m_analysisDock, m_featureDock);
 
     m_groupPanel = new GroupPanel(&window);
-    m_groupDock = new QDockWidget(QStringLiteral("分组"), &window);
+    m_groupDock = new QDockWidget(QCoreApplication::translate("OpenAutoPath", "分组"), &window);
     m_groupDock->setObjectName(QStringLiteral("groupDock"));
     m_groupDock->setWidget(m_groupPanel);
     m_groupDock->setAllowedAreas(

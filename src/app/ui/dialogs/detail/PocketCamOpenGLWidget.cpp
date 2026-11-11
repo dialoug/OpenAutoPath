@@ -1,4 +1,5 @@
 #include "app/ui/dialogs/detail/PocketCamOpenGLWidget.h"
+#include <QCoreApplication>
 
 #include <algorithm>
 #include <array>
@@ -150,8 +151,7 @@ void PocketCamOpenGLWidget::beginOpenGlStage(const QString& stage)
     if (errorCodes.isEmpty())
         return;
     if (m_preexistingOpenGlWarning.isEmpty()) {
-        m_preexistingOpenGlWarning = QStringLiteral(
-            "%1前存在外部/历史 OpenGL 错误 %2，"
+        m_preexistingOpenGlWarning = QCoreApplication::translate("OpenAutoPath", "%1前存在外部/历史 OpenGL 错误 %2，"
             "已记录并继续检查本阶段。")
             .arg(stage, errorCodes);
     }
@@ -163,8 +163,7 @@ bool PocketCamOpenGLWidget::checkOpenGlStage(const QString& stage)
     if (errorCodes.isEmpty())
         return true;
     if (m_error.isEmpty()) {
-        m_error = QStringLiteral(
-            "%1失败，OpenGL 错误：%2")
+        m_error = QCoreApplication::translate("OpenAutoPath", "%1失败，OpenGL 错误：%2")
             .arg(stage, errorCodes);
     }
     return false;

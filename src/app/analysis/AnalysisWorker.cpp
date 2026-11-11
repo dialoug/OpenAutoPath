@@ -1,6 +1,7 @@
 // AnalysisWorker 实现 —— 线程调度、缓存策略和 Qt 提示留在 app；
 // STEP 读取与领域分析由 analysis::AnalysisPipeline 执行。
 #include "AnalysisWorker.h"
+#include <QCoreApplication>
 #include "StepAnalysisCache.h"
 
 #include "analysis/AnalysisPipeline.h"
@@ -91,22 +92,22 @@ void assignPipelineFailure(oap::AnalysisPipelineStatus status,
     switch (status) {
     case oap::AnalysisPipelineStatus::ReadFailed:
         errorMessage =
-            QStringLiteral("读取 STEP 文件失败:\n") +
+            QCoreApplication::translate("OpenAutoPath", "读取 STEP 文件失败:\n") +
             sourcePath;
         return;
     case oap::AnalysisPipelineStatus::TransferFailed:
         errorMessage =
-            QStringLiteral("传输 STEP 数据失败:\n") +
+            QCoreApplication::translate("OpenAutoPath", "传输 STEP 数据失败:\n") +
             sourcePath;
         return;
     case oap::AnalysisPipelineStatus::NoFreeShapes:
         warningMessage =
-            QStringLiteral("未找到任何形状:\n") +
+            QCoreApplication::translate("OpenAutoPath", "未找到任何形状:\n") +
             sourcePath;
         return;
     case oap::AnalysisPipelineStatus::NoAnalyzableShapes:
         warningMessage =
-            QStringLiteral("未找到可分析的实体:\n") +
+            QCoreApplication::translate("OpenAutoPath", "未找到可分析的实体:\n") +
             sourcePath;
         return;
     case oap::AnalysisPipelineStatus::Cancelled:
@@ -136,7 +137,7 @@ bool executeAnalysisPipeline(const QString& sourcePath,
     }
 
     qDebug().nospace()
-        << "[OpenAutoPath] load \"" << sourcePath << "\"\n"
+        << "[OpenAutoPath] load " << sourcePath << "\n"
         << "  free_shapes=" << report.freeShapeCount
         << "  units=" << static_cast<qulonglong>(report.unitCount)
         << "  faces=" << static_cast<qulonglong>(report.faceCount) << "\n"
@@ -156,8 +157,8 @@ bool executeAnalysisPipeline(const QString& sourcePath,
 QString failureMessage(const char* prefix, const Standard_Failure& failure)
 {
     const char* message = failure.GetMessageString();
-    return QString::fromLatin1(prefix) +
-           QString::fromLocal8Bit(message ? message : "OCCT failure");
+    return QCoreApplication::translate("OpenAutoPath", prefix) +
+           QCoreApplication::translate("OpenAutoPathDiagnostic", QString::fromLocal8Bit(message ? message : "OCCT failure").toUtf8().constData());
 }
 
 void closeDocumentNoThrow(
@@ -200,10 +201,10 @@ void AnalysisWorker::loadStepFile(
     auto control = loadControl([this] { return m_cancelRun.load(); });
     control.reportStage = [&](oap::AnalysisStage stage) {
         switch (stage) {
-        case oap::AnalysisStage::Reading: progress(QStringLiteral("读取 STEP")); break;
-        case oap::AnalysisStage::Transferring: progress(QStringLiteral("转换几何")); break;
-        case oap::AnalysisStage::PreparingPreview: progress(QStringLiteral("准备模型预览")); break;
-        case oap::AnalysisStage::Indexing: progress(QStringLiteral("精确几何分析")); break;
+        case oap::AnalysisStage::Reading: progress(QCoreApplication::translate("OpenAutoPath", "读取 STEP")); break;
+        case oap::AnalysisStage::Transferring: progress(QCoreApplication::translate("OpenAutoPath", "转换几何")); break;
+        case oap::AnalysisStage::PreparingPreview: progress(QCoreApplication::translate("OpenAutoPath", "准备模型预览")); break;
+        case oap::AnalysisStage::Indexing: progress(QCoreApplication::translate("OpenAutoPath", "精确几何分析")); break;
         }
     };
     int lastPercent = -1;
@@ -212,7 +213,7 @@ void AnalysisWorker::loadStepFile(
         const int percent = total ? static_cast<int>(100 * done / total) : 100;
         if (percent == lastPercent && done != total) return;
         lastPercent = percent;
-        progress(QStringLiteral("精确几何分析"), static_cast<int>(done), static_cast<int>(total));
+        progress(QCoreApplication::translate("OpenAutoPath", "精确几何分析"), static_cast<int>(done), static_cast<int>(total));
     };
     control.preparePreview = [&](const Handle(TDocStd_Document)& doc) {
         try {
@@ -250,12 +251,12 @@ void AnalysisWorker::loadStepFile(
 
         // 缓存查询:命中则跳过 STEP 解析 + Transfer + 整条分析流水线。
         std::string contentHash;
-        progress(QStringLiteral("检查模型缓存"));
+        progress(QCoreApplication::translate("OpenAutoPath", "检查模型缓存"));
         QElapsedTimer lookupTimer; lookupTimer.start();
         const bool cacheHit = analysisCache && analysisCache->lookup(nativeSourcePath, contentHash);
         qDebug() << "[OpenAutoPath] cache_lookup_ms=" << lookupTimer.elapsed();
         if (cacheHit) {
-            progress(QStringLiteral("恢复模型缓存"));
+            progress(QCoreApplication::translate("OpenAutoPath", "恢复模型缓存"));
             QElapsedTimer timer;
             timer.start();
             oap::Model cachedModel;
@@ -281,9 +282,9 @@ void AnalysisWorker::loadStepFile(
                 result->ok = true;
                 result->fromCache = true;
                 qDebug().nospace()
-                    << "[OpenAutoPath] cache HIT \""
+                    << "[OpenAutoPath] cache HIT "
                     << sourcePath
-                    << "\"  units=" << static_cast<qulonglong>(result->model.units.size())
+                    << "  units=" << static_cast<qulonglong>(result->model.units.size())
                     << " faces=" << static_cast<qulonglong>(result->model.faces.size())
                     << "  ms: retrieve(open+readModel)=" << retrieveMillis
                     << " restoreMaps=" << restoreMillis
@@ -322,7 +323,7 @@ void AnalysisWorker::loadStepFile(
 
         // 缓存写入属于 I/O 与 XCAF 序列化，必须在 worker 中完成；否则分析完成后
         // 主窗口仍会因大模型落盘而卡顿。缓存失败不影响正常显示。
-        progress(QStringLiteral("保存模型缓存"));
+        progress(QCoreApplication::translate("OpenAutoPath", "保存模型缓存"));
         QElapsedTimer storeTimer; storeTimer.start();
         if (analysisCache && !contentHash.empty() &&
             analysisCache->store(
@@ -333,8 +334,8 @@ void AnalysisWorker::loadStepFile(
                 oap::StepAnalysisCache::
                     kDefaultBudgetBytes);
             qDebug().nospace()
-                << "[OpenAutoPath] cache STORE \""
-                << sourcePath << "\" ok ms=" << storeTimer.elapsed();
+                << "[OpenAutoPath] cache STORE "
+                << sourcePath << " ok ms=" << storeTimer.elapsed();
         }
 
         if (m_cancelRun.load()) {
@@ -353,11 +354,11 @@ void AnalysisWorker::loadStepFile(
         else result->errorMessage = failureMessage("OCCT 后台分析失败:\n", failure);
     } catch (const std::exception& failure) {
         if (m_cancelRun.load()) result->cancelled = true;
-        else result->errorMessage = QStringLiteral("后台分析失败:\n") +
-                                    QString::fromLocal8Bit(failure.what());
+        else result->errorMessage = QCoreApplication::translate("OpenAutoPath", "后台分析失败:\n") +
+                                    QCoreApplication::translate("OpenAutoPathDiagnostic", QString::fromLocal8Bit(failure.what()).toUtf8().constData());
     } catch (...) {
         if (m_cancelRun.load()) result->cancelled = true;
-        else result->errorMessage = QStringLiteral("后台分析发生未知异常。");
+        else result->errorMessage = QCoreApplication::translate("OpenAutoPath", "后台分析发生未知异常。");
     }
 
     closeDocumentNoThrow(
@@ -435,8 +436,8 @@ void AnalysisWorker::buildStepCaches(
                 }
                 ++failed;
                 qDebug().nospace()
-                    << "[OpenAutoPath] cache build FAIL \""
-                    << sourcePaths[fileIndex] << "\"  "
+                    << "[OpenAutoPath] cache build FAIL "
+                    << sourcePaths[fileIndex] << "  "
                     << (errorMessage.isEmpty()
                             ? warningMessage
                             : errorMessage);
@@ -462,15 +463,15 @@ void AnalysisWorker::buildStepCaches(
             if (stored) {
                 ++built;
                 qDebug().nospace()
-                    << "[OpenAutoPath] cache build STORE \""
+                    << "[OpenAutoPath] cache build STORE "
                     << sourcePaths[fileIndex]
-                    << "\" ok";
+                    << " ok";
             } else {
                 ++failed;
                 qWarning().nospace()
-                    << "[OpenAutoPath] cache build STORE \""
+                    << "[OpenAutoPath] cache build STORE "
                     << sourcePaths[fileIndex]
-                    << "\" failed";
+                    << " failed";
             }
         } catch (const Standard_Failure& failure) {
             ++failed;

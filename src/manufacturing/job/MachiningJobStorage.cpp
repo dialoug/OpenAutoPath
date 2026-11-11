@@ -3,6 +3,7 @@
 // 的 JSON 编解码、.oapjob 文件读写、旧 schema 迁移以及定义/执行/来源指纹计算。
 // 全部为无状态逻辑，错误通过 QString* error 返回；不涉及刀路生成与 UI。
 #include "manufacturing/job/MachiningJobStorage.h"
+#include <QCoreApplication>
 #include "manufacturing/job/detail/SurfaceFinishingJson.h"
 
 
@@ -1067,14 +1068,14 @@ bool parseDocument(const QByteArray& data,
 {
     // 统一入口：体积上限 → JSON 语法 → 格式标识 → schema 版本区间 → job 节点。
     if (data.size() > kMaxJobBytes) {
-        if (error) *error = QStringLiteral("加工项目超过 %1 MB 上限")
+        if (error) *error = QCoreApplication::translate("OpenAutoPath", "加工项目超过 %1 MB 上限")
             .arg(kMaxJobBytes / (1024 * 1024));
         return false;
     }
     QJsonParseError parseError;
     const QJsonDocument document = QJsonDocument::fromJson(data, &parseError);
     if (parseError.error != QJsonParseError::NoError || !document.isObject()) {
-        if (error) *error = QStringLiteral("加工项目 JSON 无效：%1")
+        if (error) *error = QCoreApplication::translate("OpenAutoPath", "加工项目 JSON 无效：%1")
             .arg(parseError.errorString());
         return false;
     }
@@ -1083,34 +1084,32 @@ bool parseDocument(const QByteArray& data,
     const QString format = root.value(QStringLiteral("format")).toString();
     if (format != QString::fromLatin1(kFormatId) &&
         format != QStringLiteral("faceface-machining-job")) {
-        if (error) *error = QStringLiteral("不是 OpenAutoPath 加工项目文件");
+        if (error) *error = QCoreApplication::translate("OpenAutoPath", "不是 OpenAutoPath 加工项目文件");
         return false;
     }
     const int version = root.value(QStringLiteral("schema_version")).toInt();
     if (version < kMinimumSupportedMachiningJobSchemaVersion ||
         version > kMachiningJobSchemaVersion) {
-        if (error) *error = QStringLiteral("不支持的加工项目版本：%1").arg(version);
+        if (error) *error = QCoreApplication::translate("OpenAutoPath", "不支持的加工项目版本：%1").arg(version);
         return false;
     }
     const QJsonValue jobValue = root.value(QStringLiteral("job"));
     if (!jobValue.isObject()) {
-        if (error) *error = QStringLiteral("加工项目缺少 job 定义");
+        if (error) *error = QCoreApplication::translate("OpenAutoPath", "加工项目缺少 job 定义");
         return false;
     }
     const QJsonValue legacySurfaces = jobValue.toObject()
         .value(QStringLiteral("surface_operations"));
     if (!legacySurfaces.isUndefined() &&
         (!legacySurfaces.isArray() || !legacySurfaces.toArray().isEmpty())) {
-        if (error) *error = QStringLiteral(
-            "旧版曲面加工模块已移除，其工序与 OpenCAMLib 精加工定义不兼容，无法自动迁移。请使用旧版处理这些工序。");
+        if (error) *error = QCoreApplication::translate("OpenAutoPath", "旧版曲面加工模块已移除，其工序与 OpenCAMLib 精加工定义不兼容，无法自动迁移。请使用旧版处理这些工序。");
         return false;
     }
     const int definitionVersion = jobValue.toObject()
         .value(QStringLiteral("schema_version")).toInt();
     if (definitionVersion != version) {
         if (error) {
-            *error = QStringLiteral(
-                "加工项目根版本与 job 定义版本不一致");
+            *error = QCoreApplication::translate("OpenAutoPath", "加工项目根版本与 job 定义版本不一致");
         }
         return false;
     }
@@ -1123,7 +1122,7 @@ QString retiredManualInputError(const QJsonObject& job)
     if (!plan.isUndefined()) {
         if (!plan.isObject() || !plan.toObject().value(QStringLiteral("stages")).isArray() ||
             !plan.toObject().value(QStringLiteral("stages")).toArray().isEmpty())
-            return QStringLiteral("项目包含已移除的人工孔段计划或无效人工计划；请使用旧版本处理原项目。");
+            return QCoreApplication::translate("OpenAutoPath", "项目包含已移除的人工孔段计划或无效人工计划；请使用旧版本处理原项目。");
     }
     for (const auto& value : job.value(QStringLiteral("hole_operations")).toArray()) {
         const auto operation = value.toObject();
@@ -1135,13 +1134,13 @@ QString retiredManualInputError(const QJsonObject& job)
         const bool inheritedOnly = overrideObject.size() == 1 && retract.isDouble() && retract.toDouble() == 0.0;
         if ((!overrides.isUndefined() && (!overrides.isObject() || (!overrideObject.isEmpty() && !inheritedOnly))) ||
             (!local.isUndefined() && (!local.isBool() || local.toBool())))
-            return QStringLiteral("项目包含已移除的手动孔工艺覆盖或局部人工计划；请使用旧版本处理原项目。");
+            return QCoreApplication::translate("OpenAutoPath", "项目包含已移除的手动孔工艺覆盖或局部人工计划；请使用旧版本处理原项目。");
     }
     for (const auto& value : job.value(QStringLiteral("tool_controllers")).toArray()) {
         const auto controller = value.toObject();
         const auto manual = controller.value(QStringLiteral("manual"));
         if (!manual.isUndefined() && (!manual.isBool() || manual.toBool()))
-            return QStringLiteral("项目包含已移除的手工刀具；请使用旧版本将工序绑定到刀库后再迁移。");
+            return QCoreApplication::translate("OpenAutoPath", "项目包含已移除的手工刀具；请使用旧版本将工序绑定到刀库后再迁移。");
     }
     return {};
 }
@@ -1382,7 +1381,7 @@ bool MachiningJobStorage::deserializeDefinition(
         const QString shapeError = validateCurrentShape(jobObject);
         if (!shapeError.isEmpty()) {
             if (error)
-                *error = QStringLiteral("加工项目结构无效：%1")
+                *error = QCoreApplication::translate("OpenAutoPath", "加工项目结构无效：%1")
                     .arg(shapeError);
             return false;
         }
@@ -1435,7 +1434,7 @@ bool MachiningJobStorage::deserializeDefinition(
     job.definition() = parsed;
     const std::vector<std::string> errors = job.validationErrors();
     if (!errors.empty()) {
-        if (error) *error = QStringLiteral("加工项目结构无效：%1")
+        if (error) *error = QCoreApplication::translate("OpenAutoPath", "加工项目结构无效：%1")
             .arg(QString::fromStdString(errors.front()));
         return false;
     }
@@ -1473,7 +1472,7 @@ bool MachiningJobStorage::load(
         return false;
     }
     if (file.size() < 0 || file.size() > kMaxJobBytes) {
-        if (error) *error = QStringLiteral("加工项目文件大小无效或超过上限");
+        if (error) *error = QCoreApplication::translate("OpenAutoPath", "加工项目文件大小无效或超过上限");
         return false;
     }
     return deserializeDefinition(file.readAll(), definition, error);

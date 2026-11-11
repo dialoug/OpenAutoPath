@@ -1,4 +1,5 @@
 #include "app/workflows/engraving/EngravingToolpathGenerationUseCase.h"
+#include <QCoreApplication>
 
 #include <algorithm>
 #include <atomic>
@@ -71,11 +72,11 @@ bool bindTool(const EngravingToolpathGenerationRequest& request,
     } else if (request.settings.toolMode == EngravingToolMode::AutomaticLibrary) {
         if (!std::isfinite(params.diameter) || params.diameter <= 0 ||
             !std::isfinite(params.stepOver) || params.stepOver <= 0) {
-            error = QStringLiteral("雕刻自动选刀需要有效的刀径上限及行距。");
+            error = QCoreApplication::translate("OpenAutoPath", "雕刻自动选刀需要有效的刀径上限及行距。");
             return false;
         }
         if (!request.library) {
-            error = QStringLiteral("雕刻刀库不可用，请在刀路参数中选择刀库或配置单刀。");
+            error = QCoreApplication::translate("OpenAutoPath", "雕刻刀库不可用，请在刀路参数中选择刀库或配置单刀。");
             return false;
         }
         std::vector<toolpath::ToolpathToolContext> candidates;
@@ -90,7 +91,7 @@ bool bindTool(const EngravingToolpathGenerationRequest& request,
             candidates.push_back(std::move(candidate));
         }
         if (candidates.empty()) {
-            error = QStringLiteral("雕刻刀库中没有满足刀径上限、行距及刃长要求的已分配球头刀、圆鼻刀或平底刀。");
+            error = QCoreApplication::translate("OpenAutoPath", "雕刻刀库中没有满足刀径上限、行距及刃长要求的已分配球头刀、圆鼻刀或平底刀。");
             return false;
         }
         std::sort(candidates.begin(), candidates.end(), [](const auto& a, const auto& b) {
@@ -107,7 +108,7 @@ bool bindTool(const EngravingToolpathGenerationRequest& request,
         if (tool.horizontalFeed == 0) tool.horizontalFeed = params.feed;
         if (tool.verticalFeed == 0) tool.verticalFeed = params.plungeFeed;
     } else {
-        error = QStringLiteral("雕刻刀具来源无效。");
+        error = QCoreApplication::translate("OpenAutoPath", "雕刻刀具来源无效。");
         return false;
     }
     const auto type = tooling::toolTypeFromId(QString::fromStdString(tool.toolType));
@@ -120,7 +121,7 @@ bool bindTool(const EngravingToolpathGenerationRequest& request,
         !std::isfinite(tool.horizontalRapid) || tool.horizontalRapid < 0 ||
         !std::isfinite(tool.verticalRapid) || tool.verticalRapid < 0 ||
         !std::isfinite(tool.peckDepth) || tool.peckDepth < 0) {
-        error = QStringLiteral("雕刻单刀或刀库快照无效：需要有效刀型、正刀号、刀径、刃长和切削进给。");
+        error = QCoreApplication::translate("OpenAutoPath", "雕刻单刀或刀库快照无效：需要有效刀型、正刀号、刀径、刃长和切削进给。");
         return false;
     }
     params.cutterKind = type == tooling::ToolType::BallEndMill ? toolpath::FinishingCutterKind::Ball :
@@ -143,7 +144,7 @@ EngravingToolpathGenerationResult EngravingToolpathGenerationUseCase::execute(
     if (!request.setupFrames || request.targets.empty() || request.unitIds.empty() ||
         request.targets.size() != request.unitIds.size() ||
         std::any_of(request.targets.begin(), request.targets.end(), [](const auto& shape) { return shape.IsNull(); })) {
-        rejected.error = QStringLiteral("雕刻需要完整模型实体及装夹坐标；无需先识别孔或槽腔。");
+        rejected.error = QCoreApplication::translate("OpenAutoPath", "雕刻需要完整模型实体及装夹坐标；无需先识别孔或槽腔。");
         return rejected;
     }
     std::vector<MoldSetupFace> faces;
@@ -174,18 +175,18 @@ EngravingToolpathGenerationResult EngravingToolpathGenerationUseCase::execute(
         std::sort(faces.begin(), faces.end());
         faces.erase(std::unique(faces.begin(), faces.end()), faces.end());
         if (faces.empty()) {
-            rejected.error = QStringLiteral("项目既有雕刻装夹为空。");
+            rejected.error = QCoreApplication::translate("OpenAutoPath", "项目既有雕刻装夹为空。");
             return rejected;
         }
         break;
     default:
-        rejected.error = QStringLiteral("雕刻装夹范围无效。");
+        rejected.error = QCoreApplication::translate("OpenAutoPath", "雕刻装夹范围无效。");
         return rejected;
     }
     for (const auto face : faces) {
         const auto* frame = request.setupFrames->forFace(face);
         if (!frame || !frame->valid) {
-            rejected.error = QStringLiteral("雕刻装夹坐标无效，请先建立工件坐标。");
+            rejected.error = QCoreApplication::translate("OpenAutoPath", "雕刻装夹坐标无效，请先建立工件坐标。");
             return rejected;
         }
     }
@@ -221,7 +222,7 @@ EngravingToolpathGenerationResult EngravingToolpathGenerationUseCase::execute(
                     job.definition().stock, targets, &stockError, &control);
                 if (control.cancelled()) { result.cancelled = true; return result; }
                 if (stock.IsNull()) {
-                    result.error = QStringLiteral("雕刻规划毛坯无效：%1").arg(QString::fromStdString(stockError));
+                    result.error = QCoreApplication::translate("OpenAutoPath", "雕刻规划毛坯无效：%1").arg(QCoreApplication::translate("OpenAutoPathDiagnostic", QString::fromStdString(stockError).toUtf8().constData()));
                     return result;
                 }
                 std::vector<toolpath::SurfaceFinishingResult> generated;
@@ -233,7 +234,7 @@ EngravingToolpathGenerationResult EngravingToolpathGenerationUseCase::execute(
                     auto faceParams = params;
                     if (layered) {
                         if (remainingMoves < 4) {
-                            result.error = QStringLiteral("雕刻全部装夹的累计移动数量已达到预算；请缩小加工范围或调整采样参数。");
+                            result.error = QCoreApplication::translate("OpenAutoPath", "雕刻全部装夹的累计移动数量已达到预算；请缩小加工范围或调整采样参数。");
                             return result;
                         }
                         faceParams.maxMoves = remainingMoves;
@@ -242,13 +243,13 @@ EngravingToolpathGenerationResult EngravingToolpathGenerationUseCase::execute(
                         frames.forFace(face)->setupWorkFrame, faceParams, &control, &stock);
                     if (surface.cancelled || control.cancelled()) { result.cancelled = true; return result; }
                     if (!surface.ok) {
-                        result.error = QStringLiteral("雕刻 %1 生成失败：%2")
-                            .arg(QString::fromLatin1(moldSetupFaceName(face)), QString::fromStdString(surface.error));
+                        result.error = QCoreApplication::translate("OpenAutoPath", "雕刻 %1 生成失败：%2")
+                            .arg(QString::fromLatin1(moldSetupFaceName(face)), QCoreApplication::translate("OpenAutoPathDiagnostic", QString::fromStdString(surface.error).toUtf8().constData()));
                         return result;
                     }
                     if (layered) {
                         if (surface.moves.size() > remainingMoves) {
-                            result.error = QStringLiteral("雕刻全部装夹的累计移动数量超过预算。");
+                            result.error = QCoreApplication::translate("OpenAutoPath", "雕刻全部装夹的累计移动数量超过预算。");
                             return result;
                         }
                         remainingMoves -= surface.moves.size();
@@ -270,35 +271,35 @@ EngravingToolpathGenerationResult EngravingToolpathGenerationUseCase::execute(
                 }
                 std::string error;
                 if (!manufacturing::SurfaceFinishingMachiningJobService().replaceFamily(job, captures, &error)) {
-                    result.error = QString::fromStdString(error);
+                    result.error = QCoreApplication::translate("OpenAutoPathDiagnostic", QString::fromStdString(error).toUtf8().constData());
                     return result;
                 }
                 if (control.cancelled()) { result.cancelled = true; return result; }
                 if (const auto* batch = job.currentFinishingResult()) result.batch = *batch;
                 result.program = result.batch.toProgram();
-                result.summary = QStringLiteral("雕刻加工：%1 个装夹方向，T%2，刀径 %3 mm，%4 段移动。")
+                result.summary = QCoreApplication::translate("OpenAutoPath", "雕刻加工：%1 个装夹方向，T%2，刀径 %3 mm，%4 段移动。")
                     .arg(faces.size()).arg(tool.toolNumber).arg(tool.diameter, 0, 'f', 3).arg(result.program.moveCount());
                 result.job = std::move(job);
                 result.ok = true;
             } catch (const Standard_Failure& failure) {
-                result.error = QString::fromUtf8(failure.GetMessageString());
+                result.error = QCoreApplication::translate("OpenAutoPathDiagnostic", QString::fromUtf8(failure.GetMessageString()).toUtf8().constData());
             } catch (const std::exception& failure) {
-                result.error = QString::fromUtf8(failure.what());
+                result.error = QCoreApplication::translate("OpenAutoPathDiagnostic", QString::fromUtf8(failure.what()).toUtf8().constData());
             } catch (...) {
-                result.error = QStringLiteral("雕刻生成发生未知错误。");
+                result.error = QCoreApplication::translate("OpenAutoPath", "雕刻生成发生未知错误。");
             }
             return result;
         }, [](toolpath::HeavyJobRejection reason) {
             EngravingToolpathGenerationResult result;
             result.cancelled = reason == toolpath::HeavyJobRejection::Cancelled;
-            result.error = QString::fromStdString(toolpath::heavyJobRejectionMessage(reason));
+            result.error = QCoreApplication::translate("OpenAutoPathDiagnostic", QString::fromStdString(toolpath::heavyJobRejectionMessage(reason)).toUtf8().constData());
             return result;
         });
     toolpath::HeavyJobWaitGuard wait(future, cancellation);
     WorkflowProgressRequest progress;
-    progress.title = QStringLiteral("雕刻加工");
-    progress.label = QStringLiteral("正在从完整模型生成雕刻刀路…");
-    progress.cancellingLabel = QStringLiteral("正在取消雕刻，等待当前几何计算结束…");
+    progress.title = QCoreApplication::translate("OpenAutoPath", "雕刻加工");
+    progress.label = QCoreApplication::translate("OpenAutoPath", "正在从完整模型生成雕刻刀路…");
+    progress.cancellingLabel = QCoreApplication::translate("OpenAutoPath", "正在取消雕刻，等待当前几何计算结束…");
     progress.initialTotal = faces.size();
     progress.snapshot = [completed, count = faces.size()] {
         return WorkflowProgressSnapshot{completed->load(std::memory_order_relaxed), count, {}};
@@ -309,7 +310,7 @@ EngravingToolpathGenerationResult EngravingToolpathGenerationUseCase::execute(
     progress.cancellationRequested = [cancellation] { return cancellation->load(std::memory_order_relaxed); };
     waitForWorkflowTask(request.interaction.showProgress, progress);
     auto result = future.get();
-    if (result.cancelled && result.error.isEmpty()) result.error = QStringLiteral("雕刻生成已取消，原加工项目保持不变。");
+    if (result.cancelled && result.error.isEmpty()) result.error = QCoreApplication::translate("OpenAutoPath", "雕刻生成已取消，原加工项目保持不变。");
     return result;
 }
 

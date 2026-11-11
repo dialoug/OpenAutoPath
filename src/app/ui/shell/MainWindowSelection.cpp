@@ -143,9 +143,9 @@ void MainWindow::onEntityPicked(const TopoDS_Shape &shape, int shapeType,
             highlightFaces(
                 picked.faceIds,
                 picked.matchedFeature
-                    ? QStringLiteral("整特征累加选择：当前 %1 个面")
+                    ? QCoreApplication::translate("OpenAutoPath", "整特征累加选择：当前 %1 个面")
                           .arg(static_cast<int>(picked.faceIds.size()))
-                    : QStringLiteral("独立面累加选择：当前 %1 个面")
+                    : QCoreApplication::translate("OpenAutoPath", "独立面累加选择：当前 %1 个面")
                           .arg(static_cast<int>(picked.faceIds.size())));
             if (m_groupPanel) {
                 if (const oap::Face* face =
@@ -193,7 +193,7 @@ void MainWindow::onEntityPicked(const TopoDS_Shape &shape, int shapeType,
             }
             m_resultPanel->showEdgeProperties(entityId);
             statusBar()->showMessage(
-                QStringLiteral("已拾取边 %1 (曲线 %2,面 %3)")
+                QCoreApplication::translate("OpenAutoPath", "已拾取边 %1 (曲线 %2,面 %3)")
                     .arg(entityId)
                     .arg(QString::fromStdString(picked.entitySubtype))
                     .arg(picked.relatedFaceCount));
@@ -205,7 +205,7 @@ void MainWindow::onEntityPicked(const TopoDS_Shape &shape, int shapeType,
             }
             m_resultPanel->showWireProperties(entityId);
             statusBar()->showMessage(
-                QStringLiteral("已拾取线环 %1 (%2,在面 %3 上)")
+                QCoreApplication::translate("OpenAutoPath", "已拾取线环 %1 (%2,在面 %3 上)")
                     .arg(entityId)
                     .arg(QString::fromStdString(picked.entitySubtype))
                     .arg(picked.faceIds.empty()
@@ -287,7 +287,7 @@ void MainWindow::onEntitiesBoxPicked(const std::vector<TopoDS_Shape>& shapes,
         if (m_groupPanel)
             m_groupPanel->selectUnitsByIds(selection.unitIds);
         statusBar()->showMessage(
-            QStringLiteral("框选单元：%1 个")
+            QCoreApplication::translate("OpenAutoPath", "框选单元：%1 个")
                 .arg(selection.unitIds.size()));
     } else {
         m_resultPanel->selectFacesByIds(selection.faceIds);
@@ -296,11 +296,11 @@ void MainWindow::onEntitiesBoxPicked(const std::vector<TopoDS_Shape>& shapes,
         const TopAbs_ShapeEnum type =
             static_cast<TopAbs_ShapeEnum>(selection.shapeType);
         const QString noun = type == TopAbs_EDGE
-            ? QStringLiteral("边")
-            : type == TopAbs_WIRE ? QStringLiteral("线环")
-                                  : QStringLiteral("面");
+            ? QCoreApplication::translate("OpenAutoPath", "边")
+            : type == TopAbs_WIRE ? QCoreApplication::translate("OpenAutoPath", "线环")
+                                  : QCoreApplication::translate("OpenAutoPath", "面");
         statusBar()->showMessage(
-            QStringLiteral("框选%1：%2 个，关联 %3 个面")
+            QCoreApplication::translate("OpenAutoPath", "框选%1：%2 个，关联 %3 个面")
                 .arg(noun)
                 .arg(selection.entityCount)
                 .arg(selection.faceIds.size()));
@@ -317,7 +317,7 @@ void MainWindow::onTreeFaceSelected(const QString &faceId)
 {
     m_sceneInteraction.setSelectionSource(
         oap::app::SelectionSource::Analysis);
-    highlightFaces({faceId.toStdString()}, QStringLiteral("面 %1").arg(faceId));
+    highlightFaces({faceId.toStdString()}, QCoreApplication::translate("OpenAutoPath", "面 %1").arg(faceId));
 }
 
 void MainWindow::onFeatureSelectionChanged()
@@ -328,7 +328,7 @@ void MainWindow::onFeatureSelectionChanged()
     const auto ids = m_featurePanel ? m_featurePanel->selectedFaceIds()
                                     : std::vector<std::string>{};
     highlightFaces(ids,
-        QStringLiteral("特征选择: %1 个面").arg((int)ids.size()));
+        QCoreApplication::translate("OpenAutoPath", "特征选择: %1 个面").arg((int)ids.size()));
 }
 
 void MainWindow::onGroupSelectionChanged()
@@ -339,7 +339,7 @@ void MainWindow::onGroupSelectionChanged()
     const auto ids = m_groupPanel ? m_groupPanel->selectedFaceIds()
                                   : std::vector<std::string>{};
     highlightFaces(ids,
-        QStringLiteral("分组选择: %1 个面").arg((int)ids.size()));
+        QCoreApplication::translate("OpenAutoPath", "分组选择: %1 个面").arg((int)ids.size()));
 }
 
 void MainWindow::highlightFaces(const std::vector<std::string> &faceIds,
