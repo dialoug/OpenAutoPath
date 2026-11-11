@@ -109,6 +109,14 @@ jobs:
       - name: Verify desktop DLL loading
         if: matrix.preset == 'windows-vs2022'
         run: ./tools/tests/Test-WindowsRuntimeLoad.ps1 -BinDir build/windows-vs2022/RelWithDebInfo/bin
+      - name: Verify actual desktop runtime inventory
+        if: matrix.preset == 'windows-vs2022'
+        run: |
+          $stage = Join-Path $env:RUNNER_TEMP ('oap-runtime-audit-' + [guid]::NewGuid().ToString('N'))
+          cmake --install build/windows-vs2022 --config RelWithDebInfo --component Runtime --prefix $stage
+          if ($LASTEXITCODE -ne 0) { throw 'Runtime audit installation failed' }
+          ./tools/Complete-WindowsReleaseMetadata.ps1 -Stage $stage -BuildDir build/windows-vs2022 `
+            -VerifyOnly -RequireSourceBuilds
       - name: Run fast tests
         run: ctest --preset ${{ matrix.preset }}
       - name: Verify installed package
