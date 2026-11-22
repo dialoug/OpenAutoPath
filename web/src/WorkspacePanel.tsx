@@ -1,5 +1,5 @@
 import { FolderKanban, Wrench, X, Save } from "lucide-react";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
 import {
   artifact,
   json,
@@ -17,6 +17,8 @@ import { ProjectEditor } from "./ProjectEditor";
 import { PlanningForm, type CamFeature, type Cutter } from "./PlanningForm";
 
 type Props = {
+  quality: number;
+  qualityPicker: ReactNode;
   mode: "project" | "library";
   model: string;
   library: string;
@@ -28,6 +30,8 @@ type Props = {
   preview: (job: Job) => void;
 };
 export function WorkspacePanel({
+  quality,
+  qualityPicker,
   mode,
   model,
   library,
@@ -165,7 +169,7 @@ export function WorkspacePanel({
     void work(async () => {
       const j = await submit(
         url + (replay ? "/replay" : "/simulate"),
-        { document: doc, operation },
+        { document: doc, operation, quality },
         life.current.signal,
         setPending,
       );
@@ -282,6 +286,10 @@ export function WorkspacePanel({
               </label>
             </div>
           </div>
+          {!isLib &&
+            doc &&
+            (visible === "output" || visible === "operations") &&
+            qualityPicker}
           {coverage && visible === "operations" && (
             <section role="status">
               <h3>孔覆盖审计</h3>

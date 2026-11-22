@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import {
   Box,
   CircleDot,
@@ -16,6 +16,7 @@ import {
   Wrench,
 } from "lucide-react";
 import { loadStockReplay, type StockReplay } from "./stockReplay";
+import { SimulationQuality } from "./SimulationQuality";
 import { ModelStart } from "./ModelStart";
 import { createRoot } from "react-dom/client";
 import { Viewport, type Face, type Segment } from "./Viewport";
@@ -189,11 +190,28 @@ function App() {
     };
     differences?: Record<string, Face[]>;
     throughOperation?: string;
+    quality?: number;
+    materialSpacing?: number;
+    displaySpacing?: number;
     removedVolume?: number;
     completedMoves?: number;
     totalMoves?: number;
     operations: number;
   } | null>(null);
+  const [quality, setQuality] = useState(() => {
+    const stored = Number(localStorage.getItem("cam.simulationQuality"));
+    return [2, 5, 10].includes(stored) ? stored : 10;
+  });
+  const replayCursor = useRef(0);
+  const qualityPicker = (
+    <SimulationQuality
+      value={quality}
+      onChange={(level) => {
+        localStorage.setItem("cam.simulationQuality", String(level));
+        setQuality(level);
+      }}
+    />
+  );
   const [stockView, setStockView] = useState("");
   const [showStock, setShowStock] = useState(false);
   const [replay, setReplay] = useState<StockReplay | null>(null);
@@ -471,9 +489,20 @@ function App() {
             document,
             operation,
             completedMoves,
+            quality:
+              action === "simulate" &&
+              completedMoves !== undefined &&
+              replay?.quality
+                ? replay.quality
+                : quality,
           }),
         },
       );
+      if (replay && action === "replay")
+        sessionStorage.setItem(
+          "cam.replayMove." + j.id,
+          String(replayCursor.current),
+        );
       sessionStorage.setItem("cam.replayReturn." + j.id, job.id);
       track(j);
     } catch (e) {
@@ -775,6 +804,9 @@ function App() {
               <Viewport
                 cameraTools
                 replay={replayVisible || undefined}
+                onReplayPosition={(move) => {
+                  replayCursor.current = move;
+                }}
                 inspectStock={
                   !active && (review?.operation || replayVisible)
                     ? (moves, op, cursor) => {
@@ -1060,6 +1092,43 @@ function App() {
                 className="inspectorBody results"
                 hidden={inspector !== "results"}
               >
+                {(review || stock || replay) && qualityPicker}
+                {replay && replay.quality !== quality && (
+                  <button
+                    className="primary"
+                    disabled={active}
+                    onClick={() =>
+                      void requestStock(
+                        "replay",
+                        (replay.selectedOnly ?? replay.operations.length === 1)
+                          ? replay.operations[0].id
+                          : undefined,
+                      )
+                    }
+                  >
+                    按所选精度重新回放
+                  </button>
+                )}
+                {stock && stock.quality !== quality && (
+                  <button
+                    disabled={active}
+                    onClick={() =>
+                      void requestStock(
+                        "simulate",
+                        stock.throughOperation || undefined,
+                        stock.completedMoves,
+                      )
+                    }
+                  >
+                    按所选精度重算余料
+                  </button>
+                )}
+                {stock?.materialSpacing && stock.displaySpacing && (
+                  <p>
+                    材料间距 {stock.materialSpacing.toFixed(4)} mm · 显示间距{" "}
+                    {stock.displaySpacing.toFixed(4)} mm
+                  </p>
+                )}
                 {(review || stock) && (
                   <button
                     className="primary"
@@ -1250,6 +1319,8 @@ function App() {
         <WorkspacePanel
           key={panel + model}
           mode={panel}
+          quality={quality}
+          qualityPicker={qualityPicker}
           model={model}
           features={features}
           faces={faces}

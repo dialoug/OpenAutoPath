@@ -16,7 +16,7 @@
 
 #include <Poly_Triangulation.hxx>
 
-#include "toolpath/pocket/simulation/DexelDisplayMesh.h"
+#include "toolpath/pocket/simulation/IpwQuality.h"
 
 namespace oap::app {
 
@@ -30,12 +30,11 @@ enum class IpwDisplayArtifactKind {
     OperationOvercut,
 };
 
-// 显示质量档位：影响三角网格与图元的生成预算。
-enum class IpwDisplayQuality {
-    Interactive,
-    Balanced,
-    Detailed,
-};
+using toolpath::IpwDisplayQuality;
+using toolpath::IpwDisplayQualityProfile;
+using toolpath::IpwSimulationQualityProfile;
+using toolpath::ipwDisplayQualityProfile;
+using toolpath::ipwSimulationQualityProfile;
 
 // 缓存键：内容指纹 + 变体 + 产物种类 + 质量档位；
 // 指纹变化（材料/目标变化）即视为新产物。
@@ -79,32 +78,6 @@ struct IpwDisplayArtifact {
         return !mesh.IsNull();
     }
 };
-
-struct IpwDisplayQualityProfile {
-    IpwDisplayQuality quality =
-        IpwDisplayQuality::Detailed;
-    toolpath::DexelDisplayMeshOptions meshOptions;
-};
-
-// 同一 1～10 级质量同时约束 Multi-Dexel 材料真值的 XY 采样密度。
-// requestedResolution 是期望值；MultiDexelStock 仍可为满足 maximumCellCount
-// 而采用更粗的实际分辨率，调用方必须显示最终实际值而不是只显示请求值。
-struct IpwSimulationQualityProfile {
-    IpwDisplayQuality quality =
-        IpwDisplayQuality::Detailed;
-    double cellsPerCutterDiameter = 80.0;
-    double requestedResolution = 0.0;
-    double requestedPlanarErrorUpperBound = 0.0;
-    int maximumCellCount = 8'000'000;
-};
-
-IpwDisplayQualityProfile ipwDisplayQualityProfile(
-    int level,
-    double gridResolution);
-
-IpwSimulationQualityProfile ipwSimulationQualityProfile(
-    int level,
-    double referenceCutterDiameter);
 
 const char* ipwDisplayQualityName(
     IpwDisplayQuality quality) noexcept;

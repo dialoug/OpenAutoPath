@@ -141,6 +141,7 @@ oap_module_sources(oap_toolpath_pocket OAP_TOOLPATH_POCKET_SOURCES
     src/toolpath/pocket/validation/PocketSafetyValidator.h
     src/toolpath/pocket/simulation/DexelDisplayMesh.cpp
     src/toolpath/pocket/simulation/DexelDisplayMesh.h
+    src/toolpath/pocket/simulation/IpwQuality.h
     src/toolpath/pocket/simulation/DexelIntervalOps.cpp
     src/toolpath/pocket/simulation/DexelIntervalOps.h
     src/toolpath/pocket/simulation/MultiDexelStock.cpp

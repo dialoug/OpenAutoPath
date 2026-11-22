@@ -1,4 +1,5 @@
 #include "Simulation.h"
+#include "toolpath/pocket/simulation/IpwQuality.h"
 #include "toolpath/pocket/simulation/PocketZMapComparison.h"
 #include "manufacturing/job/MachiningJob.h"
 #include "toolpath/core/simulation/FixedAxisToolpathView.h"
@@ -6,6 +7,7 @@
 #include "manufacturing/ipw/HoleMultiDexelUpdater.h"
 #include <QDataStream>
 #include <map>
+#include <array>
 #include "toolpath/core/PocketToolBinding.h"
 #include <QJsonArray>
 #include <QJsonDocument>
@@ -208,7 +210,7 @@ QJsonObject compareStock(const MachiningJob &job, Stock stock, const TopoDS_Shap
 }
 } // namespace
 
-QJsonObject replayResult(const MachiningJob &job, bool selectedOnly)
+QJsonObject replayResult(const MachiningJob &job, bool selectedOnly, int quality)
 {
     const auto &nodes = job.ipwSession().nodes();
     if (nodes.empty())
@@ -254,25 +256,33 @@ QJsonObject replayResult(const MachiningJob &job, bool selectedOnly)
     QDataStream out(&file);
     out.setByteOrder(QDataStream::LittleEndian);
     out.setFloatingPointPrecision(QDataStream::SinglePrecision);
-    toolpath::DexelDisplayMeshOptions opts;
-    opts.maximumPlanarCellCount = 20000;
-    opts.maximumTriangleCount = 100000;
     auto saveFrame = [&](const Stock &stock, qsizetype move) {
+        const auto opts = toolpath::ipwDisplayQualityProfile(quality, stock->resolution()).meshOptions;
+        toolpath::DexelDisplayMeshMetrics metrics;
         Handle(Poly_Triangulation) mesh;
         std::string error;
-        if (!stock->buildDisplayMesh(mesh, nullptr, &error, {}, opts) || mesh.IsNull())
+        if (!stock->buildDisplayMesh(mesh, &metrics, &error, {}, opts) || mesh.IsNull())
             throw std::runtime_error("余料回放网格: " + error);
-        const auto vertices = mesh->NbNodes(), triangles = mesh->NbTriangles();
-        for (int i = 1; i <= vertices; ++i) {
+        // The native surface duplicates the vertices of every triangle. Index
+        // identical transmitted positions, keeping the original facets and winding.
+        std::map<std::array<float, 3>, quint32> vertices;
+        std::vector<quint32> indices(mesh->NbNodes() + 1);
+        for (int i = 1; i <= mesh->NbNodes(); ++i) {
             const auto p = mesh->Node(i);
-            out << float(p.X()) << float(p.Y()) << float(p.Z());
+            const std::array<float, 3> xyz{float(p.X()), float(p.Y()), float(p.Z())};
+            const auto [it, inserted] = vertices.try_emplace(xyz, static_cast<quint32>(vertices.size()));
+            if (inserted)
+                out << xyz[0] << xyz[1] << xyz[2];
+            indices[i] = it->second;
         }
+        const auto triangles = mesh->NbTriangles();
         for (int i = 1; i <= triangles; ++i) {
             const auto &t = mesh->Triangle(i);
-            out << quint32(t.Value(1) - 1) << quint32(t.Value(2) - 1) << quint32(t.Value(3) - 1);
+            out << indices[t.Value(1)] << indices[t.Value(2)] << indices[t.Value(3)];
         }
-        frames.append(QJsonObject{{"move", move}, {"vertices", vertices}, {"triangles", triangles},
-                                  {"volume", stock->volume()}});
+        frames.append(QJsonObject{{"move", move}, {"vertices", static_cast<qint64>(vertices.size())}, {"triangles", triangles},
+                                  {"volume", stock->volume()}, {"materialSpacing", stock->resolution()},
+                                  {"displaySpacing", stock->resolution() * metrics.planarDecimationStride}});
     };
     // At most 33 display meshes per replay, independent of program length.
     const auto stride = (path.size() + 31) / 32;
@@ -296,7 +306,8 @@ QJsonObject replayResult(const MachiningJob &job, bool selectedOnly)
     }
     if (out.status() != QDataStream::Ok || !file.commit())
         throw std::runtime_error("无法保存余料回放");
-    return {{"frames", frames}, {"operations", spans}, {"tools", tools}, {"moves", path.size()}};
+    return {{"frames", frames}, {"operations", spans}, {"tools", tools}, {"moves", path.size()},
+            {"quality", quality}, {"selectedOnly", selectedOnly}};
 }
 
 QJsonObject stockResult(const MachiningJob &job, const ipw::IpwExecutionResult &simulation,
@@ -321,13 +332,17 @@ QJsonObject stockResult(const MachiningJob &job, const ipw::IpwExecutionResult &
     }
     std::string error;
     Handle(Poly_Triangulation) mesh;
-    toolpath::DexelDisplayMeshOptions opts;
-    opts.maximumPlanarCellCount = 180000;
-    if (!stock->buildDisplayMesh(mesh, nullptr, &error, {}, opts) || mesh.IsNull())
+    const int quality = request["quality"].toInt(5);
+    const auto opts = toolpath::ipwDisplayQualityProfile(quality, stock->resolution()).meshOptions;
+    toolpath::DexelDisplayMeshMetrics metrics;
+    if (!stock->buildDisplayMesh(mesh, &metrics, &error, {}, opts) || mesh.IsNull())
         throw std::runtime_error("IPW mesh: " + error);
     writeMeshData("stock.json", QJsonDocument(meshJson(mesh, "IPW")));
     result.insert("comparison", compareStock(job, stock, target, opts));
     result.insert("volume", stock->volume());
+    result.insert("quality", quality);
+    result.insert("materialSpacing", stock->resolution());
+    result.insert("displaySpacing", metrics.planarDecimationStride * stock->resolution());
     result.insert("operations", completeOperations);
     const auto initial = job.runtime().ipwCheckpoints.find(job.ipwSession().initialStateKey());
     if (initial)

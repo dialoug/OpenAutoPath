@@ -22,6 +22,7 @@ import (
 )
 
 type Request struct {
+	Quality         *int            `json:"quality,omitempty"`
 	AutoTool        bool            `json:"autoTool,omitempty"`
 	CompletedMoves  *int            `json:"completedMoves,omitempty"`
 	StockID         string          `json:"-"`

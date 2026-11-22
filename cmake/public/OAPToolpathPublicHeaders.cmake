@@ -47,6 +47,7 @@ list(APPEND OAP_PUBLIC_TARGET_HEADERS
     src/toolpath/hole/HoleStockSimulator.h
     src/toolpath/hole/HoleToolpathValidator.h
     src/toolpath/pocket/simulation/DexelDisplayMesh.h
+    src/toolpath/pocket/simulation/IpwQuality.h
     src/toolpath/pocket/simulation/DexelIntervalOps.h
     src/toolpath/pocket/simulation/MultiDexelStock.h
     src/toolpath/pocket/simulation/StockTargetCache.h

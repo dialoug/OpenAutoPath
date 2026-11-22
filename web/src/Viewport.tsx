@@ -13,6 +13,7 @@ type Props = {
   path: Segment[];
   cameraTools?: boolean;
   replay?: StockReplay;
+  onReplayPosition?: (move: number) => void;
   inspectStock?: (
     moves: number,
     operation: string | undefined,
@@ -28,6 +29,7 @@ export function Viewport({
   path,
   onPick,
   replay,
+  onReplayPosition,
   inspectStock,
   cameraTools = false,
 }: Props) {
@@ -98,7 +100,7 @@ export function Viewport({
     const box = new THREE.Box3();
     meshes.forEach((mesh) => box.expandByObject(mesh));
     if (replay) {
-      const stock = new THREE.BufferAttribute(replay.frames[0].positions, 3);
+      const stock = new THREE.BufferAttribute(replay.firstMesh.positions, 3);
       box.union(new THREE.Box3().setFromBufferAttribute(stock));
     }
     const center = box.getCenter(new THREE.Vector3());
@@ -301,6 +303,43 @@ export function Viewport({
     (last, frame) => (frame.move <= position ? frame : last),
     replay.frames[0],
   );
+  const [loaded, setLoaded] = useState<{
+    replay: StockReplay;
+    frame: StockReplay["frames"][number];
+    mesh: StockReplay["firstMesh"];
+  } | null>(null);
+  const [frameError, setFrameError] = useState("");
+  const [retryFrame, setRetryFrame] = useState(0);
+  useEffect(() => {
+    if (replay) onReplayPosition?.(position);
+  }, [position, replay, onReplayPosition]);
+  useEffect(() => {
+    if (!replay || !currentFrame) {
+      setLoaded(null);
+      setFrameError("");
+      return;
+    }
+    const controller = new AbortController();
+    const signal = controller.signal;
+    setFrameError("");
+    replay
+      .loadFrame(currentFrame, signal)
+      .then((mesh) => {
+        if (signal.aborted) return;
+        setLoaded({ replay, frame: currentFrame, mesh });
+        const next = replay.frames[replay.frames.indexOf(currentFrame) + 1];
+        if (next) void replay.loadFrame(next, signal).catch(() => {});
+      })
+      .catch((e) => {
+        if (!signal.aborted) {
+          setPlaying(false);
+          setFrameError(String(e));
+        }
+      });
+    return () => controller.abort();
+  }, [replay, currentFrame, retryFrame]);
+  const shown = replay && loaded?.replay === replay ? loaded : null;
+  const waiting = Boolean(replay && currentFrame !== shown?.frame);
   const operationIndex =
     replay?.operations.findIndex((op) => position <= op.end) ?? -1;
   const operation = replay?.operations[operationIndex];
@@ -343,18 +382,19 @@ export function Viewport({
     operationIndex > 0 ? replay!.operations[operationIndex - 1].end : 0;
   useEffect(() => {
     const view = state.current;
-    if (!view || !currentFrame) return;
+    if (!view || !shown) return;
     const geometry = new THREE.BufferGeometry();
     geometry.setAttribute(
       "position",
-      new THREE.BufferAttribute(currentFrame.positions, 3),
+      new THREE.BufferAttribute(shown.mesh.positions, 3),
     );
-    geometry.setIndex(new THREE.BufferAttribute(currentFrame.indices, 1));
+    geometry.setIndex(new THREE.BufferAttribute(shown.mesh.indices, 1));
     geometry.computeVertexNormals();
     const mesh = new THREE.Mesh(
       geometry,
       new THREE.MeshStandardMaterial({
         color: 0x8aa69d,
+        flatShading: true,
         roughness: 0.7,
         side: THREE.DoubleSide,
       }),
@@ -373,9 +413,9 @@ export function Viewport({
       geometry.dispose();
       if (state.current === view) view.draw();
     };
-  }, [currentFrame, faces]);
+  }, [shown, faces]);
   useEffect(() => {
-    if (!playing || !path.length) return;
+    if (!playing || !path.length || waiting) return;
     let previous: number | undefined;
     let handle = 0,
       remainder = 0,
@@ -395,7 +435,7 @@ export function Viewport({
     };
     handle = requestAnimationFrame(frame);
     return () => cancelAnimationFrame(handle);
-  }, [playing, path, speed]);
+  }, [playing, path, speed, waiting]);
   const startPosition = useRef(0);
   startPosition.current = position;
   const seek = (count: number) => {
@@ -547,10 +587,22 @@ export function Viewport({
                 </select>
               </label>
               <span>
-                余料帧 {currentFrame.move} · {currentFrame.volume.toFixed(2)}{" "}
-                mm³
+                {shown
+                  ? `余料帧 ${shown.frame.move} · ${shown.frame.volume.toFixed(2)} mm³`
+                  : "正在读取余料"}
+                {shown?.frame.displaySpacing &&
+                  ` · 网格 ${shown.frame.displaySpacing.toFixed(3)} mm`}
+                {shown && waiting && !frameError && " · 正在更新"}
               </span>
             </div>
+          )}
+          {replay && frameError && (
+            <span role="alert">
+              {frameError}{" "}
+              <button onClick={() => setRetryFrame((n) => n + 1)}>
+                重试余料帧
+              </button>
+            </span>
           )}
           {inspectStock && (
             <button

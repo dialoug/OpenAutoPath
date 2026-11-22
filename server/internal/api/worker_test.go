@@ -366,18 +366,19 @@ func TestNativeCAMWorkflow(t *testing.T) {
 	materialReplay := wait(call("POST", projectURL+"/replay", docRequest(project, nil), 202), "done")
 	replayBase := "/api/jobs/" + materialReplay.ID + "/files/"
 	var timeline struct {
+		Quality    int
 		Moves      int
 		Operations []struct {
 			ID  string
 			End int
 		}
 		Frames []struct {
-			Move, Vertices, Triangles int
-			Volume                    float64
+			Move, Vertices, Triangles               int
+			Volume, MaterialSpacing, DisplaySpacing float64
 		}
 	}
 	if json.Unmarshal(call("GET", replayBase+"result.json", nil, 200), &timeline) != nil ||
-		len(timeline.Operations) != stock.Operations || len(timeline.Frames) < 3 || len(timeline.Frames) > 33 {
+		timeline.Quality != 5 || len(timeline.Operations) != stock.Operations || len(timeline.Frames) < 3 || len(timeline.Frames) > 33 {
 		t.Fatal("invalid material playback manifest")
 	}
 	first, last := timeline.Frames[0], timeline.Frames[len(timeline.Frames)-1]
@@ -386,7 +387,7 @@ func TestNativeCAMWorkflow(t *testing.T) {
 	}
 	size := 0
 	for i, f := range timeline.Frames {
-		if f.Vertices < 1 || f.Triangles < 1 || (i > 0 && f.Move <= timeline.Frames[i-1].Move) {
+		if f.Vertices < 1 || f.Triangles < 1 || f.MaterialSpacing <= 0 || f.DisplaySpacing < f.MaterialSpacing || (i > 0 && f.Move <= timeline.Frames[i-1].Move) {
 			t.Fatal("invalid playback frame")
 		}
 		size += (f.Vertices + f.Triangles) * 12
@@ -395,6 +396,15 @@ func TestNativeCAMWorkflow(t *testing.T) {
 		t.Fatal("playback mesh stream length mismatch")
 	}
 	middle := timeline.Frames[len(timeline.Frames)/2]
+	call("POST", projectURL+"/replay", docRequest(project, map[string]any{"quality": 11}), 400)
+	detailed := wait(call("POST", projectURL+"/replay", docRequest(project, map[string]any{"quality": 10, "operation": timeline.Operations[0].ID}), 202), "done")
+	var fine struct {
+		Quality int
+		Frames  []struct{ MaterialSpacing, DisplaySpacing float64 }
+	}
+	if json.Unmarshal(call("GET", "/api/jobs/"+detailed.ID+"/files/result.json", nil, 200), &fine) != nil || fine.Quality != 10 || len(fine.Frames) < 2 || fine.Frames[0].MaterialSpacing >= first.MaterialSpacing || fine.Frames[0].DisplaySpacing > first.DisplaySpacing {
+		t.Fatal("detailed replay failed to refine the sample stock")
+	}
 	start := 0
 	for _, op := range timeline.Operations {
 		if middle.Move <= op.End {

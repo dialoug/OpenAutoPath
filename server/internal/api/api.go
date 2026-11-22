@@ -47,6 +47,7 @@ func Handler(manager *jobs.Manager, web string) http.Handler {
 			var input struct {
 				Document                                    json.RawMessage `json:"document"`
 				CompletedMoves                              *int            `json:"completedMoves"`
+				Quality                                     *int            `json:"quality"`
 				ConfirmedSetups                             *[]string       `json:"confirmedSetups"`
 				Operation                                   string          `json:"operation"`
 				AppendID                                    string          `json:"appendId"`
@@ -57,6 +58,7 @@ func Handler(manager *jobs.Manager, web string) http.Handler {
 			dec := json.NewDecoder(http.MaxBytesReader(w, r.Body, 32<<20))
 			dec.DisallowUnknownFields()
 			if err := dec.Decode(&input); err != nil || dec.Decode(new(any)) != io.EOF ||
+				(input.Quality != nil && ((action != "simulate" && action != "replay") || *input.Quality < 1 || *input.Quality > 10)) ||
 				(input.CompletedMoves != nil && (action != "simulate" || input.Operation == "" || *input.CompletedMoves < 0)) ||
 				(action == "stock" && (input.StockID == "" || len(input.Document) == 0)) ||
 				(action == "rebuild" && input.Operation == "") ||
@@ -66,7 +68,7 @@ func Handler(manager *jobs.Manager, web string) http.Handler {
 				http.Error(w, "invalid document request", 400)
 				return
 			}
-			req := jobs.Request{Action: action, CompletedMoves: input.CompletedMoves, StockID: input.StockID, ConfirmedSetups: input.ConfirmedSetups, Document: input.Document, Operation: input.Operation, AppendID: input.AppendID,
+			req := jobs.Request{Action: action, Quality: input.Quality, CompletedMoves: input.CompletedMoves, StockID: input.StockID, ConfirmedSetups: input.ConfirmedSetups, Document: input.Document, Operation: input.Operation, AppendID: input.AppendID,
 				Feature: input.Feature, AutoTool: input.AutoTool, Tool: input.Tool, Strategy: input.Strategy, LibraryID: input.LibraryID, Step: input.Step}
 			job, err := manager.Submit(owner(r), r.PathValue("id"), req, nil)
 			if errors.Is(err, os.ErrNotExist) {

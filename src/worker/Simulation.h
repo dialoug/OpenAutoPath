@@ -5,7 +5,7 @@
 
 namespace oap::worker
 {
-QJsonObject replayResult(const manufacturing::MachiningJob &job, bool selectedOnly);
+QJsonObject replayResult(const manufacturing::MachiningJob &job, bool selectedOnly, int quality);
 QJsonObject stockResult(const manufacturing::MachiningJob &job,
                         const manufacturing::ipw::IpwExecutionResult &simulation, const QJsonObject &request,
                         const TopoDS_Shape &target);

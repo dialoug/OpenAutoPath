@@ -6,9 +6,13 @@ type FrameInfo = {
   volume: number;
   vertices: number;
   triangles: number;
+  materialSpacing?: number;
+  displaySpacing?: number;
 };
 type Manifest = {
   moves: number;
+  quality?: number;
+  selectedOnly?: boolean;
   frames: FrameInfo[];
   operations: { id: string; end: number }[];
   tools?: {
@@ -17,15 +21,14 @@ type Manifest = {
     outline: [number, number][];
   }[];
 };
-export type StockFrame = {
-  move: number;
-  volume: number;
-  positions: Float32Array;
-  indices: Uint32Array;
-};
+type FrameMesh = { positions: Float32Array; indices: Uint32Array };
 export type StockReplay = {
   startMove?: number;
-  frames: StockFrame[];
+  frames: FrameInfo[];
+  firstMesh: FrameMesh;
+  loadFrame: (frame: FrameInfo, signal: AbortSignal) => Promise<FrameMesh>;
+  quality?: number;
+  selectedOnly?: boolean;
   operations: Manifest["operations"];
   tools?: Manifest["tools"];
   path: Segment[];
@@ -35,12 +38,9 @@ export async function loadStockReplay(
   job: string,
   signal: AbortSignal,
 ): Promise<StockReplay> {
-  const [info, path, buffer] = await Promise.all([
+  const [info, path] = await Promise.all([
     json<Manifest>(artifact(job, "result.json"), { signal }),
     json<Segment[]>(artifact(job, "path.json"), { signal }),
-    response(artifact(job, "replay.bin"), { signal }).then((r) =>
-      r.arrayBuffer(),
-    ),
   ]);
   if (
     !path.length ||
@@ -50,14 +50,37 @@ export async function loadStockReplay(
     info.operations.at(-1)?.end !== path.length
   )
     throw Error("余料帧与刀路长度不一致");
+  const ranges = new Map<FrameInfo, { offset: number; size: number }>();
   let offset = 0;
-  const frames = info.frames.map((frame) => {
-    const positions = new Float32Array(buffer, offset, 3 * frame.vertices);
-    offset += positions.byteLength;
-    const indices = new Uint32Array(buffer, offset, 3 * frame.triangles);
-    offset += indices.byteLength;
-    return { move: frame.move, volume: frame.volume, positions, indices };
-  });
-  if (offset !== buffer.byteLength) throw Error("余料回放文件长度不一致");
-  return { frames, operations: info.operations, tools: info.tools, path };
+  for (const frame of info.frames) {
+    const size = 12 * (frame.vertices + frame.triangles);
+    if (!Number.isSafeInteger(size) || size <= 0) throw Error("余料帧长度无效");
+    ranges.set(frame, { offset, size });
+    offset += size;
+  }
+  const cache = new Map<FrameInfo, FrameMesh>();
+  async function loadFrame(frame: FrameInfo, signal: AbortSignal) {
+    const hit = cache.get(frame);
+    if (hit) return hit;
+    const { offset, size } = ranges.get(frame)!;
+    const r = await response(artifact(job, "replay.bin"), {
+      headers: { Range: `bytes=${offset}-${offset + size - 1}` },
+      signal,
+    });
+    if (r.status !== 206) throw Error("服务未返回请求的余料帧");
+    const buffer = await r.arrayBuffer();
+    if (buffer.byteLength !== size) throw Error("余料帧数据不完整");
+    const positions = new Float32Array(buffer, 0, frame.vertices * 3);
+    const indices = new Uint32Array(
+      buffer,
+      positions.byteLength,
+      frame.triangles * 3,
+    );
+    const mesh = { positions, indices };
+    cache.set(frame, mesh);
+    if (cache.size > 3) cache.delete(cache.keys().next().value!);
+    return mesh;
+  }
+  const firstMesh = await loadFrame(info.frames[0], signal);
+  return { ...info, path, firstMesh, loadFrame };
 }

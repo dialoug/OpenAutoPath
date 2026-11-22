@@ -1,6 +1,7 @@
 #include "Project.h"
 #include "Planning.h"
 #include "Simulation.h"
+#include "toolpath/pocket/simulation/IpwQuality.h"
 #include "recognition/FeatureRecognizer.h"
 #include "tooling/adapter/hole/HoleMachiningInputMapper.h"
 #include "manufacturing/program/MachiningProgramPartitioner.h"
@@ -30,6 +31,8 @@
 #include <QSaveFile>
 #include <QUuid>
 #include <algorithm>
+#include <cmath>
+#include <limits>
 #include <stdexcept>
 
 namespace oap::worker
@@ -213,7 +216,7 @@ QJsonArray point(const gp_Pnt &p)
 ipw::IpwExecutionResult executeProject(MachiningJob &job, const StepIndexer &index,
                                        const toolpath::HoleRapidPlanningContext &context,
                                        std::map<JobOperationKind, toolpath::ToolpathParams> &parameters,
-                                       const std::string &stockPath)
+                                       const std::string &stockPath, const ipw::IpwExecutionOptions &options)
 {
     std::set<JobOperationKind> kinds;
     for (const auto &operation : MachiningOperationService::operations(job.definition()))
@@ -232,7 +235,8 @@ ipw::IpwExecutionResult executeProject(MachiningJob &job, const StepIndexer &ind
     if (stock.IsNull())
         throw std::runtime_error(error);
     const auto simulation = ipw::IpwExecutor().execute(
-        job, stock, MachiningJobStorage::definitionFingerprint(job.definition()).toStdString());
+        job, stock, MachiningJobStorage::definitionFingerprint(job.definition()).toStdString(),
+        ipw::kHybridIpwEngineId, options);
     if (!simulation.complete() || !simulation.finalCheckpoint || !simulation.finalCheckpoint->dexelStock)
         throw std::runtime_error("IPW: " + simulation.message);
     return simulation;
@@ -498,6 +502,24 @@ QJsonObject processProject(const QJsonObject &request, const StepIndexer &index,
         return result;
     if (action == "simulate" || action == "replay" || action == "export")
     {
+        const int quality = request["quality"].toInt(5);
+        ipw::IpwExecutionOptions options;
+        if (action != "export") {
+            if (quality < 1 || quality > 10)
+                throw std::runtime_error("仿真质量超出范围");
+            // Use the complete enabled project before trimming a prefix so that
+            // inspecting a move reproduces the same grid as its project replay.
+            double diameter = std::numeric_limits<double>::infinity();
+            for (const auto &op : MachiningOperationService::operations(def)) {
+                const auto *controller = job.toolControllerById(op.toolControllerId);
+                if (op.enabled && controller && controller->tool.diameter > 0)
+                    diameter = std::min(diameter, controller->tool.diameter);
+            }
+            const auto profile = toolpath::ipwSimulationQualityProfile(quality, std::isfinite(diameter) ? diameter : 1.0);
+            options.pocket.zMapResolution = profile.requestedResolution;
+            options.pocket.zMapMaxCellCount = profile.maximumCellCount;
+            options.hole = options.pocket;
+        }
         const auto through = request["operation"].toString();
         if ((action == "simulate" || action == "replay") && !through.isEmpty())
             selectPrefix(def, through.toStdString());
@@ -511,9 +533,9 @@ QJsonObject processProject(const QJsonObject &request, const StepIndexer &index,
             }
         }
         std::map<JobOperationKind, toolpath::ToolpathParams> parameters;
-        const auto simulation = executeProject(job, index, context, parameters, stockPath);
+        const auto simulation = executeProject(job, index, context, parameters, stockPath, options);
         if (action == "replay")
-            return replayResult(job, !through.isEmpty());
+            return replayResult(job, !through.isEmpty(), quality);
         if (action == "export")
             return exportPrograms(job, frames, parameters);
         result = stockResult(job, simulation, request, context.obstacleShape);
