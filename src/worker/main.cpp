@@ -1,5 +1,6 @@
 #include "analysis/AnalysisPipeline.h"
 #include "Project.h"
+#include "NcReview.h"
 #include "Planning.h"
 #include "recognition/FeatureRecognizer.h"
 #include "tooling/adapter/hole/HoleMachiningInputMapper.h"
@@ -137,7 +138,9 @@ QJsonObject generate(const RecognizedHoleGeometry& hole, const QJsonObject& requ
             setup->machiningSetup(), options, "reference.nc", error))
         throw std::runtime_error(error);
     QJsonArray segments;
+    QJsonArray operationIds;
     for (const auto& op : program.operations) {
+        operationIds.append(QString::fromStdString(op.operationId));
         for (const auto& move : op.moves)
             segments.append(QJsonArray{xyz(move.from), xyz(move.to)});
     }
@@ -148,7 +151,14 @@ QJsonObject generate(const RecognizedHoleGeometry& hole, const QJsonObject& requ
         issues.append(QJsonObject{{"code", QString::fromStdString(issue.code)},
                                   {"message", QString::fromStdString(issue.message)}});
     }
-    return {{"hole", request.value("hole")}, {"tool", bit->name}, {"toolId", bit->id},
+    QJsonArray warnings;
+    if (!batch.coverage.complete())
+        warnings.append(QJsonObject{{"line", 0}, {"message", QString::fromStdString(batch.coverage.summary())}});
+    if (!batch.productionSafety.complete())
+        warnings.append(QJsonObject{{"line", 0}, {"message", "刀具装配实体扫掠审计未完成"}});
+    const auto ncErrors = worker::reviewSingleNc(toolpath::workCoordinateCode(setup->workOffset), bit->name,
+                                                 operationIds, warnings);
+    return {{"singleNcReview", true}, {"ncErrors", ncErrors}, {"hole", request.value("hole")}, {"tool", bit->name}, {"toolId", bit->id},
             {"feed", params.tool.vertFeed}, {"rpm", params.tool.spindleSpeed},
             {"validation", QString::fromStdString(batch.validation.summary())}, {"issues", issues},
             {"coverageComplete", batch.coverage.complete()},

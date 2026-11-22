@@ -115,6 +115,7 @@ export function WorkspacePanel({
     setVersion(id);
     setDirty(false);
     localStorage.setItem(key, id);
+    return details && details.programCount ? "output" : "operations";
   }
   async function work(fn: () => Promise<void>) {
     setBusy(true);
@@ -145,6 +146,13 @@ export function WorkspacePanel({
     setDoc(value);
     setCoverage(null);
     setDirty(true);
+  }
+  function editPost(patch: Partial<Project["job"]["post"]>) {
+    if (doc && "job" in doc)
+      edit({
+        ...doc,
+        job: { ...doc.job, post: { ...doc.job.post, ...patch } },
+      });
   }
   async function save(value?: Library | Project, appendId?: string) {
     if (isLib && value && "library" in value) {
@@ -240,8 +248,7 @@ export function WorkspacePanel({
                 onChange={(e) => {
                   if (e.target.value && discard())
                     void work(async () => {
-                      await open(e.target.value);
-                      setPage("operations");
+                      setPage(await open(e.target.value));
                     });
                 }}
               >
@@ -404,7 +411,7 @@ export function WorkspacePanel({
                     }
                   />
                 )}
-                {!isLib && visible === "output" && (
+                {"job" in doc && visible === "output" && (
                   <div className="outputActions">
                     <h3>项目仿真</h3>
                     <p>按当前顺序计算已启用工序的余料。</p>
@@ -413,6 +420,25 @@ export function WorkspacePanel({
                       回放已启用工序
                     </button>
                     <h3>参考 NC</h3>
+                    <label>
+                      参考 NC 程序名
+                      <input
+                        value={doc.job.post.program_name}
+                        onChange={(e) =>
+                          editPost({ program_name: e.target.value })
+                        }
+                      />
+                    </label>
+                    <label>
+                      <input
+                        type="checkbox"
+                        checked={doc.job.post.coolant}
+                        onChange={(e) =>
+                          editPost({ coolant: e.target.checked })
+                        }
+                      />{" "}
+                      输出冷却液指令
+                    </label>
                     <p>核对各工序的装夹后，生成程序并逐文件审查。</p>
                     <button
                       onClick={() =>

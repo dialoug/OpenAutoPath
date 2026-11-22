@@ -255,7 +255,8 @@ paths:
     parameters:
       - {$ref: '#/components/parameters/id'}
     post:
-      summary: Regenerate enabled operations and publish reviewed NC partitions and ZIP
+      summary: Regenerate enabled operations and review each reference NC file
+      description: programs.json contains the exact NC text, setup, tool, operations, errors and warnings per file. A positive issue line is one-based and zero denotes the whole file. programs.zip is published only when all programs pass structural review.
       requestBody:
         required: true
         content:

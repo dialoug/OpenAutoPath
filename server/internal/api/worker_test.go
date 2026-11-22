@@ -141,6 +141,26 @@ func TestNativeCAMWorkflow(t *testing.T) {
 	pathJob := wait(call("POST", "/api/models/"+model.ID+"/toolpaths", strings.NewReader(inputs), 202), "done")
 	base = "/api/jobs/" + pathJob.ID + "/files/"
 	nc := call("GET", base+"reference.nc", nil, 200)
+	var single []struct {
+		Filename, Text string
+		Warnings       []struct {
+			Line int
+			Code string
+		}
+	}
+	if json.Unmarshal(call("GET", base+"programs.json", nil, 200), &single) != nil || len(single) != 1 || single[0].Text != string(nc) || single[0].Filename != "reference.nc" {
+		t.Fatal("single NC review differs from downloadable program")
+	}
+	sourceLines := strings.Split(string(nc), "\n")
+	foundReference := false
+	for _, warning := range single[0].Warnings {
+		if warning.Code == "reference_nc_only" && warning.Line > 0 && warning.Line <= len(sourceLines) {
+			foundReference = strings.Contains(sourceLines[warning.Line-1], "REFERENCE NC")
+		}
+	}
+	if !foundReference {
+		t.Fatal("reference warning has no matching source line")
+	}
 	for _, token := range []string{"OpenAutoPath hole", "REFERENCE NC", "S3000", "F100.", "M30"} {
 		if !bytes.Contains(nc, []byte(token)) {
 			t.Fatalf("missing %q in reference NC", token)

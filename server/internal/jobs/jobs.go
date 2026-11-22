@@ -359,9 +359,11 @@ func (m *Manager) run(ctx context.Context, dir string, j Job) {
 			return err
 		}
 		var result struct {
-			PocketJSONL bool
-			Version     int
-			Name        string
+			PocketJSONL    bool
+			SingleNCReview bool
+			NCErrors       int
+			Version        int
+			Name           string
 		}
 		if json.Unmarshal(data, &result) != nil || result.Version != 1 {
 			return errors.New("invalid worker result")
@@ -369,12 +371,20 @@ func (m *Manager) run(ctx context.Context, dir string, j Job) {
 		if result.Name != "" {
 			j.Name = result.Name
 		}
-		if j.Action == "export" {
+		files := outputs(j.Action)
+		if result.SingleNCReview && (j.Action == "generate" || j.Action == "rebuild") {
+			files = append(files, "programs.json")
+			if result.NCErrors > 0 {
+				files = slices.DeleteFunc(files, func(name string) bool { return name == "reference.nc" })
+			}
+		}
+		if j.Action == "export" && result.NCErrors > 0 {
+			files = slices.DeleteFunc(files, func(name string) bool { return name == "programs.zip" })
+		} else if j.Action == "export" {
 			if err := zipPrograms(dir); err != nil {
 				return err
 			}
 		}
-		files := outputs(j.Action)
 		if j.Action == "rebuild" && result.PocketJSONL {
 			files = append(files, "toolpath.jsonl")
 		}
@@ -421,7 +431,11 @@ func (m *Manager) Artifact(owner, id, name string) (string, error) {
 	if err != nil || j.State != "done" {
 		return "", os.ErrNotExist
 	}
-	allowed := name == "result.json" || slices.Contains(j.Files, name) || slices.Contains(outputs(j.Action), name)
+	files := j.Files
+	if len(files) == 0 {
+		files = outputs(j.Action)
+	}
+	allowed := name == "result.json" || slices.Contains(files, name)
 	if !allowed {
 		return "", os.ErrNotExist
 	}

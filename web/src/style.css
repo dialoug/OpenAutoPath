@@ -901,15 +901,114 @@ footer,
   min-height: 180px;
   margin: 8px 0;
 }
+.ncReview {
+  min-width: 0;
+}
+.ncSummary {
+  font-variant-numeric: tabular-nums;
+  color: var(--muted);
+}
+.ncIssues {
+  border-block: 1px solid var(--border);
+  padding: 8px 0;
+}
+.ncIssues ul {
+  list-style: none;
+  margin: 6px 0 0;
+  padding: 0;
+  max-height: 12rem;
+  overflow-y: auto;
+}
+.ncIssues button {
+  width: 100%;
+  justify-content: flex-start;
+  text-align: left;
+  flex-wrap: wrap;
+  gap: 4px 8px;
+  border: 0;
+  border-radius: 2px;
+}
+.ncIssues button span:last-child {
+  font-weight: 400;
+  overflow-wrap: anywhere;
+}
+.ncWarning {
+  color: #92511b;
+}
+.ncError {
+  color: #ad332b;
+}
+.ncTools,
+.ncTools form,
+.ncPaging {
+  display: flex;
+  align-items: end;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+.ncTools {
+  justify-content: space-between;
+  margin: 8px 0;
+}
+.ncTools form {
+  margin: 0;
+}
+.ncTools input {
+  max-width: 11rem;
+}
+.ncTools input[type="number"] {
+  max-width: 6rem;
+}
+.docPanel .ncTools label {
+  margin: 0;
+}
+.ncTools small {
+  align-self: center;
+}
 .ncPreview {
+  position: relative;
+  font:
+    13px/1.6 Consolas,
+    "Courier New",
+    monospace;
   background: var(--dark);
   color: #e9f4f6;
   border-radius: 6px;
-  max-height: 23rem;
+  height: min(36vh, 24rem);
   overflow: auto;
-  white-space: pre;
-  padding: 12px;
+  padding-block: 5px;
+  tab-size: 4;
 }
+.ncPreview > div {
+  display: flex;
+  min-width: 100%;
+  width: max-content;
+}
+.ncPreview [aria-current="true"] {
+  background: #354e60;
+  box-shadow: inset 3px 0 #f09c72;
+}
+.ncPreview code {
+  white-space: pre;
+  font: inherit;
+  padding-right: 1rem;
+}
+.ncPreview [aria-hidden] {
+  display: inline-block;
+  padding-inline: 0.7em 1em;
+  min-width: 5.4em;
+  text-align: right;
+  color: #b4c7ce;
+  user-select: none;
+}
+.ncPaging {
+  align-items: center;
+  margin: 6px 0;
+}
+.ncPaging small {
+  margin-right: auto;
+}
+
 .outputActions h3:not(:first-child) {
   margin-top: 20px;
 }

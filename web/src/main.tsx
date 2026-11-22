@@ -17,6 +17,7 @@ import {
 } from "lucide-react";
 import { loadStockReplay, type StockReplay } from "./stockReplay";
 import { SimulationQuality } from "./SimulationQuality";
+import { SingleNcReview } from "./NcReview";
 import { ModelStart } from "./ModelStart";
 import { createRoot } from "react-dom/client";
 import { Viewport, type Face, type Segment } from "./Viewport";
@@ -98,6 +99,10 @@ function App() {
   const [inspector, setInspector] = useState<"settings" | "results">(
     "settings",
   );
+  const [ncPreview, setNcPreview] = useState<{
+    id: string;
+    hasReport: boolean;
+  } | null>(null);
   const [panel, setPanel] = useState<"project" | "library" | null>(null);
   const [library, setLibrary] = useState(
     () => localStorage.getItem("cam.library") || "",
@@ -1250,12 +1255,22 @@ function App() {
                         {review.sweepComplete ? "完成" : "未完成"}。
                       </p>
                     )}
-                    <a
-                      href={"/api/jobs/" + job.id + "/files/reference.nc"}
-                      download
+                    <button
+                      onClick={() =>
+                        setNcPreview({
+                          id: job.id,
+                          hasReport: !!job.files?.includes("programs.json"),
+                        })
+                      }
                     >
-                      下载本次参考 NC
-                    </a>
+                      审查本次参考 NC
+                    </button>
+                    {(!job.files?.length ||
+                      job.files.includes("reference.nc")) && (
+                      <a href={artifact(job.id, "reference.nc")} download>
+                        下载本次参考 NC
+                      </a>
+                    )}
                     {job.files?.includes("toolpath.jsonl") && (
                       <a href={artifact(job.id, "toolpath.jsonl")} download>
                         下载槽腔刀路 JSONL
@@ -1315,6 +1330,13 @@ function App() {
         </div>
         {error && <pre role="alert">{error}</pre>}
       </main>
+      {ncPreview && (
+        <SingleNcReview
+          job={ncPreview.id}
+          hasReport={ncPreview.hasReport}
+          onClose={() => setNcPreview(null)}
+        />
+      )}
       {panel && (
         <WorkspacePanel
           key={panel + model}

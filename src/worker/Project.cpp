@@ -5,7 +5,7 @@
 #include "recognition/FeatureRecognizer.h"
 #include "tooling/adapter/hole/HoleMachiningInputMapper.h"
 #include "manufacturing/program/MachiningProgramPartitioner.h"
-#include "toolpath/program/validation/GCodeReview.h"
+#include "NcReview.h"
 #include "toolpath/program/validation/ToolpathProgramValidator.h"
 #include "toolpath/core/PocketToolBinding.h"
 #include "toolpath/pocket/program/PocketToolpathExport.h"
@@ -279,6 +279,24 @@ void confirmSetups(MachiningJob &job, toolpath::MoldSetupWorkFrames frames, cons
         "browser-session");
 }
 
+QJsonArray ncMachiningWarnings(const MachiningJob &job, JobOperationKind kind)
+{
+    QJsonArray warnings;
+    if (kind == JobOperationKind::Hole && job.holeResult())
+    {
+        const auto &batch = *job.holeResult();
+        if (!batch.coverage.complete())
+            warnings.append(
+                QJsonObject{{"line", 0}, {"message", QString::fromStdString(batch.coverage.summary())}});
+        if (!batch.productionSafety.complete())
+            warnings.append(QJsonObject{{"line", 0}, {"message", "刀具装配实体扫掠审计未完成"}});
+    }
+    if (kind == JobOperationKind::SurfaceFinishing)
+        warnings.append(QJsonObject{{"line", 0},
+                                    {"message", "雕刻刀刃接触采用采样计算，连续刀柄与夹具碰撞仍需复核"}});
+    return warnings;
+}
+
 QJsonObject exportPrograms(const MachiningJob &job, toolpath::MoldSetupWorkFrames frames,
                            const std::map<JobOperationKind, toolpath::ToolpathParams> &parameters)
 {
@@ -289,6 +307,7 @@ QJsonObject exportPrograms(const MachiningJob &job, toolpath::MoldSetupWorkFrame
         throw std::runtime_error(result.issues.empty() ? "没有可导出的程序" : result.issues.front().message);
     const auto operations = MachiningOperationService::operations(job.definition());
     QJsonArray programs;
+    int ncErrors = 0;
     for (const auto &part : result.partitions)
     {
         const auto op = std::find_if(operations.begin(), operations.end(),
@@ -325,43 +344,16 @@ QJsonObject exportPrograms(const MachiningJob &job, toolpath::MoldSetupWorkFrame
                                                              error))
             throw std::runtime_error(error);
         const auto nc = buffer.str();
-        const auto review = toolpath::GCodeReview().review(nc);
-        QJsonArray warnings, ids;
-        if (op->kind == JobOperationKind::Hole && job.holeResult())
-        {
-            const auto &batch = *job.holeResult();
-            if (!batch.coverage.complete())
-                warnings.append(
-                    QJsonObject{{"line", 0}, {"message", QString::fromStdString(batch.coverage.summary())}});
-            if (!batch.productionSafety.complete())
-                warnings.append(QJsonObject{{"line", 0}, {"message", "刀具装配实体扫掠审计未完成"}});
-        }
-        if (op->kind == JobOperationKind::SurfaceFinishing)
-            warnings.append(QJsonObject{{"line", 0},
-                                        {"message", "雕刻刀刃接触采用采样计算，连续刀柄与夹具碰撞仍需复核"}});
-        for (const auto &issue : review.issues)
-        {
-            if (issue.severity == toolpath::GCodeReviewSeverity::Error)
-                throw std::runtime_error(filename.toStdString() + " L" + std::to_string(issue.line) + ": " +
-                                         issue.message);
-            warnings.append(
-                QJsonObject{{"line", issue.line}, {"message", QString::fromStdString(issue.message)}});
-        }
+        QJsonArray ids;
         for (const auto &id : part.formalOperationIds)
             ids.append(QString::fromStdString(id));
-        programs.append(QJsonObject{{"filename", filename},
-                                    {"setup", QString::fromStdString(setup->id)},
-                                    {"tool", QString::fromStdString(options.toolName)},
-                                    {"operations", ids},
-                                    {"warnings", warnings},
-                                    {"lines", review.lineCount},
-                                    {"text", QString::fromStdString(nc)}});
+        const auto program = reviewNc(nc, filename, QString::fromStdString(setup->id),
+                                      QString::fromStdString(options.toolName), ids, ncMachiningWarnings(job, op->kind));
+        ncErrors += static_cast<int>(program["errors"].toArray().size());
+        programs.append(program);
     }
-    const auto data = QJsonDocument(programs).toJson(QJsonDocument::Compact);
-    QSaveFile file("programs.json");
-    if (!file.open(QIODevice::WriteOnly) || file.write(data) != data.size() || !file.commit())
-        throw std::runtime_error("无法保存 NC 程序");
-    return {{"programCount", programs.size()}};
+    writeNcReport(programs);
+    return {{"programCount", programs.size()}, {"ncErrors", ncErrors}};
 }
 
 QJsonObject planHoles(MachiningJob &job, const Model &model, const StepIndexer &index,
@@ -593,6 +585,12 @@ QJsonObject processProject(const QJsonObject &request, const StepIndexer &index,
     if (!file.open(QIODevice::WriteOnly) || file.write(data) != data.size() || !file.commit())
         throw std::runtime_error("无法写入刀路预览");
     result.insert("operation", QString::fromStdString(id));
+    const auto *boundTool = job.toolControllerById(it->toolControllerId);
+    const auto toolName = QString::fromStdString(boundTool ? boundTool->tool.toolName : options.toolName);
+    result.insert("tool", toolName);
+    result.insert("singleNcReview", true);
+    result.insert("ncErrors", reviewSingleNc(toolpath::workCoordinateCode(setup->workOffset), toolName,
+                                              {QString::fromStdString(id)}, ncMachiningWarnings(selected, it->kind)));
     result.insert("moves", path.size());
     result.insert("validation", QString::fromStdString(report.summary()));
     return result;

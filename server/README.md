@@ -69,13 +69,15 @@ HTTP 消息和状态码可查阅 [OpenAPI 定义](../contracts/http/openapi.yaml
 | 规划工序、重算或仿真 | 在项目 URL 后追加 `/plan`、`/rebuild` 或 `/simulate` 并 POST |
 | 按活动刀库重新规划所有孔 | 项目 URL 后追加 `/holes`，传 `document` 和可选 `libraryId` |
 | 绑定外部毛坯 | 项目 URL 后追加 `/stock`，传 `document` 和会话内已上传模型的 `stockId` |
-| 核对装夹与导出项目 NC | 先 POST `/setups` 保存 `confirmedSetups`，再用该版本的 `document` POST `/export`；结果含 `programs.json` 和 `programs.zip` |
+| 核对装夹与导出项目 NC | 先 POST `/setups` 保存 `confirmedSetups`，再用该版本的 `document` POST `/export`。审查报告为 `programs.json`，所有程序通过结构审查后提供 `programs.zip` |
 | 指定余料阶段 | POST `/simulate` 可传终点工序 `operation` 和该工序内可选的 `completedMoves`，传 0 表示开始该工序前 |
 | 准备余料回放 | POST `/replay` 传 `document`，可选 `operation` 限定回放工序。产物包括刀路、工序和余料帧索引、二进制显示网格 |
 | 查询或取消任务 | `GET` 或 `DELETE /api/jobs/{jobId}` |
 | 获取已完成的结果 | `GET /api/jobs/{jobId}/files/{name}` |
 
 Go 为 worker 写入 v1 请求文件，并将当前工作目录设为本次任务目录。worker 输出 JSON 行进度事件，成功时生成 `result.json`。分析结果包含网格和刀库；项目、规划和仿真任务保存原生文档。成功任务的 `files` 列出可下载产物，仿真结果的 `volume` 单位为 mm³。任务目录中的 `request.json` 保留确切输入，便于在独立工作目录重放。模型、刀具和协议约定见[请求样例](../contracts/worker/analyze.json)。
+
+在工作台的「加工结果」中选择「审查本次参考 NC」可以查看单道工序。项目完整导出位于「加工项目 → 仿真与 NC」。审查报告记录每个文件的装夹、刀具、工序、NC 原文及桌面内核给出的结构错误和警告。问题行号从 1 开始，0 表示问题涉及整个文件。页面支持点击问题定位、搜索和跳行。逐一核对各文件后，页面提供整包下载。同一浏览器标签页会记住当前任务的核对进度。
 
 在仓库根目录运行真实 worker 的集成测试。测试通过 HTTP 上传损坏文件和真实模型，检查识别面与网格映射、生成刀路、下载 NC，并验证跨会话访问隔离。
 

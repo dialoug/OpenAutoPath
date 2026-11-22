@@ -180,7 +180,7 @@ export function ProjectEditor({
           </section>
         )}
         <details className="setupRow">
-          <summary>项目工艺参数与输出设置</summary>
+          <summary>项目工艺参数</summary>
           {(
             [
               "hole_parameters",
@@ -214,29 +214,6 @@ export function ProjectEditor({
               />
             )),
           )}
-          <label>
-            参考 NC 程序名
-            <input
-              value={def.post.program_name}
-              onChange={(e) =>
-                edit((d) => {
-                  d.post.program_name = e.target.value;
-                })
-              }
-            />
-          </label>
-          <label>
-            <input
-              type="checkbox"
-              checked={def.post.coolant}
-              onChange={(e) =>
-                edit((d) => {
-                  d.post.coolant = e.target.checked;
-                })
-              }
-            />{" "}
-            输出冷却液指令
-          </label>
         </details>
       </section>
       <section hidden={view !== "operations"}>
