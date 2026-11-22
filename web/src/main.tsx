@@ -2,9 +2,21 @@ import { useEffect, useState } from "react";
 import { createRoot } from "react-dom/client";
 import { Viewport, type Face, type Segment } from "./Viewport";
 import "./style.css";
-import type { CamFeature, Cutter } from "./PlanningForm";
+import {
+  PlanningControls,
+  type CamFeature,
+  type Cutter,
+  type PlanOptions,
+} from "./PlanningForm";
 import { WorkspacePanel } from "./WorkspacePanel";
-import { assignedTools, artifact, json, type Library } from "./workspace";
+import {
+  assignedTools,
+  artifact,
+  json,
+  submit,
+  type Project,
+  type Library,
+} from "./workspace";
 
 type Job = {
   name?: string;
@@ -96,6 +108,16 @@ function App() {
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
   const [features, setFeatures] = useState<CamFeature[]>([]);
+  const [mode, setMode] = useState<"hole" | "pocket">("hole");
+  const [pocketID, setPocketID] = useState("");
+  const [featureState, setFeatureState] = useState<
+    "loading" | "ready" | "error"
+  >("loading");
+  const [featureError, setFeatureError] = useState("");
+  const [retryFeatures, retry] = useState(0);
+  const [planningJob, setPlanningJob] = useState<Job | null>(null);
+  const pockets = features.filter((f) => f.kind === "pocket");
+  const pocket = pockets.find((f) => f.id === pocketID) || pockets[0];
   const [holes, setHoles] = useState<Hole[]>([]);
   const [selected, select] = useState("");
   const [tools, setTools] = useState<Tool[]>([]);
@@ -196,15 +218,19 @@ function App() {
   useEffect(() => {
     if (!model) return;
     let live = true;
+    const controller = new AbortController();
+    setFeatureState("loading");
+    setFeatureError("");
+    setPocketID("");
     const base = "/api/jobs/" + model + "/files/";
     Promise.all(
       ["result.json", "mesh.json"].map(async (file) =>
         (await request(base + file)).json(),
       ),
     )
-      .then(([result, mesh]) => {
+      .then(async ([result, mesh]) => {
         if (live) {
-          setFeatures(result.features || []);
+          setFeatures(result.features ?? []);
           setTools(result.tools);
           setHoles(result.holes);
           setFaces(mesh);
@@ -217,15 +243,48 @@ function App() {
                 Math.abs(t.diameter - result.holes[0]?.diameter) < 0.001,
             );
           setTool(match?.id || "");
+          let regions = result;
+          if (
+            !Array.isArray(result.features) ||
+            (result.featureError && retryFeatures > 0)
+          ) {
+            const signal = controller.signal;
+            const previous =
+              retryFeatures === 0 &&
+              (await json<Job[]>("/api/workspace", { signal })).find(
+                (j) => j.action === "features" && j.modelId === model,
+              );
+            const job =
+              previous ||
+              (await submit(
+                "/api/models/" + model + "/features",
+                {},
+                signal,
+                () => {},
+              ));
+            regions = await json<{
+              features: CamFeature[];
+              featureError?: string;
+            }>(artifact(job.id, "result.json"), { signal });
+          }
+          if (!live) return;
+          setFeatures(regions.features);
+          setFeatureState(regions.featureError ? "error" : "ready");
+          setFeatureError(regions.featureError || "");
         }
       })
       .catch((e) => {
-        if (live) setError(String(e));
+        if (live) {
+          setError(String(e));
+          setFeatureError(String(e));
+          setFeatureState("error");
+        }
       });
     return () => {
       live = false;
+      controller.abort();
     };
-  }, [model]);
+  }, [model, retryFeatures]);
   async function upload(file: File) {
     setBusy(true);
     setError("");
@@ -252,6 +311,31 @@ function App() {
       setError(String(e));
     } finally {
       setBusy(false);
+    }
+  }
+  async function planPocket(options: PlanOptions) {
+    setBusy(true);
+    setError("");
+    const signal = new AbortController().signal;
+    try {
+      const key = "cam.project." + model;
+      const version = localStorage.getItem(key);
+      const document = version
+        ? await json<Project>(artifact(version, "project.oapjob"), { signal })
+        : undefined;
+      const planned = await submit(
+        "/api/models/" + model + "/projects/plan",
+        { document, libraryId: library, ...options },
+        signal,
+        setPlanningJob,
+      );
+      localStorage.setItem(key, planned.id);
+      setPanel("project");
+    } catch (e) {
+      setError(String(e));
+    } finally {
+      setBusy(false);
+      setPlanningJob(null);
     }
   }
   async function generate() {
@@ -348,16 +432,26 @@ function App() {
           </div>
           <Viewport
             faces={showStock && stock ? stock.mesh : faces}
-            highlighted={hole?.faces || []}
-            path={path}
+            highlighted={
+              (mode === "pocket" ? pocket?.faces : hole?.faces) || []
+            }
+            path={mode === "pocket" && !review?.operation ? [] : path}
             onPick={(id) => {
+              if (mode === "pocket") {
+                const hit = pockets.find((f) => f.faces.includes(id));
+                if (hit) setPocketID(hit.id);
+                return;
+              }
               const h =
                 holes.find((v) => v.id === id) ||
                 holes.find((v) => v.faces.includes(id));
               if (h) select(h.id);
             }}
           />
-          <footer>旋转 · 拖动　　缩放 · 滚轮　　选择 · 点击孔壁</footer>
+          <footer>
+            旋转 · 拖动　　缩放 · 滚轮　　选择 ·{" "}
+            {mode === "pocket" ? "点击槽腔面" : "点击孔壁"}
+          </footer>
           {stock && (
             <footer>
               <button onClick={() => setShowStock(!showStock)}>
@@ -369,79 +463,150 @@ function App() {
           )}
         </section>
         <aside>
-          <h2>
-            加工特征 <small>{holes.length}</small>
-          </h2>
-          <label>
-            孔段
-            <select value={selected} onChange={(e) => select(e.target.value)}>
-              <option value="" disabled>
-                选择孔段
-              </option>
-              {holes.map((h) => (
-                <option key={h.id} value={h.id}>
-                  {h.id}　Ø {h.diameter.toFixed(2)} mm
-                </option>
-              ))}
-            </select>
-          </label>
-          {hole && <p>孔深 {hole.depth.toFixed(2)} mm</p>}
-          <form
-            onSubmit={(e) => {
-              e.preventDefault();
-              void generate();
-            }}
-          >
-            <h2>加工参数</h2>
-            <label>
-              {library ? "活动刀库" : "模拟刀库"}
-              <select
-                required
-                value={tool}
-                onChange={(e) => {
-                  const chosen = (library ? libraryTools : tools).find(
-                    (t) => t.id === e.target.value,
-                  );
-                  setTool(e.target.value);
-                  if (chosen?.feed) setFeed(chosen.feed);
-                  if (chosen?.rpm) setRPM(chosen.rpm);
+          <h2>加工特征</h2>
+          <div className="featureModes" role="group" aria-label="加工类型">
+            <button
+              aria-pressed={mode === "hole"}
+              onClick={() => setMode("hole")}
+            >
+              孔加工 <small>{holes.length}</small>
+            </button>
+            <button
+              aria-pressed={mode === "pocket"}
+              onClick={() => setMode("pocket")}
+            >
+              槽腔加工{" "}
+              <small>{featureState === "ready" ? pockets.length : ""}</small>
+            </button>
+          </div>
+          {mode === "hole" ? (
+            <>
+              <label>
+                孔段
+                <select
+                  value={selected}
+                  onChange={(e) => select(e.target.value)}
+                >
+                  <option value="" disabled>
+                    选择孔段
+                  </option>
+                  {holes.map((h) => (
+                    <option key={h.id} value={h.id}>
+                      {h.id}　Ø {h.diameter.toFixed(2)} mm
+                    </option>
+                  ))}
+                </select>
+              </label>
+              {hole && <p>孔深 {hole.depth.toFixed(2)} mm</p>}
+              <form
+                onSubmit={(e) => {
+                  e.preventDefault();
+                  void generate();
                 }}
               >
-                <option value="">选择刀具</option>
-                {(library ? libraryTools : tools).map((t) => (
-                  <option key={t.id} value={t.id}>
-                    {t.name}
-                  </option>
-                ))}
-              </select>
-            </label>
-            <label>
-              进给 (mm/min)
-              <input
-                type="number"
-                step="any"
-                min=".001"
-                max="100000"
-                required
-                value={feed}
-                onChange={(e) => setFeed(+e.target.value)}
-              />
-            </label>
-            <label>
-              主轴转速 (rpm)
-              <input
-                type="number"
-                step="any"
-                min="1"
-                max="100000"
-                required
-                value={rpm}
-                onChange={(e) => setRPM(+e.target.value)}
-              />
-            </label>
-            <button disabled={!hole || active}>生成参考刀路</button>
-          </form>
-          {job && (
+                <h2>加工参数</h2>
+                <label>
+                  {library ? "活动刀库" : "模拟刀库"}
+                  <select
+                    required
+                    value={tool}
+                    onChange={(e) => {
+                      const chosen = (library ? libraryTools : tools).find(
+                        (t) => t.id === e.target.value,
+                      );
+                      setTool(e.target.value);
+                      if (chosen?.feed) setFeed(chosen.feed);
+                      if (chosen?.rpm) setRPM(chosen.rpm);
+                    }}
+                  >
+                    <option value="">选择刀具</option>
+                    {(library ? libraryTools : tools).map((t) => (
+                      <option key={t.id} value={t.id}>
+                        {t.name}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+                <label>
+                  进给 (mm/min)
+                  <input
+                    type="number"
+                    step="any"
+                    min=".001"
+                    max="100000"
+                    required
+                    value={feed}
+                    onChange={(e) => setFeed(+e.target.value)}
+                  />
+                </label>
+                <label>
+                  主轴转速 (rpm)
+                  <input
+                    type="number"
+                    step="any"
+                    min="1"
+                    max="100000"
+                    required
+                    value={rpm}
+                    onChange={(e) => setRPM(+e.target.value)}
+                  />
+                </label>
+                <button disabled={!hole || active}>生成参考刀路</button>
+              </form>
+            </>
+          ) : (
+            <fieldset className="pocketFields" disabled={active || !model}>
+              {!model ? (
+                <p>上传 STEP 或打开历史模型以识别槽腔。</p>
+              ) : featureState === "loading" ? (
+                <p role="status">正在识别槽腔…</p>
+              ) : featureState === "error" ? (
+                <>
+                  <p role="alert">{featureError}</p>
+                  <button onClick={() => retry((n) => n + 1)}>重新识别</button>
+                </>
+              ) : pocket ? (
+                <>
+                  <label>
+                    槽腔区域
+                    <select
+                      value={pocket.id}
+                      onChange={(e) => setPocketID(e.target.value)}
+                    >
+                      {pockets.map((f, i) => (
+                        <option key={f.id} value={f.id}>
+                          槽腔 {i + 1} · {f.id}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+                  <PlanningControls
+                    key={pocket.id}
+                    feature={pocket}
+                    cutters={library ? libraryTools : tools}
+                    plan={planPocket}
+                  />
+                </>
+              ) : (
+                <p>该模型未识别到槽腔。</p>
+              )}
+            </fieldset>
+          )}
+          {planningJob && (
+            <div role="status">
+              正在规划槽腔…{" "}
+              <button
+                onClick={() =>
+                  void request("/api/jobs/" + planningJob.id, {
+                    method: "DELETE",
+                  }).catch((e) => setError(String(e)))
+                }
+              >
+                取消槽腔规划
+              </button>
+            </div>
+          )}
+          {job && !planningJob && (
             <section aria-live="polite">
               <h2>任务状态</h2>
               <p>

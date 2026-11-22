@@ -162,7 +162,7 @@ void run(const QString& fileName)
     const auto request = QJsonDocument::fromJson(file.readAll()).object();
     const auto action = request.value("action").toString();
     if (request.value("version").toInt() != 1 || (action != "analyze" && action != "generate" &&
-        action != "library" && action != "project" && action != "rebuild" && action != "simulate" && action != "plan"))
+        action != "features" && action != "library" && action != "project" && action != "rebuild" && action != "simulate" && action != "plan"))
         throw std::runtime_error("Unsupported worker request");
     tooling::ToolLibrary library;
     QString libraryError;
@@ -212,6 +212,17 @@ void run(const QString& fileName)
         return;
     }
     const auto geometries = FeatureRecognizer().recognizeHoleGeometries(model, index).geometries;
+    QJsonObject result;
+    if (action == "analyze" || action == "features") {
+        const auto trace = worker::traceRegions(model, index, geometries);
+        result.insert("features", worker::planningFeatures(trace));
+        if (!trace.ok()) result.insert("featureError", QString::fromStdString(trace.error));
+        if (action == "features") {
+            result.insert("version", 1);
+            writeJson("result.json", QJsonDocument(result));
+            return;
+        }
+    }
     QJsonArray holes;
     const RecognizedHoleGeometry* selected = nullptr;
     for (const auto& hole : geometries) {
@@ -226,14 +237,10 @@ void run(const QString& fileName)
         if (id == request.value("hole").toString())
             selected = &hole;
     }
-    QJsonObject result;
     if (action == "analyze") {
         stage("meshing");
         writeMesh(index, part);
         result.insert("holes", holes);
-        const auto trace=worker::traceRegions(model,index,geometries);
-        result.insert("features",worker::planningFeatures(trace));
-        if(!trace.ok()) result.insert("featureError",QString::fromStdString(trace.error));
         QJsonArray units;
         for(const auto& unit:model.units) units.append(QJsonObject{{"id",QString::fromStdString(unit.unit_id)},
             {"name",QString::fromStdString(unit.decoded_name)},{"faces",static_cast<int>(unit.face_ids.size())}});

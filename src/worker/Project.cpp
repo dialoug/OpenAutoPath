@@ -286,7 +286,7 @@ QJsonObject processProject(const QJsonObject &request, const StepIndexer &index,
     manufacturing::MachiningJob job;
     auto &def = job.definition();
     QString error;
-    if (!request.contains("document") && request["action"].toString() == "project")
+    if (!request.contains("document") && (request["action"].toString() == "project" || request["action"].toString() == "plan"))
     {
         def.id = QUuid::createUuid().toString(QUuid::WithoutBraces).toStdString();
         def.part.sourcePath =

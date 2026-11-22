@@ -23,7 +23,7 @@ components:
       properties:
         id: {type: string}
         modelId: {type: string}
-        action: {enum: [analyze, generate, library, project, plan, rebuild, simulate]}
+        action: {enum: [analyze, features, generate, library, project, plan, rebuild, simulate]}
         state: {enum: [queued, running, done, cancelled, failed]}
         stage: {type: string}
         error: {type: string}
@@ -123,6 +123,19 @@ paths:
         '400': {description: Invalid request}
         '404': {description: Referenced resource is unavailable in this session}
         '429': {description: Queue full}
+  /api/models/{id}/features:
+    parameters:
+      - {$ref: '#/components/parameters/id'}
+    post:
+      summary: Recognize machining regions for an existing STEP model
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {type: object, additionalProperties: false}
+      responses:
+        '202': {$ref: '#/components/responses/Accepted'}
+        '404': {description: Model unavailable in this session}
   /api/models/{id}/projects/plan:
     parameters:
       - {$ref: '#/components/parameters/id'}
@@ -135,7 +148,7 @@ paths:
             schema:
               type: object
               additionalProperties: false
-              required: [document, feature, tool, strategy, step]
+              required: [feature, tool, strategy, step]
               properties:
                 document: {type: object}
                 feature: {type: string}

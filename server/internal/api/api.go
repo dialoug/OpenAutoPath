@@ -55,7 +55,7 @@ func Handler(manager *jobs.Manager, web string) http.Handler {
 			dec.DisallowUnknownFields()
 			if err := dec.Decode(&input); err != nil || dec.Decode(new(any)) != io.EOF ||
 				(action == "rebuild" && input.Operation == "") ||
-				(action != "library" && action != "project" && len(input.Document) == 0) ||
+				((action == "simulate" || action == "rebuild") && len(input.Document) == 0) ||
 				(action == "plan" && (input.Feature == "" || input.Tool == "" || input.Step <= 0 || input.Step > 1000)) {
 				http.Error(w, "invalid document request", 400)
 				return
@@ -78,6 +78,7 @@ func Handler(manager *jobs.Manager, web string) http.Handler {
 			respond(w, 202, job)
 		}
 	}
+	api.HandleFunc("POST /api/models/{id}/features", documentJob("features"))
 	api.HandleFunc("POST /api/libraries", documentJob("library"))
 	api.HandleFunc("POST /api/models/{id}/projects", documentJob("project"))
 	api.HandleFunc("POST /api/models/{id}/projects/rebuild", documentJob("rebuild"))

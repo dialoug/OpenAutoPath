@@ -51,9 +51,6 @@ export function PlanningForm({
   const [expanded, setExpanded] = useState(false);
   const [picked, setPicked] = useState("");
   const [id, setId] = useState("");
-  const [strategy, setStrategy] = useState("");
-  const [tool, setTool] = useState("");
-  const [step, setStep] = useState(1);
   const chosen = features.find((f) => f.id === id);
 
   const candidates = picked
@@ -76,10 +73,8 @@ export function PlanningForm({
               const matches = features.filter((f) => f.faces.includes(face));
               if (matches.length === 1) {
                 setId(matches[0].id);
-                setStrategy("");
               } else {
                 setId("");
-                setStrategy("");
               }
             }}
           />
@@ -92,7 +87,6 @@ export function PlanningForm({
                     key={f.id}
                     onClick={() => {
                       setId(f.id);
-                      setStrategy("");
                     }}
                   >
                     {names[f.kind]} · {f.id}
@@ -109,7 +103,6 @@ export function PlanningForm({
           onChange={(e) => {
             setPicked("");
             setId(e.target.value);
-            setStrategy("");
           }}
         >
           <option value="">选择区域或雕刻方向</option>
@@ -122,55 +115,80 @@ export function PlanningForm({
       </label>
       {chosen && (
         <>
-          <label>
-            加工策略
-            <select
-              value={strategy || patterns[chosen.kind][0][0]}
-              onChange={(e) => setStrategy(e.target.value)}
-            >
-              {patterns[chosen.kind].map(([v, l]) => (
-                <option value={v} key={v}>
-                  {l}
-                </option>
-              ))}
-            </select>
-          </label>
-          <MillingToolPicker
-            label="规划刀具"
+          <PlanningControls
+            key={chosen.id}
+            feature={chosen}
             cutters={cutters}
-            value={tool}
-            select={setTool}
+            plan={plan}
           />
-          <label>
-            {chosen.kind === "engrave" ? "扫描行距" : "每层切深"} (mm)
-            <input
-              type="number"
-              min=".001"
-              step="any"
-              value={step}
-              onChange={(e) => setStep(+e.target.value)}
-            />
-          </label>
-          <button
-            disabled={!tool || step <= 0}
-            onClick={() =>
-              plan({
-                feature: id,
-                tool,
-                step,
-                strategy: strategy || patterns[chosen.kind][0][0],
-              })
-            }
-          >
-            {chosen.kind === "engrave"
-              ? "追加雕刻工序"
-              : chosen.kind === "pocket"
-                ? "追加槽腔工序"
-                : "更新项目的外轮廓工序"}
-            并保存新版本
-          </button>
         </>
       )}
     </details>
+  );
+}
+
+export function PlanningControls({
+  feature,
+  cutters,
+  plan,
+}: {
+  feature: CamFeature;
+  cutters: Cutter[];
+  plan: (o: PlanOptions) => void;
+}) {
+  const [strategy, setStrategy] = useState("");
+  const [tool, setTool] = useState("");
+  const [step, setStep] = useState(1);
+  return (
+    <>
+      {" "}
+      <label>
+        加工策略
+        <select
+          value={strategy || patterns[feature.kind][0][0]}
+          onChange={(e) => setStrategy(e.target.value)}
+        >
+          {patterns[feature.kind].map(([v, l]) => (
+            <option value={v} key={v}>
+              {l}
+            </option>
+          ))}
+        </select>
+      </label>
+      <MillingToolPicker
+        label="规划刀具"
+        cutters={cutters}
+        value={tool}
+        select={setTool}
+      />
+      <label>
+        {feature.kind === "engrave" ? "扫描行距" : "每层切深"} (mm)
+        <input
+          type="number"
+          min=".001"
+          step="any"
+          value={step}
+          onChange={(e) => setStep(+e.target.value)}
+        />
+      </label>
+      <button
+        disabled={!tool || step <= 0}
+        onClick={() =>
+          plan({
+            feature: feature.id,
+            tool,
+            step,
+            strategy: strategy || patterns[feature.kind][0][0],
+          })
+        }
+      >
+        {feature.kind === "engrave"
+          ? "追加雕刻工序"
+          : feature.kind === "pocket"
+            ? "追加槽腔工序"
+            : "更新项目的外轮廓工序"}
+        并保存新版本
+      </button>
+    </>
   );
 }

@@ -251,3 +251,37 @@ header nav button {
   min-height: 180px;
   margin: 8px 0;
 }
+
+.featureModes {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 6px;
+  margin-bottom: 16px;
+}
+.featureModes button {
+  background: #edf4f3;
+  color: #244b4c;
+  border: 1px solid #bdd1ce;
+}
+.featureModes button[aria-pressed="true"] {
+  background: #086c66;
+  color: white;
+  border-color: #086c66;
+}
+.featureModes small {
+  color: inherit;
+}
+.pocketFields {
+  border: 0;
+  padding: 0;
+  margin: 0;
+  min-width: 0;
+}
+.pocketFields input[type="search"] {
+  display: block;
+  width: 100%;
+  margin-top: 5px;
+  padding: 8px;
+  border: 1px solid #afc0c3;
+  border-radius: 4px;
+}

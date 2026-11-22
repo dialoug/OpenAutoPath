@@ -11,6 +11,7 @@ import (
 	"net/http/httptest"
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 	"testing"
 	"time"
@@ -94,6 +95,11 @@ func TestNativeCAMWorkflow(t *testing.T) {
 	}
 	if err := json.Unmarshal(call("GET", base+"result.json", nil, 200), &result); err != nil {
 		t.Fatal(err)
+	}
+	backfill := wait(call("POST", "/api/models/"+model.ID+"/features", strings.NewReader("{}"), 202), "done")
+	var regions struct{ Features []struct{ ID, Kind string } }
+	if err := json.Unmarshal(call("GET", "/api/jobs/"+backfill.ID+"/files/result.json", nil, 200), &regions); err != nil || !slices.Equal(regions.Features, result.Features) || backfill.ModelID != model.ID {
+		t.Fatal("backfilled features differ from initial analysis")
 	}
 	var mesh []struct {
 		ID      string
@@ -284,7 +290,7 @@ func TestNativeCAMWorkflow(t *testing.T) {
 			return wait(call("POST", projectURL+"/rebuild", docRequest(readProject(j), map[string]any{"operation": id, "tool": tool}), 202), "done")
 		}
 		ncFor := func(j jobs.Job) []byte { return call("GET", "/api/jobs/"+j.ID+"/files/reference.nc", nil, 200) }
-		one := plan(blank, pockets[0], millingTool, "offset", 2)
+		one := wait(call("POST", projectURL+"/plan", docRequest(nil, map[string]any{"feature": pockets[0], "tool": millingTool, "strategy": "offset", "step": 2}), 202), "done")
 		ops, _ := read(one)
 		if len(ops) != 1 {
 			t.Fatal("first pocket missing")
