@@ -162,7 +162,7 @@ void run(const QString& fileName)
         throw std::runtime_error("Cannot open request");
     const auto request = QJsonDocument::fromJson(file.readAll()).object();
     const auto action = request.value("action").toString();
-    const QStringList projectActions{"project", "rebuild", "simulate", "stock",
+    const QStringList projectActions{"project", "rebuild", "simulate", "replay", "stock",
                                      "setups",  "export",  "holes",    "plan"};
     const bool projectAction = projectActions.contains(action);
     if (request.value("version").toInt() != 1 ||

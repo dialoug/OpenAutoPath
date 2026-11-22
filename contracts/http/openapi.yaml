@@ -24,7 +24,7 @@ components:
         id: {type: string}
         modelId: {type: string}
         sourceHash: {type: string, description: SHA-256 of the uploaded STEP}
-        action: {enum: [analyze, features, generate, library, project, plan, rebuild, simulate, holes, stock, setups, export]}
+        action: {enum: [analyze, features, generate, library, project, plan, rebuild, simulate, replay, holes, stock, setups, export]}
         state: {enum: [queued, running, done, cancelled, failed]}
         stage: {type: string}
         error: {type: string}
@@ -292,6 +292,27 @@ paths:
         '202': {$ref: '#/components/responses/Accepted'}
         '400': {description: Invalid request}
         '404': {description: Referenced resource is unavailable in this session}
+        '429': {description: Queue full}
+  /api/models/{id}/projects/replay:
+    parameters:
+      - {$ref: '#/components/parameters/id'}
+    post:
+      summary: Prepare toolpath and sampled remaining stock frames for playback
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [document]
+              properties:
+                document: {type: object}
+                operation: {type: string, description: Replay only this enabled operation using stock left by its predecessors}
+      responses:
+        '202': {$ref: '#/components/responses/Accepted'}
+        '400': {description: Invalid document request}
+        '404': {description: Model unavailable in this session}
         '429': {description: Queue full}
   /api/jobs/{id}:
     parameters:

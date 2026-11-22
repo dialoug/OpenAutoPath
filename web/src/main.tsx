@@ -15,6 +15,7 @@ import {
   Upload,
   Wrench,
 } from "lucide-react";
+import { loadStockReplay, type StockReplay } from "./stockReplay";
 import { ModelStart } from "./ModelStart";
 import { createRoot } from "react-dom/client";
 import { Viewport, type Face, type Segment } from "./Viewport";
@@ -195,6 +196,8 @@ function App() {
   } | null>(null);
   const [stockView, setStockView] = useState("");
   const [showStock, setShowStock] = useState(false);
+  const [replay, setReplay] = useState<StockReplay | null>(null);
+  const replayVisible = inspector === "results" ? replay : null;
   const [review, setReview] = useState<Review | null>(null);
   useEffect(() => {
     if (!review || review.operation || !holes.length) return;
@@ -211,6 +214,9 @@ function App() {
         (!job || job.id !== saved || ["queued", "running"].includes(job.state)),
     );
   function track(j: Job) {
+    setReplay(null);
+    setReview(null);
+    setPath([]);
     setStock(null);
     setShowStock(false);
     setJob(j);
@@ -219,6 +225,7 @@ function App() {
   }
   useEffect(() => {
     if (!saved) return;
+    const controller = new AbortController();
     let live = true;
     let timer: ReturnType<typeof setTimeout>;
     async function poll() {
@@ -239,6 +246,23 @@ function App() {
           localStorage.setItem("cam.model", j.id);
           setModel(j.id);
           refreshModels((n) => n + 1);
+        } else if (j.action === "replay") {
+          const data = await loadStockReplay(j.id, controller.signal);
+          if (live) {
+            const resume = Number(
+              sessionStorage.getItem("cam.replayMove." + j.id),
+            );
+            setReplay({
+              ...data,
+              startMove:
+                Number.isInteger(resume) &&
+                resume >= 0 &&
+                resume <= data.path.length
+                  ? resume
+                  : 0,
+            });
+            setInspector("results");
+          }
         } else if (j.action === "simulate") {
           const [r, mesh, differences] = await Promise.all([
             json<{ volume: number; operations: number }>(
@@ -281,6 +305,7 @@ function App() {
     void poll();
     return () => {
       live = false;
+      controller.abort();
       clearTimeout(timer);
     };
   }, [saved]);
@@ -427,28 +452,44 @@ function App() {
       setPlanningJob(null);
     }
   }
-  async function inspectStock(completedMoves: number) {
-    if (!job || !review?.operation) return;
+  async function requestStock(
+    action: "replay" | "simulate",
+    operation?: string,
+    completedMoves?: number,
+  ) {
+    if (!job) return;
     setBusy(true);
     setError("");
     try {
       const document = await json<Project>(artifact(job.id, "project.oapjob"));
-      const j = await json<Job>("/api/models/" + model + "/projects/simulate", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          document,
-          operation: review.operation,
-          completedMoves,
-        }),
-      });
-      setReview(null);
-      setPath([]);
+      const j = await json<Job>(
+        "/api/models/" + model + "/projects/" + action,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            document,
+            operation,
+            completedMoves,
+          }),
+        },
+      );
+      sessionStorage.setItem("cam.replayReturn." + j.id, job.id);
       track(j);
     } catch (e) {
       setError(String(e));
     } finally {
       setBusy(false);
+    }
+  }
+  async function returnToSource() {
+    if (!job) return;
+    const id = sessionStorage.getItem("cam.replayReturn." + job.id);
+    if (!id) return;
+    try {
+      track(await json<Job>("/api/jobs/" + id));
+    } catch (e) {
+      setError(String(e));
     }
   }
   async function generate() {
@@ -721,16 +762,34 @@ function App() {
               <div className="cardHeading">
                 <h2>
                   <Box />
-                  {stock && showStock ? "仿真视图" : "模型视图"}
+                  {replayVisible
+                    ? "余料回放"
+                    : stock && showStock
+                      ? "仿真视图"
+                      : "模型视图"}
                 </h2>
                 <span className="viewUnit">
-                  {stock && showStock ? "IPW" : "STEP"}
+                  {replayVisible || (stock && showStock) ? "IPW" : "STEP"}
                 </span>
               </div>
               <Viewport
                 cameraTools
+                replay={replayVisible || undefined}
                 inspectStock={
-                  review?.operation && !active ? inspectStock : undefined
+                  !active && (review?.operation || replayVisible)
+                    ? (moves, op, cursor) => {
+                        if (replayVisible && job)
+                          sessionStorage.setItem(
+                            "cam.replayMove." + job.id,
+                            String(cursor),
+                          );
+                        void requestStock(
+                          "simulate",
+                          op ?? review?.operation,
+                          moves,
+                        );
+                      }
+                    : undefined
                 }
                 faces={
                   showStock && stock
@@ -763,9 +822,15 @@ function App() {
                       : []
                     : (mode === "hole" ? hole?.faces : region?.faces) || []
                 }
-                path={mode !== "hole" && !review?.operation ? [] : path}
+                path={
+                  replayVisible
+                    ? replayVisible.path
+                    : mode !== "hole" && !review?.operation
+                      ? []
+                      : path
+                }
                 onPick={(id) => {
-                  if (showStock) return;
+                  if (showStock || replayVisible) return;
                   if (mode === "pocket" && manual) {
                     setInspector("settings");
                     setFloor(id);
@@ -791,11 +856,13 @@ function App() {
               <footer>
                 <MousePointer2 size={14} /> 拖动旋转 · 滚轮缩放{" "}
                 <span className="viewHint">/</span>{" "}
-                {mode === "engrave"
-                  ? "从列表选择装夹方向"
-                  : mode === "hole"
-                    ? "点击孔壁"
-                    : "点击" + regionLabel + "面"}
+                {replayVisible
+                  ? "拖动进度条检查余料"
+                  : mode === "engrave"
+                    ? "从列表选择装夹方向"
+                    : mode === "hole"
+                      ? "点击孔壁"
+                      : "点击" + regionLabel + "面"}
               </footer>
             </section>
             <aside className="inspector">
@@ -816,7 +883,8 @@ function App() {
                   aria-pressed={inspector === "results"}
                   onClick={() => setInspector("results")}
                 >
-                  加工结果{(stock || review) && <b className="resultDot" />}
+                  加工结果
+                  {(stock || review || replay) && <b className="resultDot" />}
                 </button>
               </div>
               <div className="inspectorBody" hidden={inspector !== "settings"}>
@@ -992,7 +1060,44 @@ function App() {
                 className="inspectorBody results"
                 hidden={inspector !== "results"}
               >
-                {!stock && !review && (
+                {(review || stock) && (
+                  <button
+                    className="primary"
+                    disabled={active}
+                    onClick={() =>
+                      void requestStock(
+                        "replay",
+                        review?.operation || stock?.throughOperation,
+                      )
+                    }
+                  >
+                    {stock && !stock.throughOperation
+                      ? "回放项目余料"
+                      : "回放加工余料"}
+                  </button>
+                )}
+                {job &&
+                  sessionStorage.getItem("cam.replayReturn." + job.id) && (
+                    <button
+                      disabled={active}
+                      onClick={() => void returnToSource()}
+                    >
+                      返回上次结果
+                    </button>
+                  )}
+                {replay && (
+                  <section>
+                    <h2>余料回放</h2>
+                    <p>
+                      {replay.operations.length} 道工序 · {replay.path.length}{" "}
+                      段移动 · {replay.frames.length} 帧余料
+                    </p>
+                    <p>
+                      刀路逐步播放，毛坯更新到最近的已计算帧。可在任一移动处查看该步的精确余料。
+                    </p>
+                  </section>
+                )}
+                {!stock && !review && !replay && (
                   <div className="emptyResults">
                     <Route />
                     <p>生成刀路或运行仿真后，可在这里查看和下载结果。</p>

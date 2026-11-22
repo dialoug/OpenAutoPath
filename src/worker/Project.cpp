@@ -472,7 +472,7 @@ QJsonObject processProject(const QJsonObject &request, const StepIndexer &index,
         def.stock.sourceFingerprint = expected.toStdString();
     }
     const bool computing = action == "plan" || action == "rebuild" || action == "simulate" ||
-                           action == "export" || action == "holes";
+                           action == "export" || action == "holes" || action == "replay";
     if (computing && def.stock.sourceKind == StockSourceKind::StepModel && stockPath.empty())
         throw std::runtime_error("请在加工项目中绑定与毛坯指纹匹配的 STEP");
     if (computing && !def.collisionScene.models.empty())
@@ -496,10 +496,10 @@ QJsonObject processProject(const QJsonObject &request, const StepIndexer &index,
     if (action == "project" || action == "plan" || action == "setups" || action == "stock" ||
         action == "holes")
         return result;
-    if (action == "simulate" || action == "export")
+    if (action == "simulate" || action == "replay" || action == "export")
     {
         const auto through = request["operation"].toString();
-        if (action == "simulate" && !through.isEmpty())
+        if ((action == "simulate" || action == "replay") && !through.isEmpty())
             selectPrefix(def, through.toStdString());
         if (action == "export")
         {
@@ -512,6 +512,8 @@ QJsonObject processProject(const QJsonObject &request, const StepIndexer &index,
         }
         std::map<JobOperationKind, toolpath::ToolpathParams> parameters;
         const auto simulation = executeProject(job, index, context, parameters, stockPath);
+        if (action == "replay")
+            return replayResult(job, !through.isEmpty());
         if (action == "export")
             return exportPrograms(job, frames, parameters);
         result = stockResult(job, simulation, request, context.obstacleShape);

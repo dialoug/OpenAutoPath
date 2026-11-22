@@ -12,7 +12,7 @@ type Props = {
   append: (id: string) => void;
   assets: Job[];
   bindStock: (id: string | File) => void;
-  simulate: (id: string) => void;
+  simulate: (id: string, replay?: boolean) => void;
   confirmSetups: (ids: string[]) => void;
   rebuild: (id: string, tool?: string) => void;
 };
@@ -352,6 +352,12 @@ export function ProjectEditor({
               </button>
               <button disabled={!op.enabled} onClick={() => simulate(op.id)}>
                 仿真至此工序
+              </button>
+              <button
+                disabled={!op.enabled}
+                onClick={() => simulate(op.id, true)}
+              >
+                回放此工序余料
               </button>
               <button disabled={!i} onClick={() => move(i, i - 1)}>
                 上移

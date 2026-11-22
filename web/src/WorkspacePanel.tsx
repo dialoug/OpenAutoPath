@@ -161,10 +161,10 @@ export function WorkspacePanel({
     if (!value || !doc) setPage("operations");
     await reload();
   }
-  function simulate(operation?: string) {
+  function simulate(operation?: string, replay = false) {
     void work(async () => {
       const j = await submit(
-        url + "/simulate",
+        url + (replay ? "/replay" : "/simulate"),
         { document: doc, operation },
         life.current.signal,
         setPending,
@@ -401,6 +401,9 @@ export function WorkspacePanel({
                     <h3>项目仿真</h3>
                     <p>按当前顺序计算已启用工序的余料。</p>
                     <button onClick={() => simulate()}>仿真已启用工序</button>
+                    <button onClick={() => simulate(undefined, true)}>
+                      回放已启用工序
+                    </button>
                     <h3>参考 NC</h3>
                     <p>核对各工序的装夹后，生成程序并逐文件审查。</p>
                     <button

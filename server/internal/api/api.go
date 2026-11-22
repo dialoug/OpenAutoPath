@@ -61,7 +61,7 @@ func Handler(manager *jobs.Manager, web string) http.Handler {
 				(action == "stock" && (input.StockID == "" || len(input.Document) == 0)) ||
 				(action == "rebuild" && input.Operation == "") ||
 				(action == "setups" && input.ConfirmedSetups == nil) ||
-				((action == "simulate" || action == "export" || action == "setups" || action == "rebuild") && len(input.Document) == 0) ||
+				((action == "simulate" || action == "replay" || action == "export" || action == "setups" || action == "rebuild") && len(input.Document) == 0) ||
 				(action == "plan" && (input.Feature == "" || (!input.AutoTool && input.Tool == "") || input.Step <= 0 || input.Step > 1000)) {
 				http.Error(w, "invalid document request", 400)
 				return
@@ -89,6 +89,7 @@ func Handler(manager *jobs.Manager, web string) http.Handler {
 	api.HandleFunc("POST /api/models/{id}/projects", documentJob("project"))
 	api.HandleFunc("POST /api/models/{id}/projects/rebuild", documentJob("rebuild"))
 	api.HandleFunc("POST /api/models/{id}/projects/simulate", documentJob("simulate"))
+	api.HandleFunc("POST /api/models/{id}/projects/replay", documentJob("replay"))
 	api.HandleFunc("POST /api/models/{id}/projects/stock", documentJob("stock"))
 	api.HandleFunc("POST /api/models/{id}/projects/setups", documentJob("setups"))
 	api.HandleFunc("POST /api/models/{id}/projects/holes", documentJob("holes"))

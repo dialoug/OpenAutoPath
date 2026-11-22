@@ -439,6 +439,8 @@ func outputs(action string) []string {
 		return []string{"project.oapjob"}
 	case "simulate":
 		return []string{"project.oapjob", "stock.json", "differences.json"}
+	case "replay":
+		return []string{"project.oapjob", "path.json", "replay.bin"}
 	case "library":
 		return []string{"library.oaptl"}
 	default:

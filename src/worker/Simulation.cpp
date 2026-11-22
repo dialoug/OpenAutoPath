@@ -4,7 +4,8 @@
 #include "toolpath/core/simulation/FixedAxisToolpathView.h"
 #include <algorithm>
 #include "manufacturing/ipw/HoleMultiDexelUpdater.h"
-#include "manufacturing/job/MachiningOperationService.h"
+#include <QDataStream>
+#include <map>
 #include "toolpath/core/PocketToolBinding.h"
 #include <QJsonArray>
 #include <QJsonDocument>
@@ -18,80 +19,105 @@ namespace
 {
 using Stock = std::shared_ptr<const toolpath::MultiDexelStock>;
 
-// Match the desktop transient view: replay from the immutable stock before the
-// selected operation, using its bound cutter and the actual hole-tip profile.
-Stock moveFrame(const MachiningJob &job, const ipw::IpwNode &node, std::size_t completed, std::size_t &total)
+struct FamilyProgram
 {
-    const auto parent = job.runtime().ipwCheckpoints.find(node.parentStateKey);
-    const auto *setup = job.setupById(node.operation.setupId);
-    if (!parent || !parent->dexelStock || !setup)
-        throw std::runtime_error("缺少工序起始毛坯或装夹");
-    Stock stock = parent->dexelStock;
     toolpath::ToolpathProgram program;
     toolpath::ToolpathParams params;
-    const auto ordered = MachiningOperationService::operations(job.definition());
-    const auto formal = std::find_if(ordered.begin(), ordered.end(),
-                                     [&](const auto &op) { return op.id == node.operation.id; });
-    if (formal == ordered.end())
-        throw std::runtime_error("工序不存在");
-    switch (formal->kind)
-    {
-    case JobOperationKind::Hole:
-        program = job.holeResult()->toProgram();
-        params = job.holeResult()->effectiveParams;
-        break;
-    case JobOperationKind::Pocket:
-        program = job.pocketResult()->toProgram();
-        params = job.pocketResult()->effectiveParams;
-        break;
-    case JobOperationKind::Profile:
-        program = job.profileResult()->toProgram();
-        params = job.profileResult()->effectiveParams;
-        break;
-    case JobOperationKind::SurfaceFinishing:
-        program = job.currentFinishingResult()->toProgram();
-        params = job.currentFinishingResult()->effectiveParams;
-        break;
+};
+
+FamilyProgram familyProgram(const MachiningJob &job, ipw::IpwOperationKind kind)
+{
+    switch (kind) {
+    case ipw::IpwOperationKind::Hole:
+        return {job.holeResult()->toProgram(), job.holeResult()->effectiveParams};
+    case ipw::IpwOperationKind::Pocket:
+        return {job.pocketResult()->toProgram(), job.pocketResult()->effectiveParams};
+    case ipw::IpwOperationKind::Profile:
+        return {job.profileResult()->toProgram(), job.profileResult()->effectiveParams};
+    case ipw::IpwOperationKind::SurfaceFinishing:
+        return {job.currentFinishingResult()->toProgram(), job.currentFinishingResult()->effectiveParams};
+    default:
+        throw std::runtime_error("未知余料工序");
     }
-    int sequence = 0;
-    std::size_t remaining = completed;
-    for (const auto &op : program.operations)
-    {
-        if (!runtimeOperationIdMatches(node.operation.id, op.operationId))
+}
+
+struct Cut
+{
+    toolpath::FixedAxisToolpathView path;
+    toolpath::ToolpathParams params;
+    toolpath::DexelToolProfileDefinition profile;
+};
+
+std::vector<Cut> operationCuts(const MachiningJob &job, const ipw::IpwNode &node, const FamilyProgram &family)
+{
+    const auto *setup = job.setupById(node.operation.setupId);
+    if (!setup)
+        throw std::runtime_error("缺少工序装夹");
+    std::vector<Cut> cuts;
+    for (const auto &op : family.program.operations) {
+        if (!runtimeOperationIdMatches(node.operation.id, op.operationId) || op.moves.empty())
             continue;
-        total += op.moves.size();
-        const auto count = std::min(remaining, op.moves.size());
-        remaining -= count;
-        if (!count)
-            continue;
-        const auto bound = toolpath::bindPocketToolParameters(params, op.tool);
+        auto params = toolpath::bindPocketToolParameters(family.params, op.tool);
         toolpath::DexelToolProfileDefinition profile;
-        profile.diameter = bound.tool.diameter;
-        profile.cornerRadius = bound.tool.cornerRadius;
-        profile.cuttingLength = bound.tool.cuttingEdgeLength;
+        profile.diameter = params.tool.diameter;
+        profile.cornerRadius = params.tool.cornerRadius;
+        profile.cuttingLength = params.tool.cuttingEdgeLength;
         gp_Vec axis(setup->zAxis.x, setup->zAxis.y, setup->zAxis.z);
-        if (formal->kind == JobOperationKind::Hole)
-        {
+        if (node.operation.kind == ipw::IpwOperationKind::Hole) {
             const auto &holes = job.holeResult()->machining.operations;
             const auto hole = std::find_if(holes.begin(), holes.end(),
-                                           [&](const auto &h) { return h.operationId == op.operationId; });
+                [&](const auto &h) { return h.operationId == op.operationId; });
             if (hole == holes.end())
                 throw std::runtime_error("无法绑定钻尖轮廓");
-            profile = ipw::holeDexelToolProfile(*hole, params);
+            profile = ipw::holeDexelToolProfile(*hole, family.params);
             axis = gp_Vec(hole->bottom, hole->entry);
         }
-        const toolpath::FixedAxisToolpathView view{op.operationId, axis, op.moves};
-        auto applied = stock->applyToolpathPrefix(view, bound, profile, sequence++, count, {});
-        if (!applied.stock)
-            throw std::runtime_error("无法计算此移动的余料");
-        stock = std::move(applied.stock);
+        cuts.push_back({{op.operationId, axis, op.moves}, std::move(params), profile});
     }
-    if (!total || remaining)
+    if (cuts.empty())
+        throw std::runtime_error("工序缺少可回放的刀路");
+    return cuts;
+}
+
+Stock checkpoint(const MachiningJob &job, const std::string &key)
+{
+    const auto saved = job.runtime().ipwCheckpoints.find(key);
+    if (!saved || !saved->dexelStock)
+        throw std::runtime_error("缺少工序余料检查点");
+    return saved->dexelStock;
+}
+
+// Apply only the moves between two successive samples using the same cutter
+// definition as the exact, single-step inspection.
+Stock advanceStock(Stock stock, const Cut &cut, std::size_t start, std::size_t count, int sequence)
+{
+    auto range = cut.path;
+    range.moves = range.moves.subspan(start, count);
+    const auto result = stock->applyToolpathPrefix(range, cut.params, cut.profile, sequence, count, {});
+    if (!result.stock)
+        throw std::runtime_error("无法计算此移动的余料");
+    return result.stock;
+}
+
+Stock moveFrame(const MachiningJob &job, const ipw::IpwNode &node, std::size_t completed, std::size_t &total)
+{
+    const auto family = familyProgram(job, node.operation.kind);
+    const auto cuts = operationCuts(job, node, family);
+    for (const auto &cut : cuts)
+        total += cut.path.moves.size();
+    if (completed > total)
         throw std::runtime_error("移动序号超出工序范围");
     if (completed == total)
-        return job.runtime().ipwCheckpoints.find(node.stateKey)->dexelStock;
+        return checkpoint(job, node.stateKey);
+    auto stock = checkpoint(job, node.parentStateKey);
+    for (std::size_t i = 0; i < cuts.size() && completed; ++i) {
+        const auto count = std::min(completed, cuts[i].path.moves.size());
+        stock = advanceStock(stock, cuts[i], 0, count, static_cast<int>(i));
+        completed -= count;
+    }
     return stock;
 }
+
 QJsonArray meshJson(const Handle(Poly_Triangulation) & mesh, const QString &id)
 {
     if (mesh.IsNull())
@@ -181,6 +207,97 @@ QJsonObject compareStock(const MachiningJob &job, Stock stock, const TopoDS_Shap
             {"attribution", attribution}};
 }
 } // namespace
+
+QJsonObject replayResult(const MachiningJob &job, bool selectedOnly)
+{
+    const auto &nodes = job.ipwSession().nodes();
+    if (nodes.empty())
+        throw std::runtime_error("没有可回放的工序");
+    // Keep each family's move storage alive for every non-owning Cut view.
+    std::map<ipw::IpwOperationKind, FamilyProgram> families;
+    struct Operation {
+        const ipw::IpwNode &node;
+        std::vector<Cut> cuts;
+    };
+    std::vector<Operation> operations;
+    QJsonArray path, spans, frames, tools;
+    const auto point = [](const gp_Pnt &p) { return QJsonArray{p.X(), p.Y(), p.Z()}; };
+    for (const auto &node : nodes) {
+        if (selectedOnly && &node != &nodes.back())
+            continue;
+        const auto kind = node.operation.kind;
+        if (!families.contains(kind))
+            families.emplace(kind, familyProgram(job, kind));
+        auto cuts = operationCuts(job, node, families.at(kind));
+        for (const auto &cut : cuts) {
+            for (const auto &move : cut.path.moves)
+                path.append(QJsonArray{point(move.from), point(move.to)});
+            toolpath::DexelToolProfile profile;
+            QJsonArray outline;
+            if (toolpath::buildDexelToolProfile(cut.profile, {}, profile)) {
+                for (const auto &band : profile.bands) {
+                    outline.append(QJsonArray{band.radius, band.lower});
+                    outline.append(QJsonArray{band.radius, band.upper});
+                }
+            }
+            const auto &axis = cut.path.outwardToolAxis;
+            tools.append(QJsonObject{{"end", path.size()}, {"axis", QJsonArray{axis.X(), axis.Y(), axis.Z()}},
+                                     {"outline", outline}});
+        }
+        spans.append(QJsonObject{{"id", QString::fromStdString(node.operation.id)}, {"end", path.size()}});
+        operations.push_back({node, std::move(cuts)});
+    }
+    writeMeshData("path.json", QJsonDocument(path));
+    QSaveFile file("replay.bin");
+    if (!file.open(QIODevice::WriteOnly))
+        throw std::runtime_error("无法写入余料回放");
+    QDataStream out(&file);
+    out.setByteOrder(QDataStream::LittleEndian);
+    out.setFloatingPointPrecision(QDataStream::SinglePrecision);
+    toolpath::DexelDisplayMeshOptions opts;
+    opts.maximumPlanarCellCount = 20000;
+    opts.maximumTriangleCount = 100000;
+    auto saveFrame = [&](const Stock &stock, qsizetype move) {
+        Handle(Poly_Triangulation) mesh;
+        std::string error;
+        if (!stock->buildDisplayMesh(mesh, nullptr, &error, {}, opts) || mesh.IsNull())
+            throw std::runtime_error("余料回放网格: " + error);
+        const auto vertices = mesh->NbNodes(), triangles = mesh->NbTriangles();
+        for (int i = 1; i <= vertices; ++i) {
+            const auto p = mesh->Node(i);
+            out << float(p.X()) << float(p.Y()) << float(p.Z());
+        }
+        for (int i = 1; i <= triangles; ++i) {
+            const auto &t = mesh->Triangle(i);
+            out << quint32(t.Value(1) - 1) << quint32(t.Value(2) - 1) << quint32(t.Value(3) - 1);
+        }
+        frames.append(QJsonObject{{"move", move}, {"vertices", vertices}, {"triangles", triangles},
+                                  {"volume", stock->volume()}});
+    };
+    // At most 33 display meshes per replay, independent of program length.
+    const auto stride = (path.size() + 31) / 32;
+    qsizetype cursor = 0;
+    saveFrame(checkpoint(job, operations.front().node.parentStateKey), cursor);
+    for (const auto &[node, cuts] : operations) {
+        auto stock = checkpoint(job, node.parentStateKey);
+        for (std::size_t i = 0; i < cuts.size(); ++i) {
+            const auto &cut = cuts[i];
+            for (std::size_t start = 0; start < cut.path.moves.size();) {
+                const auto count = std::min<std::size_t>(stride - cursor % stride, cut.path.moves.size() - start);
+                const bool endOfOperation = i + 1 == cuts.size() && start + count == cut.path.moves.size();
+                stock = endOfOperation ? checkpoint(job, node.stateKey)
+                                       : advanceStock(stock, cut, start, count, static_cast<int>(i));
+                cursor += count;
+                start += count;
+                if (cursor % stride == 0 || cursor == path.size())
+                    saveFrame(stock, cursor);
+            }
+        }
+    }
+    if (out.status() != QDataStream::Ok || !file.commit())
+        throw std::runtime_error("无法保存余料回放");
+    return {{"frames", frames}, {"operations", spans}, {"tools", tools}, {"moves", path.size()}};
+}
 
 QJsonObject stockResult(const MachiningJob &job, const ipw::IpwExecutionResult &simulation,
                         const QJsonObject &request, const TopoDS_Shape &target)

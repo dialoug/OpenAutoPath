@@ -784,6 +784,21 @@ footer,
 .replay input {
   width: 78px;
 }
+.replay button[aria-pressed="true"] {
+  background: var(--soft);
+  color: var(--orange);
+}
+.replayStatus {
+  display: flex;
+  gap: 4px 12px;
+  flex-wrap: wrap;
+  align-items: center;
+  font-size: 12px;
+  color: var(--muted);
+}
+.replayStatus select {
+  max-width: min(180px, 40vw);
+}
 .docPanel {
   color: var(--ink);
   padding: 0;

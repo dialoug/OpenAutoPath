@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { Box, Focus, Grid2X2, Minus, Plus, Square } from "lucide-react";
+import type { StockReplay } from "./stockReplay";
 import * as THREE from "three";
 import { OrbitControls } from "three/examples/jsm/controls/OrbitControls.js";
 
@@ -11,7 +12,12 @@ type Props = {
   colors?: Record<string, number>;
   path: Segment[];
   cameraTools?: boolean;
-  inspectStock?: (moves: number) => void;
+  replay?: StockReplay;
+  inspectStock?: (
+    moves: number,
+    operation: string | undefined,
+    cursor: number,
+  ) => void;
   onPick: (face: string) => void;
 };
 
@@ -21,6 +27,7 @@ export function Viewport({
   colors,
   path,
   onPick,
+  replay,
   inspectStock,
   cameraTools = false,
 }: Props) {
@@ -34,7 +41,11 @@ export function Viewport({
     scene: THREE.Scene;
     meshes: THREE.Mesh<THREE.BufferGeometry, THREE.MeshStandardMaterial>[];
     draw: () => void;
+    centerOn: (position: THREE.Vector3) => void;
   } | null>(null);
+  const [follow, setFollow] = useState(false);
+  const [showCutter, setShowCutter] = useState(true);
+  const cutter = useRef<THREE.Mesh | null>(null);
   const pick = useRef(onPick);
   const renderMove = useRef<((count: number) => void) | null>(null);
   const [position, setPosition] = useState(0);
@@ -86,6 +97,10 @@ export function Viewport({
     });
     const box = new THREE.Box3();
     meshes.forEach((mesh) => box.expandByObject(mesh));
+    if (replay) {
+      const stock = new THREE.BufferAttribute(replay.frames[0].positions, 3);
+      box.union(new THREE.Box3().setFromBufferAttribute(stock));
+    }
     const center = box.getCenter(new THREE.Vector3());
     const span = Math.max(box.getSize(new THREE.Vector3()).length(), 1);
     const grid = new THREE.GridHelper(span * 4, 80, 0xafbdc5, 0xc4cfd6);
@@ -177,11 +192,20 @@ export function Viewport({
         camera,
       );
       const hit = ray.intersectObjects(meshes)[0];
-      if (hit) pick.current(hit.object.name);
+      if (hit && hit.object.visible) pick.current(hit.object.name);
     };
     renderer.domElement.addEventListener("pointerdown", start);
     renderer.domElement.addEventListener("pointerup", end);
-    state.current = { scene, meshes, draw };
+    state.current = {
+      scene,
+      meshes,
+      draw,
+      centerOn(position) {
+        camera.position.sub(controls.target).add(position);
+        controls.target.copy(position);
+        controls.update();
+      },
+    };
     return () => {
       renderer.domElement.removeEventListener("pointerdown", start);
       renderer.domElement.removeEventListener("pointerup", end);
@@ -199,13 +223,13 @@ export function Viewport({
       renderer.domElement.remove();
       state.current = null;
     };
-  }, [faces, cameraTools]);
+  }, [faces, cameraTools, replay]);
   useEffect(() => {
     if (gridRef.current) {
       gridRef.current.visible = gridVisible;
       state.current?.draw();
     }
-  }, [gridVisible, faces, cameraTools]);
+  }, [gridVisible, faces, cameraTools, replay]);
   useEffect(() => {
     const view = state.current;
     if (!view) return;
@@ -216,11 +240,12 @@ export function Viewport({
           : (colors?.[mesh.name] ?? 0x859aaa),
       );
     view.draw();
-  }, [highlighted, colors, faces]);
+  }, [highlighted, colors, faces, replay]);
   useEffect(() => {
     const view = state.current;
     setPlaying(false);
-    setPosition(path.length);
+    const initial = replay ? (replay.startMove ?? 0) : path.length;
+    setPosition(initial);
     if (!view || !path.length) return;
     const geometry = new THREE.BufferGeometry().setFromPoints(
       path.flatMap(([a, b]) => [
@@ -249,9 +274,10 @@ export function Viewport({
     renderMove.current = (count) => {
       geometry.setDrawRange(0, 2 * count);
       marker.position.set(...(count ? path[count - 1][1] : path[0][0]));
+      cutter.current?.position.copy(marker.position);
       view.draw();
     };
-    renderMove.current(path.length);
+    renderMove.current(initial);
     return () => {
       renderMove.current = null;
       view.scene.remove(marker);
@@ -262,19 +288,103 @@ export function Viewport({
       line.material.dispose();
       if (state.current === view) view.draw();
     };
-  }, [path, faces]);
+  }, [path, faces, replay]);
   useEffect(() => {
-    if (position <= path.length) renderMove.current?.(position);
-  }, [position, path]);
+    if (!path.length || position > path.length) return;
+    if (follow) {
+      const tip = position ? path[position - 1][1] : path[0][0];
+      state.current?.centerOn(new THREE.Vector3(...tip));
+    }
+    renderMove.current?.(position);
+  }, [position, path, faces, follow]);
+  const currentFrame = replay?.frames.reduce(
+    (last, frame) => (frame.move <= position ? frame : last),
+    replay.frames[0],
+  );
+  const operationIndex =
+    replay?.operations.findIndex((op) => position <= op.end) ?? -1;
+  const operation = replay?.operations[operationIndex];
+  const tool = replay?.tools?.find((t) => position <= t.end);
+  useEffect(() => {
+    const view = state.current;
+    if (!view || !showCutter || !tool?.outline.length) return;
+    const profile = tool.outline.map(
+      ([radius, height]) => new THREE.Vector2(radius, height),
+    );
+    profile.unshift(new THREE.Vector2(0, profile[0].y));
+    profile.push(new THREE.Vector2(0, profile[profile.length - 1].y));
+    const mesh = new THREE.Mesh(
+      new THREE.LatheGeometry(profile, 32),
+      new THREE.MeshStandardMaterial({
+        color: 0xbe7b26,
+        metalness: 0.38,
+        roughness: 0.45,
+        side: THREE.DoubleSide,
+      }),
+    );
+    mesh.quaternion.setFromUnitVectors(
+      new THREE.Vector3(0, 1, 0),
+      new THREE.Vector3(...tool.axis).normalize(),
+    );
+    const move = Math.min(startPosition.current, path.length);
+    mesh.position.set(...(move ? path[move - 1][1] : path[0][0]));
+    cutter.current = mesh;
+    view.scene.add(mesh);
+    view.draw();
+    return () => {
+      cutter.current = null;
+      view.scene.remove(mesh);
+      mesh.geometry.dispose();
+      mesh.material.dispose();
+      if (state.current === view) view.draw();
+    };
+  }, [tool, path, faces, showCutter]);
+  const operationStart =
+    operationIndex > 0 ? replay!.operations[operationIndex - 1].end : 0;
+  useEffect(() => {
+    const view = state.current;
+    if (!view || !currentFrame) return;
+    const geometry = new THREE.BufferGeometry();
+    geometry.setAttribute(
+      "position",
+      new THREE.BufferAttribute(currentFrame.positions, 3),
+    );
+    geometry.setIndex(new THREE.BufferAttribute(currentFrame.indices, 1));
+    geometry.computeVertexNormals();
+    const mesh = new THREE.Mesh(
+      geometry,
+      new THREE.MeshStandardMaterial({
+        color: 0x8aa69d,
+        roughness: 0.7,
+        side: THREE.DoubleSide,
+      }),
+    );
+    view.meshes.forEach((m) => {
+      m.visible = false;
+    });
+    view.scene.add(mesh);
+    view.draw();
+    return () => {
+      view.meshes.forEach((m) => {
+        m.visible = true;
+      });
+      view.scene.remove(mesh);
+      mesh.material.dispose();
+      geometry.dispose();
+      if (state.current === view) view.draw();
+    };
+  }, [currentFrame, faces]);
   useEffect(() => {
     if (!playing || !path.length) return;
+    let previous: number | undefined;
     let handle = 0,
-      previous = performance.now(),
       remainder = 0,
       cursor = startPosition.current;
     const duration = Math.max(1500, Math.min(12000, path.length * 90));
     const frame = (now: number) => {
-      remainder += ((now - previous) * speed * path.length) / duration;
+      const elapsed =
+        previous === undefined ? 0 : Math.min(250, Math.max(0, now - previous));
+      remainder += (elapsed * speed * path.length) / duration;
       previous = now;
       const count = Math.floor(remainder);
       remainder -= count;
@@ -368,8 +478,24 @@ export function Viewport({
               ? "暂停"
               : position === path.length
                 ? "回放刀路"
-                : "继续播放"}
+                : position === 0
+                  ? "开始播放"
+                  : "继续播放"}
           </button>
+          <button
+            aria-pressed={follow}
+            onClick={() => setFollow((value) => !value)}
+          >
+            跟随刀尖
+          </button>
+          {tool?.outline.length ? (
+            <button
+              aria-pressed={showCutter}
+              onClick={() => setShowCutter((value) => !value)}
+            >
+              显示刀具
+            </button>
+          ) : null}
           <button disabled={position === 0} onClick={() => seek(position - 1)}>
             上一步
           </button>
@@ -401,11 +527,40 @@ export function Viewport({
               onChange={(e) => seek(+e.target.value)}
             />
           </label>
+          {replay && operation && currentFrame && (
+            <div className="replayStatus">
+              <label>
+                工序
+                <select
+                  aria-label="回放工序"
+                  value={operationIndex}
+                  onChange={(e) => {
+                    const index = Number(e.target.value);
+                    seek(index ? replay.operations[index - 1].end + 1 : 0);
+                  }}
+                >
+                  {replay.operations.map((op, i) => (
+                    <option value={i} key={op.id}>
+                      {i + 1} · {op.id}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              <span>
+                余料帧 {currentFrame.move} · {currentFrame.volume.toFixed(2)}{" "}
+                mm³
+              </span>
+            </div>
+          )}
           {inspectStock && (
             <button
               onClick={() => {
                 setPlaying(false);
-                inspectStock(position);
+                inspectStock(
+                  position - operationStart,
+                  operation?.id,
+                  position,
+                );
               }}
             >
               查看此步余料

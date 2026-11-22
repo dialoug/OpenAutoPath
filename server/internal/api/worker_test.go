@@ -361,6 +361,53 @@ func TestNativeCAMWorkflow(t *testing.T) {
 		t.Fatalf("missing mixed IPW operations: %+v", stock)
 	}
 
+	// The playback mesh stream and the exact inspection endpoint must describe
+	// the same material at a sampled move, including preceding operations.
+	materialReplay := wait(call("POST", projectURL+"/replay", docRequest(project, nil), 202), "done")
+	replayBase := "/api/jobs/" + materialReplay.ID + "/files/"
+	var timeline struct {
+		Moves      int
+		Operations []struct {
+			ID  string
+			End int
+		}
+		Frames []struct {
+			Move, Vertices, Triangles int
+			Volume                    float64
+		}
+	}
+	if json.Unmarshal(call("GET", replayBase+"result.json", nil, 200), &timeline) != nil ||
+		len(timeline.Operations) != stock.Operations || len(timeline.Frames) < 3 || len(timeline.Frames) > 33 {
+		t.Fatal("invalid material playback manifest")
+	}
+	first, last := timeline.Frames[0], timeline.Frames[len(timeline.Frames)-1]
+	if first.Move != 0 || last.Move != timeline.Moves || math.Abs(last.Volume-stock.Volume) > 1e-5 {
+		t.Fatal("playback does not end at the project stock checkpoint")
+	}
+	size := 0
+	for i, f := range timeline.Frames {
+		if f.Vertices < 1 || f.Triangles < 1 || (i > 0 && f.Move <= timeline.Frames[i-1].Move) {
+			t.Fatal("invalid playback frame")
+		}
+		size += (f.Vertices + f.Triangles) * 12
+	}
+	if len(call("GET", replayBase+"replay.bin", nil, 200)) != size {
+		t.Fatal("playback mesh stream length mismatch")
+	}
+	middle := timeline.Frames[len(timeline.Frames)/2]
+	start := 0
+	for _, op := range timeline.Operations {
+		if middle.Move <= op.End {
+			exact := wait(call("POST", projectURL+"/simulate", docRequest(project, map[string]any{"operation": op.ID, "completedMoves": middle.Move - start}), 202), "done")
+			var sample struct{ Volume float64 }
+			if json.Unmarshal(call("GET", "/api/jobs/"+exact.ID+"/files/result.json", nil, 200), &sample) != nil || math.Abs(sample.Volume-middle.Volume) > 1e-5 {
+				t.Fatalf("sampled volume %.9f differs from exact volume %.9f", middle.Volume, sample.Volume)
+			}
+			break
+		}
+		start = op.End
+	}
+
 	prefix := wait(call("POST", projectURL+"/simulate", docRequest(project, map[string]any{"operation": id}), 202), "done")
 	if json.Unmarshal(call("GET", "/api/jobs/"+prefix.ID+"/files/result.json", nil, 200), &stock) != nil || stock.Operations != 1 {
 		t.Fatalf("invalid IPW prefix: %+v", stock)
