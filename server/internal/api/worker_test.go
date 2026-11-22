@@ -1,6 +1,7 @@
 package api
 
 import (
+	"archive/zip"
 	"bytes"
 	"encoding/json"
 	"fmt"
@@ -221,6 +222,16 @@ func TestNativeCAMWorkflow(t *testing.T) {
 	if json.Unmarshal(call("GET", "/api/jobs/"+simulated.ID+"/files/result.json", nil, 200), &stock) != nil || stock.Volume <= 0 || stock.Operations != 1 {
 		t.Fatalf("incorrect IPW result: %+v", stock)
 	}
+	var diff struct {
+		Comparison struct{ Allowance, Overcut, Missing, CertainOvercut float64 }
+	}
+	if err := json.Unmarshal(call("GET", "/api/jobs/"+simulated.ID+"/files/result.json", nil, 200), &diff); err != nil || diff.Comparison.Allowance <= 0 || diff.Comparison.CertainOvercut > diff.Comparison.Overcut {
+		t.Fatalf("invalid material comparison: %+v", diff)
+	}
+	var views map[string]json.RawMessage
+	if json.Unmarshal(call("GET", "/api/jobs/"+simulated.ID+"/files/differences.json", nil, 200), &views) != nil || len(views["allowance"]) == 0 {
+		t.Fatal("missing allowance geometry")
+	}
 	var stockMesh []struct{ Indices []int }
 	if json.Unmarshal(call("GET", "/api/jobs/"+simulated.ID+"/files/stock.json", nil, 200), &stockMesh) != nil || len(stockMesh) != 1 || len(stockMesh[0].Indices) < 3 {
 		t.Fatal("missing IPW triangles")
@@ -348,6 +359,172 @@ func TestNativeCAMWorkflow(t *testing.T) {
 	mixed := wait(call("POST", projectURL+"/simulate", docRequest(project, nil), 202), "done")
 	if json.Unmarshal(call("GET", "/api/jobs/"+mixed.ID+"/files/result.json", nil, 200), &stock) != nil || stock.Operations < 4 {
 		t.Fatalf("missing mixed IPW operations: %+v", stock)
+	}
+
+	prefix := wait(call("POST", projectURL+"/simulate", docRequest(project, map[string]any{"operation": id}), 202), "done")
+	if json.Unmarshal(call("GET", "/api/jobs/"+prefix.ID+"/files/result.json", nil, 200), &stock) != nil || stock.Operations != 1 {
+		t.Fatalf("invalid IPW prefix: %+v", stock)
+	}
+	if !bytes.Contains(readProject(prefix), []byte("surface_finishing_operations")) {
+		t.Fatal("partial simulation changed project")
+	}
+	rejected := wait(call("POST", projectURL+"/export", docRequest(project, nil), 202), "failed")
+	call("GET", "/api/jobs/"+rejected.ID+"/files/programs.zip", nil, 404)
+	var setupDoc struct {
+		Job struct{ Setups []struct{ ID string } }
+	}
+	if err := json.Unmarshal(project, &setupDoc); err != nil {
+		t.Fatal(err)
+	}
+	var setupIDs []string
+	for _, s := range setupDoc.Job.Setups {
+		setupIDs = append(setupIDs, s.ID)
+	}
+	confirmed := wait(call("POST", projectURL+"/setups", docRequest(project, map[string]any{"confirmedSetups": setupIDs}), 202), "done")
+	exported := wait(call("POST", projectURL+"/export", docRequest(readProject(confirmed), nil), 202), "done")
+	packBase := "/api/jobs/" + exported.ID + "/files/"
+	var reviewed []struct {
+		Filename, Text string
+		Operations     []string
+	}
+	if json.Unmarshal(call("GET", packBase+"programs.json", nil, 200), &reviewed) != nil || len(reviewed) < 2 {
+		t.Fatal("missing reviewed program groups")
+	}
+	zipped := call("GET", packBase+"programs.zip", nil, 200)
+	archive, e := zip.NewReader(bytes.NewReader(zipped), int64(len(zipped)))
+	if e != nil || len(archive.File) != len(reviewed) {
+		t.Fatal("invalid program archive", e)
+	}
+	for i, member := range archive.File {
+		r, e := member.Open()
+		if e != nil {
+			t.Fatal(e)
+		}
+		raw, e := io.ReadAll(r)
+		r.Close()
+		if e != nil || member.Name != reviewed[i].Filename || string(raw) != reviewed[i].Text || len(reviewed[i].Operations) == 0 {
+			t.Fatal("review differs from export")
+		}
+	}
+	batch := wait(call("POST", projectURL+"/holes", docRequest(project, nil), 202), "done")
+	var batched struct{ Job map[string]json.RawMessage }
+	if json.Unmarshal(readProject(batch), &batched) != nil {
+		t.Fatal("invalid batch project")
+	}
+	for _, key := range []string{"hole_operations", "pocket_operations", "profile_operations", "surface_finishing_operations"} {
+		var ops []any
+		if json.Unmarshal(batched.Job[key], &ops) != nil || len(ops) == 0 {
+			t.Fatal("batch lost " + key)
+		}
+	}
+	for _, moves := range []int{0, 7} {
+		frame := wait(call("POST", projectURL+"/simulate", docRequest(project, map[string]any{"operation": id, "completedMoves": moves}), 202), "done")
+		var progress struct {
+			CompletedMoves, TotalMoves int
+			Volume, RemovedVolume      float64
+		}
+		if json.Unmarshal(call("GET", "/api/jobs/"+frame.ID+"/files/result.json", nil, 200), &progress) != nil || progress.CompletedMoves != moves || progress.TotalMoves < 14 || progress.Volume <= 0 || (moves == 0 && progress.RemovedVolume != 0) {
+			t.Fatalf("incorrect IPW frame %+v", progress)
+		}
+	}
+	stockBound := wait(call("POST", projectURL+"/stock", docRequest(project, map[string]any{"stockId": model.ID}), 202), "done")
+	boundDoc := readProject(stockBound)
+	var bound struct {
+		Job struct {
+			Stock struct {
+				Hash string `json:"source_fingerprint"`
+				Kind int    `json:"source_kind"`
+				Path string `json:"source_path"`
+			}
+		}
+	}
+	if json.Unmarshal(boundDoc, &bound) != nil || bound.Job.Stock.Kind != 2 || len(bound.Job.Stock.Hash) != 64 || filepath.IsAbs(bound.Job.Stock.Path) {
+		t.Fatal("invalid portable stock binding")
+	}
+	wait(call("POST", projectURL+"/simulate", docRequest(boundDoc, map[string]any{"operation": id}), 202), "done")
+	var missingStock map[string]any
+	if err := json.Unmarshal(boundDoc, &missingStock); err != nil {
+		t.Fatal(err)
+	}
+	missingStock["job"].(map[string]any)["stock"].(map[string]any)["source_fingerprint"] = strings.Repeat("0", 64)
+	changed, err := json.Marshal(missingStock)
+	if err != nil {
+		t.Fatal(err)
+	}
+	wait(call("POST", projectURL+"/simulate", docRequest(changed, nil), 202), "failed")
+	for _, group := range []struct {
+		kind, field, strategy string
+		min                   int
+		auto                  bool
+	}{
+		{"pocket-all", "pocket_operations", "offset", 2, true}, {"profile-all", "profile_operations", "contour", 6, false},
+	} {
+		args := map[string]any{"feature": group.kind, "tool": millingTool, "autoTool": group.auto, "strategy": group.strategy, "step": 2}
+		if group.kind == "profile-all" {
+			rejected := wait(call("POST", projectURL+"/plan", docRequest(project, args), 202), "failed")
+			if !strings.Contains(rejected.Error, "tool reach") {
+				t.Fatal("expected native reach validation", rejected.Error)
+			}
+			// The side setups of this fixture span 120 mm. Use a distinct long-reach test library.
+			var source map[string]any
+			if e := json.Unmarshal(lib, &source); e != nil {
+				t.Fatal(e)
+			}
+			for _, item := range source["library"].(map[string]any)["tools"].([]any) {
+				bit := item.(map[string]any)
+				if bit["id"] == millingTool {
+					g := bit["geometry"].(map[string]any)
+					g["overall_length"] = 160
+					g["cutting_edge_length"] = 130
+				}
+			}
+			raw, e := json.Marshal(source)
+			if e != nil {
+				t.Fatal(e)
+			}
+			args["libraryId"] = wait(call("POST", "/api/libraries", docRequest(raw, nil), 202), "done").ID
+		}
+		all := wait(call("POST", projectURL+"/plan", docRequest(project, args), 202), "done")
+		var data struct{ Job map[string]json.RawMessage }
+		var regions []struct {
+			Target struct {
+				Root string `json:"root_wire_id"`
+			}
+		}
+		if json.Unmarshal(readProject(all), &data) != nil || json.Unmarshal(data.Job[group.field], &regions) != nil {
+			t.Fatal("invalid batch plan")
+		}
+		roots := map[string]bool{}
+		for _, r := range regions {
+			roots[r.Target.Root] = true
+		}
+		if len(roots) < group.min {
+			t.Fatalf("missing %s references: %v", group.kind, roots)
+		}
+	}
+	six := wait(call("POST", projectURL+"/plan", docRequest(project, map[string]any{"feature": "engrave-all", "strategy": "finish", "step": 2, "tool": millingTool}), 202), "done")
+	var sixDoc struct {
+		Job struct {
+			Ops []struct{ ID string } `json:"surface_finishing_operations"`
+		}
+	}
+	if json.Unmarshal(readProject(six), &sixDoc) != nil || len(sixDoc.Job.Ops) != 6 {
+		t.Fatal("incomplete six face job")
+	}
+	// The fixture's rounded rectangular pocket has its planar floor at Z=12 (F32).
+	floor := "F32"
+	manual := wait(call("POST", projectURL+"/plan", docRequest(project, map[string]any{"feature": "manual-pocket-" + floor, "strategy": "offset", "step": 2, "tool": millingTool}), 202), "done")
+	var manualDoc struct {
+		Job struct {
+			Ops []struct{ ID string } `json:"pocket_operations"`
+		}
+	}
+	if json.Unmarshal(readProject(manual), &manualDoc) != nil || len(manualDoc.Job.Ops) < 2 {
+		t.Fatal("manual floor lost")
+	}
+	replay := wait(call("POST", projectURL+"/rebuild", docRequest(readProject(manual), map[string]any{"operation": manualDoc.Job.Ops[len(manualDoc.Job.Ops)-1].ID}), 202), "done")
+	if len(call("GET", "/api/jobs/"+replay.ID+"/files/toolpath.jsonl", nil, 200)) < 10 {
+		t.Fatal("empty pocket JSONL")
 	}
 	imported := wait(call("POST", projectURL, docRequest(project, nil), 202), "done")
 	if !bytes.Contains(readProject(imported), []byte(id)) {

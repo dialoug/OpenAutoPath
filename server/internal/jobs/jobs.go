@@ -5,6 +5,7 @@ import (
 	"bufio"
 	"context"
 	"crypto/rand"
+	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
 	"errors"
@@ -21,35 +22,43 @@ import (
 )
 
 type Request struct {
-	Feature     string          `json:"feature,omitempty"`
-	Strategy    string          `json:"strategy,omitempty"`
-	Step        float64         `json:"step,omitempty"`
-	Document    json.RawMessage `json:"document,omitempty"`
-	Operation   string          `json:"operation,omitempty"`
-	SourceName  string          `json:"sourceName,omitempty"`
-	LibraryID   string          `json:"-"`
-	LibraryFile string          `json:"libraryFile,omitempty"`
-	AppendID    string          `json:"-"`
-	AppendFile  string          `json:"appendFile,omitempty"`
-	Version     int             `json:"version"`
-	Action      string          `json:"action"`
-	Model       string          `json:"model"`
-	Hole        string          `json:"hole,omitempty"`
-	Tool        string          `json:"tool,omitempty"`
-	Feed        float64         `json:"feed,omitempty"`
-	RPM         float64         `json:"rpm,omitempty"`
+	AutoTool        bool            `json:"autoTool,omitempty"`
+	CompletedMoves  *int            `json:"completedMoves,omitempty"`
+	StockID         string          `json:"-"`
+	StockFile       string          `json:"stockFile,omitempty"`
+	StockName       string          `json:"stockName,omitempty"`
+	StockHash       string          `json:"stockHash,omitempty"`
+	ConfirmedSetups *[]string       `json:"confirmedSetups,omitempty"`
+	Feature         string          `json:"feature,omitempty"`
+	Strategy        string          `json:"strategy,omitempty"`
+	Step            float64         `json:"step,omitempty"`
+	Document        json.RawMessage `json:"document,omitempty"`
+	Operation       string          `json:"operation,omitempty"`
+	SourceName      string          `json:"sourceName,omitempty"`
+	LibraryID       string          `json:"-"`
+	LibraryFile     string          `json:"libraryFile,omitempty"`
+	AppendID        string          `json:"-"`
+	AppendFile      string          `json:"appendFile,omitempty"`
+	Version         int             `json:"version"`
+	Action          string          `json:"action"`
+	Model           string          `json:"model"`
+	Hole            string          `json:"hole,omitempty"`
+	Tool            string          `json:"tool,omitempty"`
+	Feed            float64         `json:"feed,omitempty"`
+	RPM             float64         `json:"rpm,omitempty"`
 }
 
 type Job struct {
-	Files   []string  `json:"files,omitempty"`
-	Name    string    `json:"name,omitempty"`
-	Created time.Time `json:"created,omitempty"`
-	Stage   string    `json:"stage,omitempty"`
-	ID      string    `json:"id"`
-	ModelID string    `json:"modelId"`
-	Action  string    `json:"action"`
-	State   string    `json:"state"`
-	Error   string    `json:"error,omitempty"`
+	SourceHash string    `json:"sourceHash,omitempty"`
+	Files      []string  `json:"files,omitempty"`
+	Name       string    `json:"name,omitempty"`
+	Created    time.Time `json:"created,omitempty"`
+	Stage      string    `json:"stage,omitempty"`
+	ID         string    `json:"id"`
+	ModelID    string    `json:"modelId"`
+	Action     string    `json:"action"`
+	State      string    `json:"state"`
+	Error      string    `json:"error,omitempty"`
 }
 
 type Manager struct {
@@ -159,6 +168,57 @@ func (m *Manager) Submit(owner, modelID string, req Request, upload io.Reader) (
 		}
 		req.SourceName = model.Name
 	}
+	if req.StockID != "" {
+		asset, e := m.Load(owner, req.StockID)
+		if e != nil || asset.State != "done" || asset.Action != "analyze" || req.Action != "stock" {
+			return Job{}, os.ErrNotExist
+		}
+		req.StockFile = filepath.Join(m.dir(owner, asset.ID), "model.step")
+		req.StockName = asset.Name
+		req.StockHash = asset.SourceHash
+		if req.StockHash == "" {
+			// Backfill models uploaded before source hashes were recorded.
+			f, e := os.Open(req.StockFile)
+			if e != nil {
+				return Job{}, e
+			}
+			h := sha256.New()
+			_, e = io.Copy(h, f)
+			f.Close()
+			if e != nil {
+				return Job{}, e
+			}
+			asset.SourceHash = hex.EncodeToString(h.Sum(nil))
+			m.mu.Lock()
+			e = save(m.dir(owner, asset.ID), asset)
+			m.mu.Unlock()
+			if e != nil {
+				return Job{}, e
+			}
+			req.StockHash = asset.SourceHash
+		}
+	} else if len(req.Document) > 0 && req.Action != "project" && req.Action != "library" {
+		var ref struct {
+			Job struct {
+				Stock struct {
+					Kind int    `json:"source_kind"`
+					Hash string `json:"source_fingerprint"`
+				}
+			}
+		}
+		if json.Unmarshal(req.Document, &ref) == nil && ref.Job.Stock.Kind == 2 && ref.Job.Stock.Hash != "" {
+			assets, e := m.List(owner)
+			if e != nil {
+				return Job{}, e
+			}
+			for _, asset := range assets {
+				if asset.Action == "analyze" && asset.SourceHash == ref.Job.Stock.Hash {
+					req.StockFile = filepath.Join(m.dir(owner, asset.ID), "model.step")
+					break
+				}
+			}
+		}
+	}
 	if req.LibraryID != "" {
 		req.LibraryFile, err = m.Artifact(owner, req.LibraryID, "library.oaptl")
 		if err != nil {
@@ -186,6 +246,7 @@ func (m *Manager) Submit(owner, modelID string, req Request, upload io.Reader) (
 	}()
 	req.Model = filepath.Join(m.dir(owner, modelID), "model.step")
 	req.Version = 1
+	var sourceHash string
 	if upload != nil {
 		var f *os.File
 		f, err = os.OpenFile(req.Model, os.O_CREATE|os.O_EXCL|os.O_WRONLY, 0600)
@@ -193,7 +254,9 @@ func (m *Manager) Submit(owner, modelID string, req Request, upload io.Reader) (
 			return Job{}, err
 		}
 		var size int64
-		size, err = io.Copy(f, upload)
+		h := sha256.New()
+		size, err = io.Copy(io.MultiWriter(f, h), upload)
+		sourceHash = hex.EncodeToString(h.Sum(nil))
 		closeErr := f.Close()
 		if err == nil {
 			err = closeErr
@@ -212,7 +275,7 @@ func (m *Manager) Submit(owner, modelID string, req Request, upload io.Reader) (
 	if err = os.WriteFile(filepath.Join(dir, "request.json"), data, 0600); err != nil {
 		return Job{}, err
 	}
-	j := Job{ID: id, ModelID: modelID, Action: req.Action, State: "queued", Name: req.SourceName, Created: time.Now().UTC()}
+	j := Job{ID: id, SourceHash: sourceHash, ModelID: modelID, Action: req.Action, State: "queued", Name: req.SourceName, Created: time.Now().UTC()}
 	m.mu.Lock()
 	defer m.mu.Unlock()
 	if err = save(dir, j); err != nil {
@@ -295,8 +358,9 @@ func (m *Manager) run(ctx context.Context, dir string, j Job) {
 			return err
 		}
 		var result struct {
-			Version int
-			Name    string
+			PocketJSONL bool
+			Version     int
+			Name        string
 		}
 		if json.Unmarshal(data, &result) != nil || result.Version != 1 {
 			return errors.New("invalid worker result")
@@ -304,7 +368,15 @@ func (m *Manager) run(ctx context.Context, dir string, j Job) {
 		if result.Name != "" {
 			j.Name = result.Name
 		}
+		if j.Action == "export" {
+			if err := zipPrograms(dir); err != nil {
+				return err
+			}
+		}
 		files := outputs(j.Action)
+		if j.Action == "rebuild" && result.PocketJSONL {
+			files = append(files, "toolpath.jsonl")
+		}
 		for _, name := range files {
 			info, err := os.Stat(filepath.Join(dir, name))
 			if err != nil || info.Size() == 0 {
@@ -348,7 +420,7 @@ func (m *Manager) Artifact(owner, id, name string) (string, error) {
 	if err != nil || j.State != "done" {
 		return "", os.ErrNotExist
 	}
-	allowed := name == "result.json" || slices.Contains(outputs(j.Action), name)
+	allowed := name == "result.json" || slices.Contains(j.Files, name) || slices.Contains(outputs(j.Action), name)
 	if !allowed {
 		return "", os.ErrNotExist
 	}
@@ -361,10 +433,12 @@ func outputs(action string) []string {
 		return []string{"mesh.json", "library.oaptl"}
 	case "generate", "rebuild":
 		return []string{"path.json", "reference.nc", "project.oapjob"}
-	case "project", "plan":
+	case "export":
+		return []string{"programs.json", "programs.zip", "project.oapjob"}
+	case "project", "plan", "setups", "holes", "stock":
 		return []string{"project.oapjob"}
 	case "simulate":
-		return []string{"project.oapjob", "stock.json"}
+		return []string{"project.oapjob", "stock.json", "differences.json"}
 	case "library":
 		return []string{"library.oaptl"}
 	default:

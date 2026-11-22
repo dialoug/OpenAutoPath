@@ -112,7 +112,8 @@ bool refreshActivePlan(MachiningJob& next, const MachiningJob& previous)
 
 TopoDS_Shape SurfaceFinishingMachiningJobService::buildPlanningStock(
     StockDefinition& stock, const std::vector<TopoDS_Shape>& completeTargetUnits,
-    std::string* error, const toolpath::ToolpathGenerationControl* control)
+    std::string* error, const toolpath::ToolpathGenerationControl* control,
+    const std::string& resolvedStockPath)
 {
     if (error) error->clear();
     const auto reject = [error](const std::string& message) {
@@ -121,16 +122,17 @@ TopoDS_Shape SurfaceFinishingMachiningJobService::buildPlanningStock(
     };
     if (control && control->cancelled()) return reject("Planning stock construction was cancelled.");
     if (stock.sourceKind == StockSourceKind::StepModel) {
+        const auto& path = resolvedStockPath.empty() ? stock.sourcePath : resolvedStockPath;
         QString failure;
         const auto before = MachiningJobStorage::sourceFileFingerprint(
-            QString::fromStdString(stock.sourcePath), &failure);
+            QString::fromStdString(path), &failure);
         if (before.isEmpty()) return reject(failure.toStdString());
         if (!stock.sourceFingerprint.empty() && stock.sourceFingerprint != before.toStdString())
             return reject("Planning stock STEP content changed; explicitly reselect the stock and regenerate the job.");
-        const auto loaded = toolpath::StockModelLoader().loadStep(stock.sourcePath, control);
+        const auto loaded = toolpath::StockModelLoader().loadStep(path, control);
         if (!loaded.ok()) return reject(loaded.message);
         const auto after = MachiningJobStorage::sourceFileFingerprint(
-            QString::fromStdString(stock.sourcePath), &failure);
+            QString::fromStdString(path), &failure);
         if (after.isEmpty() || after != before)
             return reject("Planning stock STEP changed while it was being read.");
         stock.sourceFingerprint = before.toStdString();
@@ -399,7 +401,8 @@ bool SurfaceFinishingMachiningJobService::replaceFamily(
 }
 
 toolpath::SurfaceFinishingBatch SurfaceFinishingMachiningJobService::regenerate(
-    MachiningJob& job, const StepIndexer& indexer, const toolpath::ToolpathGenerationControl* control) const
+    MachiningJob& job, const StepIndexer& indexer, const toolpath::ToolpathGenerationControl* control,
+    const std::string& resolvedStockPath) const
 {
     toolpath::SurfaceFinishingBatch batch;
     const auto errors = job.validationErrors();
@@ -444,7 +447,7 @@ toolpath::SurfaceFinishingBatch SurfaceFinishingMachiningJobService::regenerate(
             gp_Dir(setup->xAxis.x, setup->xAxis.y, setup->xAxis.z));
         auto& stock = planningStocks[op->target.unitIds];
         std::string stockError;
-        if (stock.IsNull()) stock = buildPlanningStock(def.stock, targetUnits, &stockError, control);
+        if (stock.IsNull()) stock = buildPlanningStock(def.stock, targetUnits, &stockError, control, resolvedStockPath);
         if (control && control->cancelled()) { batch.cancelled = true; batch.operations.clear(); return batch; }
         if (stock.IsNull()) { fail(batch, stockError); return batch; }
         const bool layered = op->parameters.mode == toolpath::EngravingMachiningMode::StockRoughingAndFinishing;

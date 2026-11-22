@@ -22,6 +22,7 @@
 #include <QSaveFile>
 #include <iostream>
 #include <stdexcept>
+#include <set>
 
 namespace {
 using namespace oap;
@@ -161,8 +162,12 @@ void run(const QString& fileName)
         throw std::runtime_error("Cannot open request");
     const auto request = QJsonDocument::fromJson(file.readAll()).object();
     const auto action = request.value("action").toString();
-    if (request.value("version").toInt() != 1 || (action != "analyze" && action != "generate" &&
-        action != "features" && action != "library" && action != "project" && action != "rebuild" && action != "simulate" && action != "plan"))
+    const QStringList projectActions{"project", "rebuild", "simulate", "stock",
+                                     "setups",  "export",  "holes",    "plan"};
+    const bool projectAction = projectActions.contains(action);
+    if (request.value("version").toInt() != 1 ||
+        (!projectAction && action != "analyze" && action != "generate" && action != "features" &&
+         action != "library"))
         throw std::runtime_error("Unsupported worker request");
     tooling::ToolLibrary library;
     QString libraryError;
@@ -200,7 +205,8 @@ void run(const QString& fileName)
         }
     }
     context.obstacleShape = part;
-    if (action == "project" || action == "rebuild" || action == "simulate" || action == "plan") {
+    if (projectAction)
+    {
         Bbox bounds;
         for (const auto& unit : model.units) bounds.merge(unit.bbox);
         const auto frame = MoldCoordinateFrame::fromBounds(bounds);
@@ -216,6 +222,17 @@ void run(const QString& fileName)
     if (action == "analyze" || action == "features") {
         const auto trace = worker::traceRegions(model, index, geometries);
         result.insert("features", worker::planningFeatures(trace));
+        QJsonArray throughFaces, axes;
+        for (const auto &id : std::set<std::string>(trace.throughStructureFaceIds.begin(),
+                                                    trace.throughStructureFaceIds.end()))
+            throughFaces.append(QString::fromStdString(id));
+        for (const auto &axis : trace.axisStats)
+            axes.append(QJsonObject{{"axis", QString::fromStdString(axis.axisLabel)},
+                                    {"roots", axis.rootFaceCount},
+                                    {"slots", axis.blindSlotPathCount},
+                                    {"pockets", axis.blindPocketPathCount},
+                                    {"faces", static_cast<qint64>(axis.traceFaceIds.size())}});
+        result.insert("recognition", QJsonObject{{"throughFaces", throughFaces}, {"axes", axes}});
         if (!trace.ok()) result.insert("featureError", QString::fromStdString(trace.error));
         if (action == "features") {
             result.insert("version", 1);
@@ -232,8 +249,13 @@ void run(const QString& fileName)
         QJsonArray faces;
         for (const auto& face : hole.sourceFaceIds)
             faces.append(QString::fromStdString(face));
-        holes.append(QJsonObject{{"id", id}, {"diameter", 2 * hole.radius},
-                                 {"depth", hole.depth()}, {"faces", faces}});
+        holes.append(QJsonObject{{"id", id},
+                                 {"diameter", 2 * hole.radius},
+                                 {"depth", hole.depth()},
+                                 {"faces", faces},
+                                 {"kind", hole.kind == FeatureKind::ThroughHole       ? "通孔"
+                                          : hole.kind == FeatureKind::CountersinkHole ? "沉孔"
+                                                                                      : "盲孔"}});
         if (id == request.value("hole").toString())
             selected = &hole;
     }

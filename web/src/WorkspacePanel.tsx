@@ -3,12 +3,14 @@ import {
   artifact,
   json,
   submit,
+  waitForJob,
   response,
   type Job,
   type Project,
   type Library,
 } from "./workspace";
 import type { Face } from "./Viewport";
+import { NcReview, type NcProgram } from "./NcReview";
 import { LibraryEditor } from "./LibraryEditor";
 import { ProjectEditor } from "./ProjectEditor";
 import { PlanningForm, type CamFeature, type Cutter } from "./PlanningForm";
@@ -39,6 +41,16 @@ export function WorkspacePanel({
   const key = isLib ? "cam.libraryEditor" : "cam.project." + model;
   const [items, itemsSet] = useState<Job[]>([]);
   const [doc, setDoc] = useState<Library | Project | null>(null);
+  type Coverage = {
+    covered: number;
+    eligible: number;
+    input: number;
+    issues: string[];
+  };
+  const [coverage, setCoverage] = useState<Coverage | null>(null);
+  const [nc, setNC] = useState<{ job: string; programs: NcProgram[] } | null>(
+    null,
+  );
   const [version, setVersion] = useState("");
   const [dirty, setDirty] = useState(false),
     [busy, setBusy] = useState(false),
@@ -67,6 +79,25 @@ export function WorkspacePanel({
     const value = await json<Library | Project>(artifact(id, file), {
       signal: life.current.signal,
     });
+    const details =
+      !isLib &&
+      (await json<{ holeCoverage?: Coverage; programCount?: number }>(
+        artifact(id, "result.json"),
+        {
+          signal: life.current.signal,
+        },
+      ));
+    setCoverage((details && details.holeCoverage) || null);
+    setNC(
+      details && details.programCount
+        ? {
+            job: id,
+            programs: await json<NcProgram[]>(artifact(id, "programs.json"), {
+              signal: life.current.signal,
+            }),
+          }
+        : null,
+    );
     setDoc(value);
     setVersion(id);
     setDirty(false);
@@ -97,7 +128,9 @@ export function WorkspacePanel({
   }, []);
   const discard = () => !dirty || window.confirm("放弃当前未保存的修改？");
   function edit(value: Library | Project) {
+    setNC(null);
     setDoc(value);
+    setCoverage(null);
     setDirty(true);
   }
   async function save(value?: Library | Project, appendId?: string) {
@@ -117,6 +150,19 @@ export function WorkspacePanel({
     );
     await open(job.id);
     await reload();
+  }
+  function simulate(operation?: string) {
+    void work(async () => {
+      const j = await submit(
+        url + "/simulate",
+        { document: doc, operation },
+        life.current.signal,
+        setPending,
+      );
+      localStorage.setItem(key, j.id);
+      preview(j);
+      close();
+    });
   }
   return (
     <div className="docBackdrop">
@@ -188,6 +234,18 @@ export function WorkspacePanel({
               />
             </label>
           </div>
+          {coverage && (
+            <section role="status">
+              <h3>孔覆盖审计</h3>
+              <p>
+                识别 {coverage.input} 个孔段，六面装夹范围内已覆盖{" "}
+                {coverage.covered} / {coverage.eligible}。
+              </p>
+              {coverage.issues.map((message, i) => (
+                <p key={i}>{message}</p>
+              ))}
+            </section>
+          )}
           {doc && (
             <>
               {isLib ? (
@@ -201,6 +259,48 @@ export function WorkspacePanel({
                   value={doc as Project}
                   change={edit}
                   cutters={cutters}
+                  assets={items.filter((j) => j.action === "analyze")}
+                  bindStock={(asset) =>
+                    void work(async () => {
+                      const signal = life.current.signal;
+                      const stockId =
+                        typeof asset === "string"
+                          ? asset
+                          : (
+                              await waitForJob(
+                                await json<Job>(
+                                  "/api/models?name=" +
+                                    encodeURIComponent(asset.name),
+                                  { method: "POST", body: asset, signal },
+                                ),
+                                signal,
+                                setPending,
+                              )
+                            ).id;
+                      const j = await submit(
+                        url + "/stock",
+                        { document: doc, stockId },
+                        signal,
+                        setPending,
+                      );
+                      await open(j.id);
+                      await reload();
+                    })
+                  }
+                  simulate={simulate}
+                  confirmSetups={(confirmedSetups) =>
+                    void work(async () => {
+                      const j = await submit(
+                        url + "/setups",
+                        { document: doc, confirmedSetups },
+                        life.current.signal,
+                        setPending,
+                      );
+                      await open(j.id);
+                      await reload();
+                    })
+                  }
+                  key={version}
                   generated={generated}
                   append={(id) => void work(() => save(doc, id))}
                   rebuild={(operation, tool) =>
@@ -244,23 +344,26 @@ export function WorkspacePanel({
                   />
                 )}
                 {!isLib && (
-                  <button
-                    onClick={() =>
-                      void work(async () => {
-                        const j = await submit(
-                          url + "/simulate",
-                          { document: doc },
-                          life.current.signal,
-                          setPending,
-                        );
-                        localStorage.setItem(key, j.id);
-                        preview(j);
-                        close();
-                      })
-                    }
-                  >
-                    仿真已启用工序
-                  </button>
+                  <>
+                    <button onClick={() => simulate()}>仿真已启用工序</button>
+                    <button
+                      onClick={() =>
+                        void work(async () => {
+                          setNC(null);
+                          const j = await submit(
+                            url + "/export",
+                            { document: doc },
+                            life.current.signal,
+                            setPending,
+                          );
+                          await open(j.id);
+                          await reload();
+                        })
+                      }
+                    >
+                      生成项目参考 NC 并审查
+                    </button>
+                  </>
                 )}
                 <button
                   disabled={!dirty}
@@ -288,6 +391,7 @@ export function WorkspacePanel({
             </>
           )}
         </fieldset>
+        {nc && <NcReview key={nc.job} {...nc} />}
         {busy && (
           <p role="status">
             正在处理…{" "}

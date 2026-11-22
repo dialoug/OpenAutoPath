@@ -45,23 +45,29 @@ func Handler(manager *jobs.Manager, web string) http.Handler {
 	documentJob := func(action string) http.HandlerFunc {
 		return func(w http.ResponseWriter, r *http.Request) {
 			var input struct {
-				Document                           json.RawMessage `json:"document"`
-				Operation                          string          `json:"operation"`
-				AppendID                           string          `json:"appendId"`
-				Feature, Tool, Strategy, LibraryID string
-				Step                               float64
+				Document                                    json.RawMessage `json:"document"`
+				CompletedMoves                              *int            `json:"completedMoves"`
+				ConfirmedSetups                             *[]string       `json:"confirmedSetups"`
+				Operation                                   string          `json:"operation"`
+				AppendID                                    string          `json:"appendId"`
+				Feature, Tool, Strategy, LibraryID, StockID string
+				AutoTool                                    bool `json:"autoTool"`
+				Step                                        float64
 			}
 			dec := json.NewDecoder(http.MaxBytesReader(w, r.Body, 32<<20))
 			dec.DisallowUnknownFields()
 			if err := dec.Decode(&input); err != nil || dec.Decode(new(any)) != io.EOF ||
+				(input.CompletedMoves != nil && (action != "simulate" || input.Operation == "" || *input.CompletedMoves < 0)) ||
+				(action == "stock" && (input.StockID == "" || len(input.Document) == 0)) ||
 				(action == "rebuild" && input.Operation == "") ||
-				((action == "simulate" || action == "rebuild") && len(input.Document) == 0) ||
-				(action == "plan" && (input.Feature == "" || input.Tool == "" || input.Step <= 0 || input.Step > 1000)) {
+				(action == "setups" && input.ConfirmedSetups == nil) ||
+				((action == "simulate" || action == "export" || action == "setups" || action == "rebuild") && len(input.Document) == 0) ||
+				(action == "plan" && (input.Feature == "" || (!input.AutoTool && input.Tool == "") || input.Step <= 0 || input.Step > 1000)) {
 				http.Error(w, "invalid document request", 400)
 				return
 			}
-			req := jobs.Request{Action: action, Document: input.Document, Operation: input.Operation, AppendID: input.AppendID,
-				Feature: input.Feature, Tool: input.Tool, Strategy: input.Strategy, LibraryID: input.LibraryID, Step: input.Step}
+			req := jobs.Request{Action: action, CompletedMoves: input.CompletedMoves, StockID: input.StockID, ConfirmedSetups: input.ConfirmedSetups, Document: input.Document, Operation: input.Operation, AppendID: input.AppendID,
+				Feature: input.Feature, AutoTool: input.AutoTool, Tool: input.Tool, Strategy: input.Strategy, LibraryID: input.LibraryID, Step: input.Step}
 			job, err := manager.Submit(owner(r), r.PathValue("id"), req, nil)
 			if errors.Is(err, os.ErrNotExist) {
 				http.NotFound(w, r)
@@ -83,6 +89,10 @@ func Handler(manager *jobs.Manager, web string) http.Handler {
 	api.HandleFunc("POST /api/models/{id}/projects", documentJob("project"))
 	api.HandleFunc("POST /api/models/{id}/projects/rebuild", documentJob("rebuild"))
 	api.HandleFunc("POST /api/models/{id}/projects/simulate", documentJob("simulate"))
+	api.HandleFunc("POST /api/models/{id}/projects/stock", documentJob("stock"))
+	api.HandleFunc("POST /api/models/{id}/projects/setups", documentJob("setups"))
+	api.HandleFunc("POST /api/models/{id}/projects/holes", documentJob("holes"))
+	api.HandleFunc("POST /api/models/{id}/projects/export", documentJob("export"))
 	api.HandleFunc("POST /api/models/{id}/projects/plan", documentJob("plan"))
 	api.HandleFunc("POST /api/models", func(w http.ResponseWriter, r *http.Request) {
 		r.Body = http.MaxBytesReader(w, r.Body, 128<<20)
@@ -154,7 +164,7 @@ func Handler(manager *jobs.Manager, web string) http.Handler {
 			http.NotFound(w, r)
 			return
 		}
-		if name == "reference.nc" || name == "project.oapjob" || name == "library.oaptl" {
+		if name == "programs.zip" || name == "toolpath.jsonl" || name == "reference.nc" || name == "project.oapjob" || name == "library.oaptl" {
 			w.Header().Set("Content-Disposition", `attachment; filename="`+name+`"`)
 		}
 		http.ServeFile(w, r, file)

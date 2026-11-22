@@ -7,11 +7,20 @@ export type Segment = [[number, number, number], [number, number, number]];
 type Props = {
   faces: Face[];
   highlighted: string[];
+  colors?: Record<string, number>;
   path: Segment[];
+  inspectStock?: (moves: number) => void;
   onPick: (face: string) => void;
 };
 
-export function Viewport({ faces, highlighted, path, onPick }: Props) {
+export function Viewport({
+  faces,
+  highlighted,
+  colors,
+  path,
+  onPick,
+  inspectStock,
+}: Props) {
   const host = useRef<HTMLDivElement>(null);
   const state = useRef<{
     scene: THREE.Scene;
@@ -19,7 +28,10 @@ export function Viewport({ faces, highlighted, path, onPick }: Props) {
     draw: () => void;
   } | null>(null);
   const pick = useRef(onPick);
-  const replay = useRef<(() => void) | null>(null);
+  const renderMove = useRef<((count: number) => void) | null>(null);
+  const [position, setPosition] = useState(0);
+  const [playing, setPlaying] = useState(false);
+  const [speed, setSpeed] = useState(1);
   pick.current = onPick;
   const [error, setError] = useState("");
   useEffect(() => {
@@ -134,12 +146,16 @@ export function Viewport({ faces, highlighted, path, onPick }: Props) {
     if (!view) return;
     for (const mesh of view.meshes)
       mesh.material.color.setHex(
-        highlighted.includes(mesh.name) ? 0x069486 : 0x93a5af,
+        highlighted.includes(mesh.name)
+          ? 0x069486
+          : (colors?.[mesh.name] ?? 0x93a5af),
       );
     view.draw();
-  }, [highlighted, faces]);
+  }, [highlighted, colors, faces]);
   useEffect(() => {
     const view = state.current;
+    setPlaying(false);
+    setPosition(path.length);
     if (!view || !path.length) return;
     const geometry = new THREE.BufferGeometry().setFromPoints(
       path.flatMap(([a, b]) => [
@@ -154,40 +170,129 @@ export function Viewport({ faces, highlighted, path, onPick }: Props) {
     line.renderOrder = 1;
     view.scene.add(line);
     view.draw();
-    let animation = 0;
-    replay.current = () => {
-      cancelAnimationFrame(animation);
-      const start = performance.now();
-      const duration = Math.max(1500, Math.min(12000, path.length * 90));
-      const frame = (now: number) => {
-        const progress = Math.min(1, (now - start) / duration);
-        geometry.setDrawRange(0, 2 * Math.ceil(progress * path.length));
-        view.draw();
-        if (progress < 1) animation = requestAnimationFrame(frame);
-      };
-      animation = requestAnimationFrame(frame);
+    const marker = new THREE.Points(
+      new THREE.BufferGeometry().setFromPoints([new THREE.Vector3()]),
+      new THREE.PointsMaterial({
+        color: 0xbd3617,
+        size: 9,
+        sizeAttenuation: false,
+        depthTest: false,
+      }),
+    );
+    marker.renderOrder = 2;
+    view.scene.add(marker);
+    renderMove.current = (count) => {
+      geometry.setDrawRange(0, 2 * count);
+      marker.position.set(...(count ? path[count - 1][1] : path[0][0]));
+      view.draw();
     };
+    renderMove.current(path.length);
     return () => {
-      cancelAnimationFrame(animation);
-      replay.current = null;
+      renderMove.current = null;
+      view.scene.remove(marker);
+      marker.geometry.dispose();
+      marker.material.dispose();
       view.scene.remove(line);
       geometry.dispose();
       line.material.dispose();
       if (state.current === view) view.draw();
     };
   }, [path, faces]);
+  useEffect(() => {
+    if (position <= path.length) renderMove.current?.(position);
+  }, [position, path]);
+  useEffect(() => {
+    if (!playing || !path.length) return;
+    let handle = 0,
+      previous = performance.now(),
+      remainder = 0,
+      cursor = startPosition.current;
+    const duration = Math.max(1500, Math.min(12000, path.length * 90));
+    const frame = (now: number) => {
+      remainder += ((now - previous) * speed * path.length) / duration;
+      previous = now;
+      const count = Math.floor(remainder);
+      remainder -= count;
+      cursor = Math.min(path.length, cursor + count);
+      setPosition(cursor);
+      if (cursor < path.length) handle = requestAnimationFrame(frame);
+      else setPlaying(false);
+    };
+    handle = requestAnimationFrame(frame);
+    return () => cancelAnimationFrame(handle);
+  }, [playing, path, speed]);
+  const startPosition = useRef(0);
+  startPosition.current = position;
+  const seek = (count: number) => {
+    setPlaying(false);
+    setPosition(count);
+  };
   return (
     <div className="viewport" ref={host}>
       {error && <span>{error}</span>}
       {path.length > 0 && !error && (
-        <button
+        <div
           className="replay"
           onPointerDown={(e) => e.stopPropagation()}
           onPointerUp={(e) => e.stopPropagation()}
-          onClick={() => replay.current?.()}
         >
-          回放刀路
-        </button>
+          <button
+            onClick={() => {
+              if (position === path.length) {
+                startPosition.current = 0;
+                setPosition(0);
+              }
+              setPlaying(!playing);
+            }}
+          >
+            {playing
+              ? "暂停"
+              : position === path.length
+                ? "回放刀路"
+                : "继续播放"}
+          </button>
+          <button disabled={position === 0} onClick={() => seek(position - 1)}>
+            上一步
+          </button>
+          <button
+            disabled={position === path.length}
+            onClick={() => seek(position + 1)}
+          >
+            下一步
+          </button>
+          <select
+            aria-label="播放速度"
+            value={speed}
+            onChange={(e) => setSpeed(+e.target.value)}
+          >
+            {[0.25, 0.5, 1, 2, 4].map((v) => (
+              <option key={v} value={v}>
+                {v}×
+              </option>
+            ))}
+          </select>
+          <label>
+            移动 {position} / {path.length}
+            <input
+              aria-label="刀路进度"
+              type="range"
+              min="0"
+              max={path.length}
+              value={position}
+              onChange={(e) => seek(+e.target.value)}
+            />
+          </label>
+          {inspectStock && (
+            <button
+              onClick={() => {
+                setPlaying(false);
+                inspectStock(position);
+              }}
+            >
+              查看此步余料
+            </button>
+          )}
+        </div>
       )}
       {!faces.length && <span>上传 STEP 模型以查看几何与加工特征</span>}
     </div>

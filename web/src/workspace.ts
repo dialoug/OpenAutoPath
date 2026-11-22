@@ -51,7 +51,8 @@ export type Library = {
     controllers: Slot[];
   };
 };
-type PocketSettings = {
+export type PocketSettings = {
+  [group: string]: Record<string, unknown>;
   depth: { step_down: number };
   clearing: { pattern: number };
 };
@@ -76,9 +77,23 @@ export type Family = keyof typeof families;
 export type Definition = Record<Family, Op[]> & {
   name: string;
   pocket_parameters: PocketSettings;
+  profile_parameters: PocketSettings;
+  hole_parameters: PocketSettings;
+  post: { program_name: string; coolant: boolean };
+  setups: {
+    id: string;
+    work_offset: number;
+    origin: { x: number; y: number; z: number };
+    valid: boolean;
+    axis_mapping: string;
+    operator_instruction: string;
+    confirmation: { confirmed: boolean };
+  }[];
   part: { source_path: string };
   stock: {
     source_kind: number;
+    source_path: string;
+    source_fingerprint: string;
     margin_x: number;
     margin_y: number;
     margin_z: number;
@@ -121,6 +136,13 @@ export async function submit(
     body: JSON.stringify(body),
     signal,
   });
+  return waitForJob(job, signal, onQueued);
+}
+export async function waitForJob(
+  job: Job,
+  signal: AbortSignal,
+  onQueued: (job: Job) => void,
+) {
   onQueued(job);
   while (job.state === "queued" || job.state === "running") {
     await new Promise((resolve) => setTimeout(resolve, 350));

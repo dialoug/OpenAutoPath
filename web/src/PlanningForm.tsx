@@ -19,6 +19,7 @@ export type PlanOptions = {
   tool: string;
   step: number;
   strategy: string;
+  autoTool?: boolean;
 };
 const names = { pocket: "槽腔", profile: "外轮廓", engrave: "雕刻装夹" };
 const patterns = {
@@ -136,9 +137,15 @@ export function PlanningControls({
   cutters: Cutter[];
   plan: (o: PlanOptions) => void;
 }) {
+  const [all, setAll] = useState(false);
+  const [autoTool, setAutoTool] = useState(false);
   const [strategy, setStrategy] = useState("");
   const [tool, setTool] = useState("");
   const [step, setStep] = useState(1);
+  const canAuto =
+    feature.kind === "pocket" ||
+    (feature.kind === "profile" && strategy !== "contour");
+  const automatic = canAuto && autoTool;
   return (
     <>
       {" "}
@@ -155,12 +162,34 @@ export function PlanningControls({
           ))}
         </select>
       </label>
-      <MillingToolPicker
-        label="规划刀具"
-        cutters={cutters}
-        value={tool}
-        select={setTool}
-      />
+      {feature.kind !== "engrave" && !feature.id.startsWith("manual-") && (
+        <label>
+          <input
+            type="checkbox"
+            checked={all}
+            onChange={(e) => setAll(e.target.checked)}
+          />{" "}
+          重新规划全部{names[feature.kind]}区域
+        </label>
+      )}
+      {canAuto && (
+        <label>
+          <input
+            type="checkbox"
+            checked={autoTool}
+            onChange={(e) => setAutoTool(e.target.checked)}
+          />{" "}
+          由活动刀库自动选刀
+        </label>
+      )}
+      {!automatic && (
+        <MillingToolPicker
+          label="规划刀具"
+          cutters={cutters}
+          value={tool}
+          select={setTool}
+        />
+      )}
       <label>
         {feature.kind === "engrave" ? "扫描行距" : "每层切深"} (mm)
         <input
@@ -172,21 +201,26 @@ export function PlanningControls({
         />
       </label>
       <button
-        disabled={!tool || step <= 0}
+        disabled={(!automatic && !tool) || step <= 0}
         onClick={() =>
           plan({
-            feature: feature.id,
-            tool,
+            feature: all ? feature.kind + "-all" : feature.id,
+            tool: automatic ? "" : tool,
+            autoTool: automatic,
             step,
             strategy: strategy || patterns[feature.kind][0][0],
           })
         }
       >
-        {feature.kind === "engrave"
-          ? "追加雕刻工序"
-          : feature.kind === "pocket"
-            ? "追加槽腔工序"
-            : "更新项目的外轮廓工序"}
+        {all
+          ? "更新全部" + names[feature.kind] + "工序"
+          : feature.kind === "engrave"
+            ? feature.id === "engrave-all"
+              ? "重新规划全部六面雕刻"
+              : "追加雕刻工序"
+            : feature.kind === "pocket"
+              ? "追加槽腔工序"
+              : "更新项目的外轮廓工序"}
         并保存新版本
       </button>
     </>

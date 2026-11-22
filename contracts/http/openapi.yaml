@@ -23,7 +23,8 @@ components:
       properties:
         id: {type: string}
         modelId: {type: string}
-        action: {enum: [analyze, features, generate, library, project, plan, rebuild, simulate]}
+        sourceHash: {type: string, description: SHA-256 of the uploaded STEP}
+        action: {enum: [analyze, features, generate, library, project, plan, rebuild, simulate, holes, stock, setups, export]}
         state: {enum: [queued, running, done, cancelled, failed]}
         stage: {type: string}
         error: {type: string}
@@ -148,9 +149,13 @@ paths:
             schema:
               type: object
               additionalProperties: false
-              required: [feature, tool, strategy, step]
+              required: [feature, strategy, step]
+              anyOf:
+                - {required: [tool]}
+                - {required: [autoTool], properties: {autoTool: {const: true}}}
               properties:
                 document: {type: object}
+                autoTool: {type: boolean, description: Select eligible cutters from the active library}
                 feature: {type: string}
                 tool: {type: string}
                 strategy: {type: string}
@@ -184,6 +189,88 @@ paths:
         '400': {description: Invalid request}
         '404': {description: Referenced resource is unavailable in this session}
         '429': {description: Queue full}
+  /api/models/{id}/projects/holes:
+    parameters:
+      - {$ref: '#/components/parameters/id'}
+    post:
+      summary: Automatically plan the recognized holes with the active library
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              properties:
+                document: {type: object}
+                libraryId: {type: string}
+      responses:
+        '202': {$ref: '#/components/responses/Accepted'}
+        '400': {description: Invalid request}
+        '404': {description: Referenced resource is unavailable in this session}
+        '429': {description: Queue full}
+  /api/models/{id}/projects/stock:
+    parameters:
+      - {$ref: '#/components/parameters/id'}
+    post:
+      summary: Bind a session-owned STEP as project stock
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [document, stockId]
+              properties:
+                document: {type: object}
+                stockId: {type: string}
+      responses:
+        '202': {$ref: '#/components/responses/Accepted'}
+        '400': {description: Invalid request}
+        '404': {description: Referenced resource is unavailable in this session}
+        '429': {description: Queue full}
+  /api/models/{id}/projects/setups:
+    parameters:
+      - {$ref: '#/components/parameters/id'}
+    post:
+      summary: Save the explicitly confirmed setup IDs
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [document, confirmedSetups]
+              properties:
+                document: {type: object}
+                confirmedSetups: {type: array, items: {type: string}}
+      responses:
+        '202': {$ref: '#/components/responses/Accepted'}
+        '400': {description: Invalid request}
+        '404': {description: Referenced resource is unavailable in this session}
+        '429': {description: Queue full}
+  /api/models/{id}/projects/export:
+    parameters:
+      - {$ref: '#/components/parameters/id'}
+    post:
+      summary: Regenerate enabled operations and publish reviewed NC partitions and ZIP
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [document]
+              properties:
+                document: {type: object}
+      responses:
+        '202': {$ref: '#/components/responses/Accepted'}
+        '400': {description: Invalid request}
+        '404': {description: Referenced resource is unavailable in this session}
+        '429': {description: Queue full}
   /api/models/{id}/projects/simulate:
     parameters:
       - {$ref: '#/components/parameters/id'}
@@ -199,6 +286,8 @@ paths:
               required: [document]
               properties:
                 document: {type: object}
+                operation: {type: string, description: Stop after this enabled operation}
+                completedMoves: {type: integer, minimum: 0, description: Move prefix within the selected operation}
       responses:
         '202': {$ref: '#/components/responses/Accepted'}
         '400': {description: Invalid request}
@@ -225,7 +314,7 @@ paths:
       - name: name
         in: path
         required: true
-        schema: {enum: [result.json, mesh.json, path.json, reference.nc, library.oaptl, project.oapjob, stock.json]}
+        schema: {enum: [result.json, mesh.json, path.json, reference.nc, library.oaptl, project.oapjob, stock.json, differences.json, programs.json, programs.zip, toolpath.jsonl]}
     get:
       responses:
         '200': {description: Completed job artifact}

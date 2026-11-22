@@ -1,5 +1,15 @@
 #include "Project.h"
 #include "Planning.h"
+#include "Simulation.h"
+#include "recognition/FeatureRecognizer.h"
+#include "tooling/adapter/hole/HoleMachiningInputMapper.h"
+#include "manufacturing/program/MachiningProgramPartitioner.h"
+#include "toolpath/program/validation/GCodeReview.h"
+#include "toolpath/program/validation/ToolpathProgramValidator.h"
+#include "toolpath/core/PocketToolBinding.h"
+#include "toolpath/pocket/program/PocketToolpathExport.h"
+#include <map>
+#include <sstream>
 #include "manufacturing/finishing/SurfaceFinishingMachiningJobService.h"
 #include "manufacturing/hole/HoleMachiningJobService.h"
 #include "manufacturing/ipw/IpwExecutor.h"
@@ -147,7 +157,8 @@ struct RebuiltOperation
 };
 
 RebuiltOperation rebuildFamily(MachiningJob &job, JobOperationKind kind, const StepIndexer &index,
-                               const toolpath::HoleRapidPlanningContext &context)
+                               const toolpath::HoleRapidPlanningContext &context,
+                               const std::string &stockPath)
 {
     toolpath::ToolpathProgram program;
     toolpath::ToolpathParams params;
@@ -180,7 +191,7 @@ RebuiltOperation rebuildFamily(MachiningJob &job, JobOperationKind kind, const S
         break;
     }
     case JobOperationKind::SurfaceFinishing: {
-        const auto batch = SurfaceFinishingMachiningJobService().regenerate(job, index);
+        const auto batch = SurfaceFinishingMachiningJobService().regenerate(job, index, nullptr, stockPath);
         if (!job.currentFinishingResult())
             throw std::runtime_error("雕刻工序重建或验证失败");
         report = batch.validation;
@@ -199,8 +210,10 @@ QJsonArray point(const gp_Pnt &p)
     return {p.X(), p.Y(), p.Z()};
 }
 
-QJsonObject simulateProject(MachiningJob &job, const StepIndexer &index,
-                            const toolpath::HoleRapidPlanningContext &context)
+ipw::IpwExecutionResult executeProject(MachiningJob &job, const StepIndexer &index,
+                                       const toolpath::HoleRapidPlanningContext &context,
+                                       std::map<JobOperationKind, toolpath::ToolpathParams> &parameters,
+                                       const std::string &stockPath)
 {
     std::set<JobOperationKind> kinds;
     for (const auto &operation : MachiningOperationService::operations(job.definition()))
@@ -209,47 +222,182 @@ QJsonObject simulateProject(MachiningJob &job, const StepIndexer &index,
     if (kinds.empty())
         throw std::runtime_error("没有启用的加工工序");
     for (auto kind : kinds)
-        rebuildFamily(job, kind, index, context);
+        parameters.emplace(kind, rebuildFamily(job, kind, index, context, stockPath).params);
     std::vector<TopoDS_Shape> units;
     for (TopoDS_Iterator it(context.obstacleShape); it.More(); it.Next())
         units.push_back(it.Value());
     std::string error;
-    auto stock =
-        SurfaceFinishingMachiningJobService::buildPlanningStock(job.definition().stock, units, &error);
+    auto stock = SurfaceFinishingMachiningJobService::buildPlanningStock(job.definition().stock, units,
+                                                                         &error, nullptr, stockPath);
     if (stock.IsNull())
         throw std::runtime_error(error);
     const auto simulation = ipw::IpwExecutor().execute(
         job, stock, MachiningJobStorage::definitionFingerprint(job.definition()).toStdString());
     if (!simulation.complete() || !simulation.finalCheckpoint || !simulation.finalCheckpoint->dexelStock)
         throw std::runtime_error("IPW: " + simulation.message);
-    Handle(Poly_Triangulation) mesh;
-    toolpath::DexelDisplayMeshOptions opts;
-    opts.maximumPlanarCellCount = 180000;
-    if (!simulation.finalCheckpoint->dexelStock->buildDisplayMesh(mesh, nullptr, &error, {}, opts) ||
-        mesh.IsNull())
-        throw std::runtime_error("IPW mesh: " + error);
-    QJsonArray positions, indices;
-    for (int i = 1; i <= mesh->NbNodes(); ++i)
+    return simulation;
+}
+
+void selectPrefix(MachiningJobDefinition &def, const std::string &last)
+{
+    const auto ordered = MachiningOperationService::operations(def);
+    const auto end = std::find_if(ordered.begin(), ordered.end(),
+                                  [&](const auto &op) { return op.id == last && op.enabled; });
+    if (end == ordered.end())
+        throw std::runtime_error("请选择已启用的仿真终点工序");
+    std::set<std::string> included;
+    for (auto it = ordered.begin(); it != end + 1; ++it)
+        if (it->enabled)
+            included.insert(it->id);
+    const auto trim = [&](auto &ops) {
+        for (auto &op : ops)
+            op.enabled = included.contains(op.id);
+    };
+    trim(def.holeOperations);
+    trim(def.pocketOperations);
+    trim(def.profileOperations);
+    trim(def.finishingOperations);
+}
+
+void confirmSetups(MachiningJob &job, toolpath::MoldSetupWorkFrames frames, const QJsonArray &ids)
+{
+    auto &def = job.definition();
+    for (const auto &setup : def.setups)
+        frames.setConfirmed(setup.face, false);
+    for (const auto &id : ids)
     {
-        const auto p = mesh->Node(i);
-        positions.append(p.X());
-        positions.append(p.Y());
-        positions.append(p.Z());
+        const auto *setup = job.setupById(id.toString().toStdString());
+        if (!setup || !setup->valid || !frames.setConfirmed(setup->face, true))
+            throw std::runtime_error("无法确认无效装夹");
     }
-    for (int i = 1; i <= mesh->NbTriangles(); ++i)
+    MachiningJobApplicationService::captureSetups(
+        def, frames, QDateTime::currentDateTimeUtc().toString(Qt::ISODateWithMs).toStdString(),
+        "browser-session");
+}
+
+QJsonObject exportPrograms(const MachiningJob &job, toolpath::MoldSetupWorkFrames frames,
+                           const std::map<JobOperationKind, toolpath::ToolpathParams> &parameters)
+{
+    const auto result = MachiningProgramPartitioner().partition(job);
+    if (!result.assembly.ok() && !result.assembly.issues.empty())
+        throw std::runtime_error(result.assembly.issues.front().message);
+    if (!result.ok())
+        throw std::runtime_error(result.issues.empty() ? "没有可导出的程序" : result.issues.front().message);
+    const auto operations = MachiningOperationService::operations(job.definition());
+    QJsonArray programs;
+    for (const auto &part : result.partitions)
     {
-        const auto &tri = mesh->Triangle(i);
-        for (int k = 1; k <= 3; ++k)
-            indices.append(tri.Value(k) - 1);
+        const auto op = std::find_if(operations.begin(), operations.end(),
+                                     [&](const auto &o) { return o.id == part.formalOperationIds.front(); });
+        const auto *controller = job.toolControllerById(part.toolControllerId);
+        const auto *setup = job.setupById(part.setupId);
+        if (op == operations.end() || !controller || !setup || !setup->confirmation.confirmed)
+            throw std::runtime_error("程序缺少工序、刀具或装夹");
+        frames.setConfirmed(setup->face, true);
+        const auto frame = frames.forFace(setup->face)->machiningSetup();
+        auto options = job.definition().post.options;
+        const QString filename = QString("%1-%2-T%3.nc")
+                                     .arg(part.index + 1, 3, 10, QChar('0'))
+                                     .arg(toolpath::workCoordinateCode(part.workOffset))
+                                     .arg(part.toolNumber);
+        options.programName += " " + filename.toStdString();
+        options.toolId = part.toolId;
+        options.toolName = controller->tool.toolName;
+        std::string error;
+        auto params = parameters.at(op->kind);
+        if (op->kind == JobOperationKind::Pocket)
+        {
+            const auto &pockets = job.definition().pocketOperations;
+            const auto pocket = std::find_if(pockets.begin(), pockets.end(),
+                                             [&](const auto &item) { return item.id == op->id; });
+            params = toolpath::bindPocketToolParameters(
+                pocket->parameters.value_or(job.definition().pocketParameters), controller->tool);
+        }
+        const auto validation = toolpath::ToolpathProgramValidator().validate(part.program, params);
+        if (!validation.ok())
+            throw std::runtime_error(validation.summary());
+        std::ostringstream buffer;
+        if (!toolpath::ReferenceNcGCodePostProcessor().write(buffer, part.program, params, frame, options,
+                                                             error))
+            throw std::runtime_error(error);
+        const auto nc = buffer.str();
+        const auto review = toolpath::GCodeReview().review(nc);
+        QJsonArray warnings, ids;
+        if (op->kind == JobOperationKind::Hole && job.holeResult())
+        {
+            const auto &batch = *job.holeResult();
+            if (!batch.coverage.complete())
+                warnings.append(
+                    QJsonObject{{"line", 0}, {"message", QString::fromStdString(batch.coverage.summary())}});
+            if (!batch.productionSafety.complete())
+                warnings.append(QJsonObject{{"line", 0}, {"message", "刀具装配实体扫掠审计未完成"}});
+        }
+        if (op->kind == JobOperationKind::SurfaceFinishing)
+            warnings.append(QJsonObject{{"line", 0},
+                                        {"message", "雕刻刀刃接触采用采样计算，连续刀柄与夹具碰撞仍需复核"}});
+        for (const auto &issue : review.issues)
+        {
+            if (issue.severity == toolpath::GCodeReviewSeverity::Error)
+                throw std::runtime_error(filename.toStdString() + " L" + std::to_string(issue.line) + ": " +
+                                         issue.message);
+            warnings.append(
+                QJsonObject{{"line", issue.line}, {"message", QString::fromStdString(issue.message)}});
+        }
+        for (const auto &id : part.formalOperationIds)
+            ids.append(QString::fromStdString(id));
+        programs.append(QJsonObject{{"filename", filename},
+                                    {"setup", QString::fromStdString(setup->id)},
+                                    {"tool", QString::fromStdString(options.toolName)},
+                                    {"operations", ids},
+                                    {"warnings", warnings},
+                                    {"lines", review.lineCount},
+                                    {"text", QString::fromStdString(nc)}});
     }
-    QSaveFile file("stock.json");
-    const auto bytes =
-        QJsonDocument(QJsonArray{QJsonObject{{"id", "IPW"}, {"positions", positions}, {"indices", indices}}})
-            .toJson(QJsonDocument::Compact);
-    if (!file.open(QIODevice::WriteOnly) || file.write(bytes) != bytes.size() || !file.commit())
-        throw std::runtime_error("无法保存余料网格");
-    return {{"volume", simulation.finalCheckpoint->volume},
-            {"operations", static_cast<qint64>(simulation.executedNodeCount)}};
+    const auto data = QJsonDocument(programs).toJson(QJsonDocument::Compact);
+    QSaveFile file("programs.json");
+    if (!file.open(QIODevice::WriteOnly) || file.write(data) != data.size() || !file.commit())
+        throw std::runtime_error("无法保存 NC 程序");
+    return {{"programCount", programs.size()}};
+}
+
+QJsonObject planHoles(MachiningJob &job, const Model &model, const StepIndexer &index,
+                      const tooling::ToolLibrary &library, const toolpath::MoldSetupWorkFrames &frames,
+                      const toolpath::HoleRapidPlanningContext &context)
+{
+    Bbox bounds;
+    for (const auto &unit : model.units)
+        bounds.merge(unit.bbox);
+    const auto holes = FeatureRecognizer().recognizeHoleGeometries(model, index);
+    const auto inputs =
+        tooling::HoleMachiningInputMapper().resolve(holes.geometries, bounds, *context.moldFrame);
+    if (inputs.empty())
+        throw std::runtime_error("没有可规划的孔");
+    const auto generated =
+        tooling::HoleAutomaticToolpath().generate(library, inputs, job.definition().holeParameters, &context);
+    if (generated.batch.toProgram().empty() || !generated.batch.validation.ok())
+        throw std::runtime_error(generated.batch.diagnostics.empty()
+                                     ? generated.batch.validation.summary()
+                                     : generated.batch.diagnostics.back().message);
+    HoleJobCaptureRequest capture;
+    capture.definition = job.definition();
+    capture.inputs = &inputs;
+    capture.automaticSelection = &generated.selection;
+    capture.generated = &generated.batch;
+    capture.setupFrames = &frames;
+    capture.toolLibraryId = library.id().toStdString();
+    std::string error;
+    if (!HoleMachiningJobService().capture(job, capture, &error))
+        throw std::runtime_error(error);
+    const auto &coverage = generated.batch.coverage;
+    QJsonArray issues;
+    for (const auto &issue : coverage.blockingIssues)
+        issues.append(QString::fromStdString(issue.message));
+    for (const auto &issue : coverage.warningIssues)
+        issues.append(QString::fromStdString(issue.message));
+    return {{"input", coverage.inputHoleSegmentCount},
+            {"covered", coverage.coveredHoleSegmentCount},
+            {"eligible", coverage.sixFaceHoleSegmentCount},
+            {"issues", issues}};
 }
 } // namespace
 
@@ -280,13 +428,17 @@ void captureProject(const QJsonObject &request, const tooling::HoleAutomaticTool
 }
 
 QJsonObject processProject(const QJsonObject &request, const StepIndexer &index, const Model &model,
-                           const tooling::ToolLibrary &library, const toolpath::MoldSetupWorkFrames &frames,
+                           const tooling::ToolLibrary &library,
+                           const toolpath::MoldSetupWorkFrames &modelFrames,
                            const toolpath::HoleRapidPlanningContext &context)
 {
+    auto frames = modelFrames;
     manufacturing::MachiningJob job;
     auto &def = job.definition();
     QString error;
-    if (!request.contains("document") && (request["action"].toString() == "project" || request["action"].toString() == "plan"))
+    if (!request.contains("document") &&
+        (request["action"].toString() == "project" || request["action"].toString() == "plan" ||
+         request["action"].toString() == "holes"))
     {
         def.id = QUuid::createUuid().toString(QUuid::WithoutBraces).toStdString();
         def.part.sourcePath =
@@ -305,11 +457,33 @@ QJsonObject processProject(const QJsonObject &request, const StepIndexer &index,
     auto collisionScene = std::move(def.collisionScene);
     MachiningJobApplicationService::rebindLoadedSetups(def, frames);
     def.collisionScene = std::move(collisionScene);
+    for (const auto &setup : def.setups)
+        frames.setConfirmed(setup.face, setup.confirmation.confirmed);
     const auto action = request["action"].toString();
-    if (action != "project" && (def.stock.sourceKind == StockSourceKind::StepModel || !def.collisionScene.models.empty()))
-        throw std::runtime_error("该项目引用外部毛坯或碰撞模型，请在桌面端计算该版本");
+    const auto stockPath = request["stockFile"].toString().toStdString();
+    if (action == "stock")
+    {
+        const auto expected = request["stockHash"].toString();
+        if (stockPath.empty() || expected.isEmpty() ||
+            expected != MachiningJobStorage::sourceFileFingerprint(request["stockFile"].toString(), &error))
+            throw std::runtime_error("毛坯 STEP 指纹校验失败");
+        def.stock.sourceKind = StockSourceKind::StepModel;
+        def.stock.sourcePath = QFileInfo(request["stockName"].toString()).fileName().toStdString();
+        def.stock.sourceFingerprint = expected.toStdString();
+    }
+    const bool computing = action == "plan" || action == "rebuild" || action == "simulate" ||
+                           action == "export" || action == "holes";
+    if (computing && def.stock.sourceKind == StockSourceKind::StepModel && stockPath.empty())
+        throw std::runtime_error("请在加工项目中绑定与毛坯指纹匹配的 STEP");
+    if (computing && !def.collisionScene.models.empty())
+        throw std::runtime_error("该项目含外部碰撞模型，请在桌面端复核");
     if (request.contains("appendFile"))
         appendGeneratedHole(def, request["appendFile"].toString());
+    if (action == "setups")
+        confirmSetups(job, frames, request["confirmedSetups"].toArray());
+    QJsonObject result;
+    if (action == "holes")
+        result.insert("holeCoverage", planHoles(job, model, index, library, frames, context));
     if (action == "plan")
     {
         planFeature(job, request, model, index, library, frames, context.obstacleShape);
@@ -318,11 +492,32 @@ QJsonObject processProject(const QJsonObject &request, const StepIndexer &index,
         changePocketTool(job, request, library);
     def.modifiedAt = QDateTime::currentDateTimeUtc().toString(Qt::ISODateWithMs).toStdString();
     saveDefinition(def);
-    QJsonObject result{{"name", QString::fromStdString(def.name)}};
-    if (request["action"].toString() == "project" || request["action"].toString() == "plan")
+    result.insert("name", QString::fromStdString(def.name));
+    if (action == "project" || action == "plan" || action == "setups" || action == "stock" ||
+        action == "holes")
         return result;
-    if (request["action"].toString() == "simulate")
-        return simulateProject(job, index, context);
+    if (action == "simulate" || action == "export")
+    {
+        const auto through = request["operation"].toString();
+        if (action == "simulate" && !through.isEmpty())
+            selectPrefix(def, through.toStdString());
+        if (action == "export")
+        {
+            for (const auto &op : MachiningOperationService::operations(def))
+            {
+                const auto *setup = job.setupById(op.setupId);
+                if (op.enabled && (!setup || !setup->confirmation.confirmed))
+                    throw std::runtime_error("请先核对并确认工序的装夹 " + op.setupId);
+            }
+        }
+        std::map<JobOperationKind, toolpath::ToolpathParams> parameters;
+        const auto simulation = executeProject(job, index, context, parameters, stockPath);
+        if (action == "export")
+            return exportPrograms(job, frames, parameters);
+        result = stockResult(job, simulation, request, context.obstacleShape);
+        result.insert("throughOperation", through);
+        return result;
+    }
 
     const auto id = request["operation"].toString().toStdString();
     const auto operations = MachiningOperationService::operations(def);
@@ -337,12 +532,17 @@ QJsonObject processProject(const QJsonObject &request, const StepIndexer &index,
     selectOperation(subset.pocketOperations, id);
     selectOperation(subset.profileOperations, id);
     selectOperation(subset.finishingOperations, id);
-    auto [program, params, report] = rebuildFamily(selected, it->kind, index, context);
+    auto [program, params, report] = rebuildFamily(selected, it->kind, index, context, stockPath);
     if (it->kind == JobOperationKind::Pocket) {
         const auto actual = std::find_if(subset.pocketOperations.begin(), subset.pocketOperations.end(),
                                          [&](const auto& op){ return op.id == id; });
         const auto original = std::find_if(def.pocketOperations.begin(), def.pocketOperations.end(),
                                            [&](const auto& op){ return op.id == id; });
+        std::string exportError;
+        if (!toolpath::PocketToolpathExport().writeJsonl(selected.currentPocketResult()->operations, params,
+                                                         "toolpath.jsonl", exportError))
+            throw std::runtime_error(exportError);
+        result.insert("pocketJsonl", true);
         *original = *actual;
         saveDefinition(def);
     }
@@ -355,7 +555,7 @@ QJsonObject processProject(const QJsonObject &request, const StepIndexer &index,
         options.toolId = controller->tool.toolId;
         options.toolName = controller->tool.toolName;
     }
-    options.programName = def.name + " " + id;
+    options.programName += " " + id;
     std::string why;
     if (!toolpath::ToolpathProgramExport().writeGCode(program, params, setup->machiningSetup(), options,
                                                       "reference.nc", why))

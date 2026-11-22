@@ -26,7 +26,8 @@ public:
     static TopoDS_Shape buildPlanningStock(
         StockDefinition& stock, const std::vector<TopoDS_Shape>& completeTargetUnits,
         std::string* error = nullptr,
-        const toolpath::ToolpathGenerationControl* control = nullptr);
+        const toolpath::ToolpathGenerationControl* control = nullptr,
+        const std::string& resolvedStockPath = {});
     bool capture(MachiningJob& job, const SurfaceFinishingJobCaptureRequest& request,
                  std::string* error = nullptr) const;
     // Atomically replaces all engraving faces, retaining IDs and sequence for
@@ -36,7 +37,8 @@ public:
         std::string* error = nullptr) const;
     toolpath::SurfaceFinishingBatch regenerate(
         MachiningJob& job, const StepIndexer& indexer,
-        const toolpath::ToolpathGenerationControl* control = nullptr) const;
+        const toolpath::ToolpathGenerationControl* control = nullptr,
+        const std::string& resolvedStockPath = {}) const;
     static std::string operationFingerprint(
         const MachiningJobDefinition& definition,
         const SurfaceFinishingOperationDefinition& operation);

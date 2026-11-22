@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { families, type Family, type Project, type Job } from "./workspace";
 import type { Cutter } from "./PlanningForm";
+import { MachiningParameters } from "./MachiningParameters";
 import { MillingToolPicker } from "./MillingToolPicker";
 type Props = {
   cutters: Cutter[];
@@ -8,6 +9,10 @@ type Props = {
   change: (doc: Project) => void;
   generated: Job[];
   append: (id: string) => void;
+  assets: Job[];
+  bindStock: (id: string | File) => void;
+  simulate: (id: string) => void;
+  confirmSetups: (ids: string[]) => void;
   rebuild: (id: string, tool?: string) => void;
 };
 export function ProjectEditor({
@@ -17,6 +22,10 @@ export function ProjectEditor({
   cutters,
   append,
   rebuild,
+  simulate,
+  assets,
+  bindStock,
+  confirmSetups,
 }: Props) {
   const [appendID, setAppendID] = useState("");
   const [changing, setChanging] = useState("");
@@ -62,6 +71,8 @@ export function ProjectEditor({
           onChange={(e) =>
             edit((d) => {
               d.stock.source_kind = +e.target.value;
+              d.stock.source_path = "";
+              d.stock.source_fingerprint = "";
             })
           }
         >
@@ -72,6 +83,40 @@ export function ProjectEditor({
           )}
         </select>
       </label>
+      <details className="setupRow">
+        <summary>
+          外部 STEP 毛坯
+          {def.stock.source_kind === 2 ? " · " + def.stock.source_path : ""}
+        </summary>
+        <label>
+          已上传的毛坯
+          <select
+            value=""
+            onChange={(e) => {
+              if (e.target.value) bindStock(e.target.value);
+            }}
+          >
+            <option value="">选择 STEP 并绑定毛坯</option>
+            {assets.map((m) => (
+              <option key={m.id} value={m.id}>
+                {m.name} · {m.id.slice(0, 6)}
+              </option>
+            ))}
+          </select>
+        </label>
+        <label className="upload">
+          上传并绑定毛坯
+          <input
+            type="file"
+            accept=".stp,.step"
+            onChange={(e) => {
+              const f = e.target.files?.[0];
+              e.target.value = "";
+              if (f) bindStock(f);
+            }}
+          />
+        </label>
+      </details>
       <div className="docGrid">
         {(["margin_x", "margin_y", "margin_z"] as const).map((k, i) => (
           <label key={k}>
@@ -91,6 +136,102 @@ export function ProjectEditor({
           </label>
         ))}
       </div>
+      {def.setups.length > 0 && (
+        <section>
+          <h3>装夹与工件坐标</h3>
+          {def.setups.map((s) => (
+            <details key={s.id} className="setupRow">
+              <summary>
+                {s.work_offset ? "G" + (53 + s.work_offset) : "未分配坐标"} ·{" "}
+                {s.id} · {s.confirmation.confirmed ? "已确认" : "待确认"}
+              </summary>
+              <p>
+                原点 (mm)　
+                {[s.origin.x, s.origin.y, s.origin.z]
+                  .map((v) => v.toFixed(3))
+                  .join(", ")}
+              </p>
+              <p>{s.axis_mapping}</p>
+              <p>{s.operator_instruction}</p>
+              <button
+                disabled={!s.valid}
+                onClick={() =>
+                  confirmSetups(
+                    def.setups
+                      .filter((item) =>
+                        item.id === s.id
+                          ? !s.confirmation.confirmed
+                          : item.confirmation.confirmed,
+                      )
+                      .map((item) => item.id),
+                  )
+                }
+              >
+                {s.confirmation.confirmed ? "撤销装夹确认" : "确认此装夹与坐标"}
+              </button>
+            </details>
+          ))}
+        </section>
+      )}
+      <details className="setupRow">
+        <summary>项目工艺参数与输出设置</summary>
+        {(
+          [
+            "hole_parameters",
+            "pocket_parameters",
+            "profile_parameters",
+          ] as const
+        ).map((key, i) =>
+          ["depth", ["hole", "clearing", "profile"][i]].map((group, j) => (
+            <MachiningParameters
+              key={key + group}
+              title={
+                ["孔", "槽腔", "外轮廓"][i] +
+                (j === 0 ? "深度与安全高度" : "工艺")
+              }
+              values={def[key][group]}
+              change={(values) =>
+                edit((d) => {
+                  Object.assign(d[key][group], values);
+                  for (const op of d[
+                    (
+                      [
+                        "hole_operations",
+                        "pocket_operations",
+                        "profile_operations",
+                      ] as const
+                    )[i]
+                  ])
+                    op.state = 1;
+                })
+              }
+            />
+          )),
+        )}
+        <label>
+          参考 NC 程序名
+          <input
+            value={def.post.program_name}
+            onChange={(e) =>
+              edit((d) => {
+                d.post.program_name = e.target.value;
+              })
+            }
+          />
+        </label>
+        <label>
+          <input
+            type="checkbox"
+            checked={def.post.coolant}
+            onChange={(e) =>
+              edit((d) => {
+                d.post.coolant = e.target.checked;
+              })
+            }
+          />{" "}
+          输出冷却液指令
+        </label>
+      </details>
       <h3>工序顺序 · {ordered.length}</h3>
       {ordered.map(({ op, family }, i) => (
         <article className="opRow" key={op.id}>
@@ -114,6 +255,19 @@ export function ProjectEditor({
                 ?.tool.tool_name
             }
           </small>
+          {family === "surface_finishing_operations" && op.parameters && (
+            <MachiningParameters
+              title="雕刻工艺参数"
+              values={op.parameters}
+              change={(values) =>
+                edit((d) => {
+                  const item = d[family].find((o) => o.id === op.id)!;
+                  Object.assign(item.parameters!, values);
+                  item.state = 1;
+                })
+              }
+            />
+          )}
           {family === "pocket_operations" && (
             <>
               <p>
@@ -129,6 +283,25 @@ export function ProjectEditor({
                 · 层深{" "}
                 {(op.parameters || def.pocket_parameters).depth.step_down} mm
               </p>
+              {(["depth", "clearing"] as const).map((group) => (
+                <MachiningParameters
+                  key={group}
+                  title={
+                    group === "depth"
+                      ? "此工序深度与安全高度"
+                      : "此工序清料与进刀"
+                  }
+                  values={(op.parameters || def.pocket_parameters)[group]}
+                  change={(values) =>
+                    edit((d) => {
+                      const item = d[family].find((o) => o.id === op.id)!;
+                      item.parameters ??= structuredClone(d.pocket_parameters);
+                      Object.assign(item.parameters[group], values);
+                      item.state = 1;
+                    })
+                  }
+                />
+              ))}
               {changing === op.id ? (
                 <div>
                   <MillingToolPicker
@@ -161,6 +334,9 @@ export function ProjectEditor({
           <div className="docActions">
             <button disabled={!op.enabled} onClick={() => rebuild(op.id)}>
               重算并预览
+            </button>
+            <button disabled={!op.enabled} onClick={() => simulate(op.id)}>
+              仿真至此工序
             </button>
             <button disabled={!i} onClick={() => move(i, i - 1)}>
               上移

@@ -59,6 +59,10 @@ HTTP 消息和状态码可查阅 [OpenAPI 定义](../contracts/http/openapi.yaml
 | 新建、导入或保存刀库 | `POST /api/libraries` |
 | 新建、导入或保存项目 | `POST /api/models/{modelId}/projects` |
 | 规划工序、重算或仿真 | 在项目 URL 后追加 `/plan`、`/rebuild` 或 `/simulate` 并 POST |
+| 按活动刀库重新规划所有孔 | 项目 URL 后追加 `/holes`，传 `document` 和可选 `libraryId` |
+| 绑定外部毛坯 | 项目 URL 后追加 `/stock`，传 `document` 和会话内已上传模型的 `stockId` |
+| 核对装夹与导出项目 NC | 先 POST `/setups` 保存 `confirmedSetups`，再用该版本的 `document` POST `/export`；结果含 `programs.json` 和 `programs.zip` |
+| 指定余料阶段 | POST `/simulate` 可传终点工序 `operation` 和该工序内可选的 `completedMoves`，传 0 表示开始该工序前 |
 | 查询或取消任务 | `GET` 或 `DELETE /api/jobs/{jobId}` |
 | 获取已完成的结果 | `GET /api/jobs/{jobId}/files/{name}` |
 

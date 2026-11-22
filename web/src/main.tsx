@@ -28,7 +28,23 @@ type Job = {
   stage?: string;
   error?: string;
 };
-type Hole = { id: string; diameter: number; depth: number; faces: string[] };
+type Recognition = {
+  throughFaces: string[];
+  axes: {
+    axis: string;
+    roots: number;
+    slots: number;
+    pockets: number;
+    faces: number;
+  }[];
+};
+type Hole = {
+  kind?: string;
+  id: string;
+  diameter: number;
+  depth: number;
+  faces: string[];
+};
 type Tool = Cutter;
 type Review = {
   operation?: string;
@@ -108,16 +124,24 @@ function App() {
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
   const [features, setFeatures] = useState<CamFeature[]>([]);
-  const [mode, setMode] = useState<"hole" | "pocket">("hole");
-  const [pocketID, setPocketID] = useState("");
+  const [mode, setMode] = useState<"hole" | CamFeature["kind"]>("hole");
+  const [recognition, setRecognition] = useState<Recognition | null>(null);
+  const [colorFeatures, setColorFeatures] = useState(false);
+  const [manual, setManual] = useState<"" | "pocket" | "slot">("");
+  const [floor, setFloor] = useState("");
+  const [regionID, setRegionID] = useState("");
   const [featureState, setFeatureState] = useState<
     "loading" | "ready" | "error"
   >("loading");
   const [featureError, setFeatureError] = useState("");
   const [retryFeatures, retry] = useState(0);
   const [planningJob, setPlanningJob] = useState<Job | null>(null);
-  const pockets = features.filter((f) => f.kind === "pocket");
-  const pocket = pockets.find((f) => f.id === pocketID) || pockets[0];
+  const regionNames = { pocket: "槽腔", profile: "外轮廓", engrave: "雕刻" };
+  const regionLabel = mode === "hole" ? "孔" : regionNames[mode];
+  const regions = features.filter((f) => f.kind === mode);
+  if (mode === "engrave" && regions.length === 6)
+    regions.push({ id: "engrave-all", kind: "engrave", faces: [] });
+  const region = regions.find((f) => f.id === regionID) || regions[0];
   const [holes, setHoles] = useState<Hole[]>([]);
   const [selected, select] = useState("");
   const [tools, setTools] = useState<Tool[]>([]);
@@ -129,8 +153,27 @@ function App() {
   const [stock, setStock] = useState<{
     mesh: Face[];
     volume: number;
+    comparison?: {
+      allowance: number;
+      overcut: number;
+      missing: number;
+      certainOvercut: number;
+      boundaryUncertainty: number;
+      attribution: {
+        operation: string;
+        sequence: number;
+        volume: number;
+        certain: number;
+      }[];
+    };
+    differences?: Record<string, Face[]>;
+    throughOperation?: string;
+    removedVolume?: number;
+    completedMoves?: number;
+    totalMoves?: number;
     operations: number;
   } | null>(null);
+  const [stockView, setStockView] = useState("");
   const [showStock, setShowStock] = useState(false);
   const [review, setReview] = useState<Review | null>(null);
   useEffect(() => {
@@ -177,14 +220,18 @@ function App() {
           setModel(j.id);
           refreshModels((n) => n + 1);
         } else if (j.action === "simulate") {
-          const [r, mesh] = await Promise.all([
+          const [r, mesh, differences] = await Promise.all([
             json<{ volume: number; operations: number }>(
               artifact(j.id, "result.json"),
             ),
             json<Face[]>(artifact(j.id, "stock.json")),
+            j.files?.includes("differences.json")
+              ? json<Record<string, Face[]>>(artifact(j.id, "differences.json"))
+              : undefined,
           ]);
           if (live) {
-            setStock({ ...r, mesh });
+            setStockView("");
+            setStock({ ...r, mesh, differences });
             setShowStock(true);
             setReview(null);
             setPath([]);
@@ -221,7 +268,10 @@ function App() {
     const controller = new AbortController();
     setFeatureState("loading");
     setFeatureError("");
-    setPocketID("");
+    setRegionID("");
+    setRecognition(null);
+    setManual("");
+    setFloor("");
     const base = "/api/jobs/" + model + "/files/";
     Promise.all(
       ["result.json", "mesh.json"].map(async (file) =>
@@ -246,6 +296,7 @@ function App() {
           let regions = result;
           if (
             !Array.isArray(result.features) ||
+            !result.recognition ||
             (result.featureError && retryFeatures > 0)
           ) {
             const signal = controller.signal;
@@ -254,8 +305,14 @@ function App() {
               (await json<Job[]>("/api/workspace", { signal })).find(
                 (j) => j.action === "features" && j.modelId === model,
               );
+            const cached =
+              previous &&
+              (await json<{ recognition?: Recognition }>(
+                artifact(previous.id, "result.json"),
+                { signal },
+              ));
             const job =
-              previous ||
+              (previous && cached && cached.recognition && previous) ||
               (await submit(
                 "/api/models/" + model + "/features",
                 {},
@@ -269,6 +326,7 @@ function App() {
           }
           if (!live) return;
           setFeatures(regions.features);
+          setRecognition(regions.recognition ?? null);
           setFeatureState(regions.featureError ? "error" : "ready");
           setFeatureError(regions.featureError || "");
         }
@@ -313,7 +371,7 @@ function App() {
       setBusy(false);
     }
   }
-  async function planPocket(options: PlanOptions) {
+  async function plan(options?: PlanOptions) {
     setBusy(true);
     setError("");
     const signal = new AbortController().signal;
@@ -323,8 +381,16 @@ function App() {
       const document = version
         ? await json<Project>(artifact(version, "project.oapjob"), { signal })
         : undefined;
+      if (
+        !options &&
+        document?.job.hole_operations.length &&
+        !window.confirm("按当前刀库重新规划项目中全部孔工序？")
+      )
+        return;
       const planned = await submit(
-        "/api/models/" + model + "/projects/plan",
+        "/api/models/" +
+          model +
+          (options ? "/projects/plan" : "/projects/holes"),
         { document, libraryId: library, ...options },
         signal,
         setPlanningJob,
@@ -336,6 +402,30 @@ function App() {
     } finally {
       setBusy(false);
       setPlanningJob(null);
+    }
+  }
+  async function inspectStock(completedMoves: number) {
+    if (!job || !review?.operation) return;
+    setBusy(true);
+    setError("");
+    try {
+      const document = await json<Project>(artifact(job.id, "project.oapjob"));
+      const j = await json<Job>("/api/models/" + model + "/projects/simulate", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          document,
+          operation: review.operation,
+          completedMoves,
+        }),
+      });
+      setReview(null);
+      setPath([]);
+      track(j);
+    } catch (e) {
+      setError(String(e));
+    } finally {
+      setBusy(false);
     }
   }
   async function generate() {
@@ -431,15 +521,50 @@ function App() {
             </label>
           </div>
           <Viewport
-            faces={showStock && stock ? stock.mesh : faces}
-            highlighted={
-              (mode === "pocket" ? pocket?.faces : hole?.faces) || []
+            inspectStock={
+              review?.operation && !active ? inspectStock : undefined
             }
-            path={mode === "pocket" && !review?.operation ? [] : path}
+            faces={
+              showStock && stock
+                ? (stock.differences?.[stockView] ?? stock.mesh)
+                : faces
+            }
+            colors={
+              colorFeatures && !showStock
+                ? Object.fromEntries([
+                    ...features.flatMap((f) =>
+                      f.faces.map((id) => [
+                        id,
+                        f.kind === "pocket" ? 0xe8af60 : 0x82a9ce,
+                      ]),
+                    ),
+                    ...(recognition?.throughFaces || []).map((id) => [
+                      id,
+                      0xc89cbe,
+                    ]),
+                    ...holes.flatMap((h) =>
+                      h.faces.map((id) => [id, 0x59b29d]),
+                    ),
+                  ])
+                : undefined
+            }
+            highlighted={
+              mode === "pocket" && manual
+                ? floor
+                  ? [floor]
+                  : []
+                : (mode === "hole" ? hole?.faces : region?.faces) || []
+            }
+            path={mode !== "hole" && !review?.operation ? [] : path}
             onPick={(id) => {
-              if (mode === "pocket") {
-                const hit = pockets.find((f) => f.faces.includes(id));
-                if (hit) setPocketID(hit.id);
+              if (showStock) return;
+              if (mode === "pocket" && manual) {
+                setFloor(id);
+                return;
+              }
+              if (mode !== "hole") {
+                const hit = regions.find((f) => f.faces.includes(id));
+                if (hit) setRegionID(hit.id);
                 return;
               }
               const h =
@@ -450,15 +575,70 @@ function App() {
           />
           <footer>
             旋转 · 拖动　　缩放 · 滚轮　　选择 ·{" "}
-            {mode === "pocket" ? "点击槽腔面" : "点击孔壁"}
+            {mode === "engrave"
+              ? "从列表选择装夹方向"
+              : mode === "hole"
+                ? "点击孔壁"
+                : "点击" + regionLabel + "面"}
           </footer>
+          {stock?.comparison && (
+            <details className="stockAudit">
+              <summary>余量与过切对比</summary>
+              <label>
+                查看区域
+                <select
+                  value={stockView}
+                  onChange={(e) => {
+                    setStockView(e.target.value);
+                    setShowStock(true);
+                  }}
+                >
+                  <option value="">仿真毛坯</option>
+                  {Object.keys(stock.differences || {}).map((key) => (
+                    <option key={key} value={key}>
+                      {
+                        {
+                          allowance: "剩余加工余量",
+                          overcut: "过切区域",
+                          missing: "初始毛坯缺料",
+                        }[key]
+                      }
+                    </option>
+                  ))}
+                </select>
+              </label>
+              <p>
+                剩余加工余量 {stock.comparison.allowance.toFixed(3)} mm³ ·
+                初始缺料 {stock.comparison.missing.toFixed(3)} mm³
+              </p>
+              <p>
+                过切上界 {stock.comparison.overcut.toFixed(3)} mm³，其中确定过切{" "}
+                {stock.comparison.certainOvercut.toFixed(3)} mm³，边界不确定量{" "}
+                {stock.comparison.boundaryUncertainty.toFixed(3)} mm³。
+              </p>
+              {stock.comparison.attribution.map((a) => (
+                <p key={a.operation}>
+                  工序 {a.sequence + 1} · {a.operation} · 过切上界{" "}
+                  {a.volume.toFixed(3)} mm³
+                </p>
+              ))}
+            </details>
+          )}
           {stock && (
             <footer>
               <button onClick={() => setShowStock(!showStock)}>
                 {showStock ? "显示零件" : "显示余料"}
               </button>
-              已仿真 {stock.operations} 道工序 · 剩余体积{" "}
-              {stock.volume.toFixed(2)} mm³
+              {stock.throughOperation ? "阶段余料" : "最终余料"} · 已仿真{" "}
+              {stock.operations} 道完整工序
+              {stock.completedMoves !== undefined &&
+                " · 当前工序移动 " +
+                  stock.completedMoves +
+                  " / " +
+                  stock.totalMoves}{" "}
+              · 剩余体积 {stock.volume.toFixed(2)} mm³
+              {stock.removedVolume !== undefined &&
+                " · 去除 " + stock.removedVolume.toFixed(2) + " mm³"}
             </footer>
           )}
         </section>
@@ -471,13 +651,20 @@ function App() {
             >
               孔加工 <small>{holes.length}</small>
             </button>
-            <button
-              aria-pressed={mode === "pocket"}
-              onClick={() => setMode("pocket")}
-            >
-              槽腔加工{" "}
-              <small>{featureState === "ready" ? pockets.length : ""}</small>
-            </button>
+            {(Object.keys(regionNames) as CamFeature["kind"][]).map((k) => (
+              <button
+                key={k}
+                aria-pressed={mode === k}
+                onClick={() => setMode(k)}
+              >
+                {regionNames[k]}加工{" "}
+                <small>
+                  {featureState === "ready"
+                    ? features.filter((f) => f.kind === k).length
+                    : ""}
+                </small>
+              </button>
+            ))}
           </div>
           {mode === "hole" ? (
             <>
@@ -497,7 +684,12 @@ function App() {
                   ))}
                 </select>
               </label>
-              {hole && <p>孔深 {hole.depth.toFixed(2)} mm</p>}
+              {hole && (
+                <p>
+                  {hole.kind && hole.kind + " · "}孔深 {hole.depth.toFixed(2)}{" "}
+                  mm
+                </p>
+              )}
               <form
                 onSubmit={(e) => {
                   e.preventDefault();
@@ -553,48 +745,122 @@ function App() {
                 </label>
                 <button disabled={!hole || active}>生成参考刀路</button>
               </form>
+              <button
+                disabled={!holes.length || active}
+                onClick={() => void plan()}
+              >
+                按刀库自动规划全部孔
+              </button>
             </>
           ) : (
             <fieldset className="pocketFields" disabled={active || !model}>
-              {!model ? (
-                <p>上传 STEP 或打开历史模型以识别槽腔。</p>
+              {mode === "pocket" && model && (
+                <label>
+                  区域来源
+                  <select
+                    value={manual}
+                    onChange={(e) => {
+                      setManual(e.target.value as typeof manual);
+                      setFloor("");
+                      setShowStock(false);
+                    }}
+                  >
+                    <option value="">自动识别</option>
+                    <option value="pocket">由底面补腔</option>
+                    <option value="slot">由底面补槽</option>
+                  </select>
+                </label>
+              )}
+              {mode === "pocket" && manual && model ? (
+                <>
+                  <label>
+                    加工底面
+                    <select
+                      value={floor}
+                      onChange={(e) => setFloor(e.target.value)}
+                    >
+                      <option value="">点击模型底面或选择面号</option>
+                      {faces.map((f) => (
+                        <option key={f.id}>{f.id}</option>
+                      ))}
+                    </select>
+                  </label>
+                  {floor && (
+                    <PlanningControls
+                      key={manual + floor}
+                      feature={{
+                        id: "manual-" + manual + "-" + floor,
+                        kind: "pocket",
+                        faces: [floor],
+                      }}
+                      cutters={library ? libraryTools : tools}
+                      plan={plan}
+                    />
+                  )}
+                </>
+              ) : !model ? (
+                <p>上传 STEP 或打开历史模型以识别{regionLabel}。</p>
               ) : featureState === "loading" ? (
-                <p role="status">正在识别槽腔…</p>
+                <p role="status">正在识别{regionLabel}…</p>
               ) : featureState === "error" ? (
                 <>
                   <p role="alert">{featureError}</p>
                   <button onClick={() => retry((n) => n + 1)}>重新识别</button>
                 </>
-              ) : pocket ? (
+              ) : region ? (
                 <>
                   <label>
-                    槽腔区域
+                    {regionLabel}
+                    {mode === "engrave" ? "方向" : "区域"}
                     <select
-                      value={pocket.id}
-                      onChange={(e) => setPocketID(e.target.value)}
+                      value={region.id}
+                      onChange={(e) => setRegionID(e.target.value)}
                     >
-                      {pockets.map((f, i) => (
+                      {regions.map((f, i) => (
                         <option key={f.id} value={f.id}>
-                          槽腔 {i + 1} · {f.id}
+                          {f.id === "engrave-all"
+                            ? "全部六面装夹"
+                            : regionLabel + " " + (i + 1) + " · " + f.id}
                         </option>
                       ))}
                     </select>
                   </label>
                   <PlanningControls
-                    key={pocket.id}
-                    feature={pocket}
+                    key={region.id}
+                    feature={region}
                     cutters={library ? libraryTools : tools}
-                    plan={planPocket}
+                    plan={plan}
                   />
                 </>
               ) : (
-                <p>该模型未识别到槽腔。</p>
+                <p>该模型未识别到{regionLabel}。</p>
               )}
             </fieldset>
           )}
+          {recognition && (
+            <details className="setupRow">
+              <summary>三轴识别明细</summary>
+              <label>
+                <input
+                  type="checkbox"
+                  checked={colorFeatures}
+                  onChange={(e) => setColorFeatures(e.target.checked)}
+                />{" "}
+                按特征着色
+              </label>
+              <p>孔壁（绿） · 槽腔（橙） · 外轮廓（蓝） · 通结构（紫）</p>
+              <p>通结构面 {recognition.throughFaces.join("、") || "无"}</p>
+              {recognition.axes.map((a) => (
+                <p key={a.axis}>
+                  {a.axis} · 根面 {a.roots} · 盲槽 {a.slots} · 盲腔 {a.pockets}{" "}
+                  · 跟踪面 {a.faces}
+                </p>
+              ))}
+            </details>
+          )}
           {planningJob && (
             <div role="status">
-              正在规划槽腔…{" "}
+              正在规划{regionLabel}…{" "}
               <button
                 onClick={() =>
                   void request("/api/jobs/" + planningJob.id, {
@@ -602,7 +868,7 @@ function App() {
                   }).catch((e) => setError(String(e)))
                 }
               >
-                取消槽腔规划
+                取消规划
               </button>
             </div>
           )}
@@ -648,6 +914,11 @@ function App() {
               <a href={"/api/jobs/" + job.id + "/files/reference.nc"} download>
                 下载本次参考 NC
               </a>
+              {job.files?.includes("toolpath.jsonl") && (
+                <a href={artifact(job.id, "toolpath.jsonl")} download>
+                  下载槽腔刀路 JSONL
+                </a>
+              )}
               {job.files?.includes("project.oapjob") && (
                 <a href={artifact(job.id, "project.oapjob")} download>
                   下载加工项目
