@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from "react";
+import { Box, Focus, Grid2X2, Minus, Plus, Square } from "lucide-react";
 import * as THREE from "three";
 import { OrbitControls } from "three/examples/jsm/controls/OrbitControls.js";
 
@@ -9,6 +10,7 @@ type Props = {
   highlighted: string[];
   colors?: Record<string, number>;
   path: Segment[];
+  cameraTools?: boolean;
   inspectStock?: (moves: number) => void;
   onPick: (face: string) => void;
 };
@@ -20,8 +22,14 @@ export function Viewport({
   path,
   onPick,
   inspectStock,
+  cameraTools = false,
 }: Props) {
   const host = useRef<HTMLDivElement>(null);
+  const [gridVisible, setGridVisible] = useState(true);
+  const cameraAction = useRef<
+    ((action: "fit" | "iso" | "top" | "in" | "out") => void) | null
+  >(null);
+  const gridRef = useRef<THREE.GridHelper | null>(null);
   const state = useRef<{
     scene: THREE.Scene;
     meshes: THREE.Mesh<THREE.BufferGeometry, THREE.MeshStandardMaterial>[];
@@ -42,13 +50,13 @@ export function Viewport({
       renderer = new THREE.WebGLRenderer({ antialias: true });
       setError("");
     } catch {
-      setError("浏览器无法创建三维视口，可从右侧列表选择孔。");
+      setError("浏览器无法创建三维视口。");
       return;
     }
     root.appendChild(renderer.domElement);
     renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
     const scene = new THREE.Scene();
-    scene.background = new THREE.Color(0xe9eff1);
+    scene.background = new THREE.Color(0xeff2f4);
     const camera = new THREE.PerspectiveCamera(38, 1, 0.01, 1e6);
     camera.up.set(0, 0, 1);
     const controls = new OrbitControls(camera, renderer.domElement);
@@ -67,7 +75,7 @@ export function Viewport({
       const mesh = new THREE.Mesh(
         geo,
         new THREE.MeshStandardMaterial({
-          color: 0x93a5af,
+          color: 0x859aaa,
           roughness: 0.68,
           side: THREE.DoubleSide,
         }),
@@ -80,6 +88,13 @@ export function Viewport({
     meshes.forEach((mesh) => box.expandByObject(mesh));
     const center = box.getCenter(new THREE.Vector3());
     const span = Math.max(box.getSize(new THREE.Vector3()).length(), 1);
+    const grid = new THREE.GridHelper(span * 4, 80, 0xafbdc5, 0xc4cfd6);
+    grid.rotation.x = Math.PI / 2;
+    grid.position.set(center.x, center.y, box.min.z - span * 0.015);
+    grid.material.transparent = true;
+    grid.material.opacity = 0.47;
+    gridRef.current = grid;
+    if (cameraTools) scene.add(grid);
     camera.position
       .copy(center)
       .add(
@@ -90,13 +105,53 @@ export function Viewport({
     controls.target.copy(center);
     controls.update();
     const draw = () => renderer.render(scene, camera);
+    const fit = () => {
+      const direction = camera.position
+        .clone()
+        .sub(controls.target)
+        .normalize();
+      const distance =
+        (span / 2 / Math.sin(THREE.MathUtils.degToRad(camera.fov / 2))) *
+        Math.max(1, 1 / camera.aspect) *
+        (camera.aspect < 1.15 ? 1.12 : 0.93);
+      controls.target.copy(center);
+      camera.position.copy(center).addScaledVector(direction, distance);
+      controls.update();
+      draw();
+    };
+    cameraAction.current = (action) => {
+      if (action === "in" || action === "out") {
+        camera.position
+          .sub(controls.target)
+          .multiplyScalar(action === "in" ? 0.8 : 1.25)
+          .add(controls.target);
+        controls.update();
+        draw();
+        return;
+      }
+      if (action === "iso" || action === "top") {
+        controls.target.copy(center);
+        camera.position
+          .copy(center)
+          .add(
+            action === "iso"
+              ? new THREE.Vector3(1, -1.6, 1.1)
+              : new THREE.Vector3(0, -0.00001, 1),
+          );
+      }
+      fit();
+    };
+    let previousAspect = 0;
     const resize = () => {
       const { width, height } = root.getBoundingClientRect();
       if (!width || !height) return;
-      renderer.setSize(width, height);
+      renderer.setSize(width, height, false);
       camera.aspect = width / height;
       camera.updateProjectionMatrix();
-      draw();
+      if (!previousAspect || previousAspect < 1.15 !== camera.aspect < 1.15)
+        fit();
+      else draw();
+      previousAspect = camera.aspect;
     };
     controls.addEventListener("change", draw);
     const observer = new ResizeObserver(resize);
@@ -124,23 +179,33 @@ export function Viewport({
       const hit = ray.intersectObjects(meshes)[0];
       if (hit) pick.current(hit.object.name);
     };
-    root.addEventListener("pointerdown", start);
-    root.addEventListener("pointerup", end);
+    renderer.domElement.addEventListener("pointerdown", start);
+    renderer.domElement.addEventListener("pointerup", end);
     state.current = { scene, meshes, draw };
     return () => {
-      root.removeEventListener("pointerdown", start);
-      root.removeEventListener("pointerup", end);
+      renderer.domElement.removeEventListener("pointerdown", start);
+      renderer.domElement.removeEventListener("pointerup", end);
       observer.disconnect();
       controls.dispose();
       meshes.forEach((m) => {
         m.geometry.dispose();
         m.material.dispose();
       });
+      cameraAction.current = null;
+      gridRef.current = null;
+      grid.geometry.dispose();
+      grid.material.dispose();
       renderer.dispose();
       renderer.domElement.remove();
       state.current = null;
     };
-  }, [faces]);
+  }, [faces, cameraTools]);
+  useEffect(() => {
+    if (gridRef.current) {
+      gridRef.current.visible = gridVisible;
+      state.current?.draw();
+    }
+  }, [gridVisible, faces, cameraTools]);
   useEffect(() => {
     const view = state.current;
     if (!view) return;
@@ -148,7 +213,7 @@ export function Viewport({
       mesh.material.color.setHex(
         highlighted.includes(mesh.name)
           ? 0x069486
-          : (colors?.[mesh.name] ?? 0x93a5af),
+          : (colors?.[mesh.name] ?? 0x859aaa),
       );
     view.draw();
   }, [highlighted, colors, faces]);
@@ -229,6 +294,60 @@ export function Viewport({
   };
   return (
     <div className="viewport" ref={host}>
+      {cameraTools && faces.length > 0 && !error && (
+        <div
+          className="cameraTools"
+          aria-label="视图控制"
+          onPointerDown={(e) => e.stopPropagation()}
+          onPointerUp={(e) => e.stopPropagation()}
+        >
+          <button
+            title="等轴测视图"
+            aria-label="等轴测视图"
+            onClick={() => cameraAction.current?.("iso")}
+          >
+            <Box />
+          </button>
+          <button
+            title="俯视图"
+            aria-label="俯视图"
+            onClick={() => cameraAction.current?.("top")}
+          >
+            <Square />
+          </button>
+          <i />
+          <button
+            title="放大"
+            aria-label="放大"
+            onClick={() => cameraAction.current?.("in")}
+          >
+            <Plus />
+          </button>
+          <button
+            title="缩小"
+            aria-label="缩小"
+            onClick={() => cameraAction.current?.("out")}
+          >
+            <Minus />
+          </button>
+          <button
+            title="适应视口"
+            aria-label="适应视口"
+            onClick={() => cameraAction.current?.("fit")}
+          >
+            <Focus />
+          </button>
+          <i />
+          <button
+            title="显示网格"
+            aria-label="显示网格"
+            aria-pressed={gridVisible}
+            onClick={() => setGridVisible((v) => !v)}
+          >
+            <Grid2X2 />
+          </button>
+        </div>
+      )}
       {error && <span>{error}</span>}
       {path.length > 0 && !error && (
         <div

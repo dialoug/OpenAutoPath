@@ -201,6 +201,7 @@ export function PlanningControls({
         />
       </label>
       <button
+        className="primary"
         disabled={(!automatic && !tool) || step <= 0}
         onClick={() =>
           plan({

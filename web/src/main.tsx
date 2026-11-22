@@ -1,4 +1,21 @@
 import { useEffect, useState } from "react";
+import {
+  Box,
+  CircleDot,
+  FileBox,
+  FolderKanban,
+  History,
+  Layers3,
+  MousePointer2,
+  PanelLeft,
+  Pentagon,
+  Route,
+  Settings2,
+  Spline,
+  Upload,
+  Wrench,
+} from "lucide-react";
+import { ModelStart } from "./ModelStart";
 import { createRoot } from "react-dom/client";
 import { Viewport, type Face, type Segment } from "./Viewport";
 import "./style.css";
@@ -76,6 +93,9 @@ async function request(url: string, options?: RequestInit) {
   return response;
 }
 function App() {
+  const [inspector, setInspector] = useState<"settings" | "results">(
+    "settings",
+  );
   const [panel, setPanel] = useState<"project" | "library" | null>(null);
   const [library, setLibrary] = useState(
     () => localStorage.getItem("cam.library") || "",
@@ -230,6 +250,7 @@ function App() {
               : undefined,
           ]);
           if (live) {
+            setInspector("results");
             setStockView("");
             setStock({ ...r, mesh, differences });
             setShowStock(true);
@@ -244,6 +265,7 @@ function App() {
             ),
           );
           if (live) {
+            setInspector("results");
             setReview(r);
             setPath(p);
           }
@@ -354,6 +376,7 @@ function App() {
           body: file,
         })
       ).json();
+      setInspector("settings");
       setFeatures([]);
       setHoles([]);
       select("");
@@ -454,492 +477,669 @@ function App() {
       setBusy(false);
     }
   }
+  const modes = [
+    { key: "hole", label: "孔加工", icon: CircleDot, count: holes.length },
+    {
+      key: "pocket",
+      label: "槽腔加工",
+      icon: Layers3,
+      count: features.filter((f) => f.kind === "pocket").length,
+    },
+    {
+      key: "profile",
+      label: "外轮廓加工",
+      icon: Pentagon,
+      count: features.filter((f) => f.kind === "profile").length,
+    },
+    {
+      key: "engrave",
+      label: "雕刻加工",
+      icon: Spline,
+      count: features.filter((f) => f.kind === "engrave").length,
+    },
+  ] as const;
+  const ModeIcon = modes.find((m) => m.key === mode)!.icon;
+  const items =
+    mode === "hole"
+      ? holes.map((h) => ({
+          id: h.id,
+          label: h.id,
+          detail: "Ø " + h.diameter.toFixed(2),
+        }))
+      : regions.map((f, i) => ({
+          id: f.id,
+          label:
+            f.id === "engrave-all"
+              ? "全部六面装夹"
+              : regionLabel + " " + (i + 1),
+          detail: f.id.replace(/^(pocket|profile|engrave)-/, ""),
+        }));
   return (
     <>
-      <header>
-        <b>OpenAutoPath</b>
-        <span>加工工作台</span>
-        <nav>
+      <header className="appHeader">
+        <div className="brand">
+          <span className="brandMark">
+            <Layers3 size={22} />
+          </span>
+          OpenAutoPath
+        </div>
+        <nav aria-label="主导航">
           <button
+            aria-current={!panel ? "page" : undefined}
+            onClick={() => setPanel(null)}
+          >
+            <Box />
+            加工工作台
+          </button>
+          <button
+            aria-current={panel === "project" ? "page" : undefined}
             disabled={active || !model}
             onClick={() => setPanel("project")}
           >
+            <FolderKanban />
             加工项目
           </button>
-          <button disabled={active} onClick={() => setPanel("library")}>
+          <button
+            aria-current={panel === "library" ? "page" : undefined}
+            disabled={active}
+            onClick={() => setPanel("library")}
+          >
+            <Wrench />
             刀库管理
           </button>
         </nav>
       </header>
-      <main>
-        <section className="workspace">
-          <div className="bar">
-            <h1>{name || "模型视图"}</h1>
-            {models.length > 0 && (
-              <select
-                aria-label="历史模型"
-                value={model}
-                disabled={active}
-                onChange={(e) => {
-                  const chosen = models.find((m) => m.id === e.target.value);
-                  if (!chosen) return;
-                  const title = chosen.name || "model.step";
-                  setName(title);
-                  localStorage.setItem("cam.name", title);
-                  setPath([]);
-                  setReview(null);
-                  setFaces([]);
-                  setHoles([]);
-                  setFeatures([]);
-                  setError("");
-                  track(chosen);
-                }}
-              >
-                <option value="" disabled>
-                  历史模型
-                </option>
-                {models.map((m) => (
-                  <option key={m.id} value={m.id}>
-                    {m.name || "model.step"} · {m.id.slice(0, 6)}
-                  </option>
-                ))}
-              </select>
-            )}
-            <label className="upload">
-              上传 STEP
-              <input
-                aria-label="上传 STEP"
-                disabled={active}
-                type="file"
-                accept=".step,.stp"
-                onChange={(e) => {
-                  const f = e.target.files?.[0];
-                  if (f) void upload(f);
-                  e.target.value = "";
-                }}
-              />
-            </label>
+      <main className="appMain">
+        <div className="pageBar">
+          <div>
+            <h1>加工工作台</h1>
+            <div className="documentLine">
+              <FileBox size={14} />
+              {model || active
+                ? name || "正在打开模型"
+                : "选择一个 STEP 模型开始加工"}
+            </div>
           </div>
-          <Viewport
-            inspectStock={
-              review?.operation && !active ? inspectStock : undefined
-            }
-            faces={
-              showStock && stock
-                ? (stock.differences?.[stockView] ?? stock.mesh)
-                : faces
-            }
-            colors={
-              colorFeatures && !showStock
-                ? Object.fromEntries([
-                    ...features.flatMap((f) =>
-                      f.faces.map((id) => [
-                        id,
-                        f.kind === "pocket" ? 0xe8af60 : 0x82a9ce,
-                      ]),
-                    ),
-                    ...(recognition?.throughFaces || []).map((id) => [
-                      id,
-                      0xc89cbe,
-                    ]),
-                    ...holes.flatMap((h) =>
-                      h.faces.map((id) => [id, 0x59b29d]),
-                    ),
-                  ])
-                : undefined
-            }
-            highlighted={
-              mode === "pocket" && manual
-                ? floor
-                  ? [floor]
-                  : []
-                : (mode === "hole" ? hole?.faces : region?.faces) || []
-            }
-            path={mode !== "hole" && !review?.operation ? [] : path}
-            onPick={(id) => {
-              if (showStock) return;
-              if (mode === "pocket" && manual) {
-                setFloor(id);
-                return;
-              }
-              if (mode !== "hole") {
-                const hit = regions.find((f) => f.faces.includes(id));
-                if (hit) setRegionID(hit.id);
-                return;
-              }
-              const h =
-                holes.find((v) => v.id === id) ||
-                holes.find((v) => v.faces.includes(id));
-              if (h) select(h.id);
-            }}
-          />
-          <footer>
-            旋转 · 拖动　　缩放 · 滚轮　　选择 ·{" "}
-            {mode === "engrave"
-              ? "从列表选择装夹方向"
-              : mode === "hole"
-                ? "点击孔壁"
-                : "点击" + regionLabel + "面"}
-          </footer>
-          {stock?.comparison && (
-            <details className="stockAudit">
-              <summary>余量与过切对比</summary>
-              <label>
-                查看区域
+          <div className="modelActions">
+            {" "}
+            {models.length > 0 && (
+              <label className="history">
+                <History size={15} />
                 <select
-                  value={stockView}
+                  aria-label="历史模型"
+                  value={model}
+                  disabled={active}
                   onChange={(e) => {
-                    setStockView(e.target.value);
-                    setShowStock(true);
+                    const chosen = models.find((m) => m.id === e.target.value);
+                    if (!chosen) return;
+                    const title = chosen.name || "model.step";
+                    setInspector("settings");
+                    setName(title);
+                    localStorage.setItem("cam.name", title);
+                    setPath([]);
+                    setReview(null);
+                    setFaces([]);
+                    setHoles([]);
+                    setFeatures([]);
+                    setError("");
+                    track(chosen);
                   }}
                 >
-                  <option value="">仿真毛坯</option>
-                  {Object.keys(stock.differences || {}).map((key) => (
-                    <option key={key} value={key}>
-                      {
-                        {
-                          allowance: "剩余加工余量",
-                          overcut: "过切区域",
-                          missing: "初始毛坯缺料",
-                        }[key]
-                      }
-                    </option>
-                  ))}
-                </select>
-              </label>
-              <p>
-                剩余加工余量 {stock.comparison.allowance.toFixed(3)} mm³ ·
-                初始缺料 {stock.comparison.missing.toFixed(3)} mm³
-              </p>
-              <p>
-                过切上界 {stock.comparison.overcut.toFixed(3)} mm³，其中确定过切{" "}
-                {stock.comparison.certainOvercut.toFixed(3)} mm³，边界不确定量{" "}
-                {stock.comparison.boundaryUncertainty.toFixed(3)} mm³。
-              </p>
-              {stock.comparison.attribution.map((a) => (
-                <p key={a.operation}>
-                  工序 {a.sequence + 1} · {a.operation} · 过切上界{" "}
-                  {a.volume.toFixed(3)} mm³
-                </p>
-              ))}
-            </details>
-          )}
-          {stock && (
-            <footer>
-              <button onClick={() => setShowStock(!showStock)}>
-                {showStock ? "显示零件" : "显示余料"}
-              </button>
-              {stock.throughOperation ? "阶段余料" : "最终余料"} · 已仿真{" "}
-              {stock.operations} 道完整工序
-              {stock.completedMoves !== undefined &&
-                " · 当前工序移动 " +
-                  stock.completedMoves +
-                  " / " +
-                  stock.totalMoves}{" "}
-              · 剩余体积 {stock.volume.toFixed(2)} mm³
-              {stock.removedVolume !== undefined &&
-                " · 去除 " + stock.removedVolume.toFixed(2) + " mm³"}
-            </footer>
-          )}
-        </section>
-        <aside>
-          <h2>加工特征</h2>
-          <div className="featureModes" role="group" aria-label="加工类型">
-            <button
-              aria-pressed={mode === "hole"}
-              onClick={() => setMode("hole")}
-            >
-              孔加工 <small>{holes.length}</small>
-            </button>
-            {(Object.keys(regionNames) as CamFeature["kind"][]).map((k) => (
-              <button
-                key={k}
-                aria-pressed={mode === k}
-                onClick={() => setMode(k)}
-              >
-                {regionNames[k]}加工{" "}
-                <small>
-                  {featureState === "ready"
-                    ? features.filter((f) => f.kind === k).length
-                    : ""}
-                </small>
-              </button>
-            ))}
-          </div>
-          {mode === "hole" ? (
-            <>
-              <label>
-                孔段
-                <select
-                  value={selected}
-                  onChange={(e) => select(e.target.value)}
-                >
                   <option value="" disabled>
-                    选择孔段
+                    历史模型
                   </option>
-                  {holes.map((h) => (
-                    <option key={h.id} value={h.id}>
-                      {h.id}　Ø {h.diameter.toFixed(2)} mm
+                  {models.map((m) => (
+                    <option key={m.id} value={m.id}>
+                      {m.name || "model.step"} · {m.id.slice(0, 6)}
                     </option>
                   ))}
                 </select>
               </label>
-              {hole && (
-                <p>
-                  {hole.kind && hole.kind + " · "}孔深 {hole.depth.toFixed(2)}{" "}
-                  mm
-                </p>
-              )}
-              <form
-                onSubmit={(e) => {
-                  e.preventDefault();
-                  void generate();
-                }}
-              >
-                <h2>加工参数</h2>
-                <label>
-                  {library ? "活动刀库" : "模拟刀库"}
-                  <select
-                    required
-                    value={tool}
-                    onChange={(e) => {
-                      const chosen = (library ? libraryTools : tools).find(
-                        (t) => t.id === e.target.value,
-                      );
-                      setTool(e.target.value);
-                      if (chosen?.feed) setFeed(chosen.feed);
-                      if (chosen?.rpm) setRPM(chosen.rpm);
-                    }}
-                  >
-                    <option value="">选择刀具</option>
-                    {(library ? libraryTools : tools).map((t) => (
-                      <option key={t.id} value={t.id}>
-                        {t.name}
-                      </option>
-                    ))}
-                  </select>
-                </label>
-                <label>
-                  进给 (mm/min)
-                  <input
-                    type="number"
-                    step="any"
-                    min=".001"
-                    max="100000"
-                    required
-                    value={feed}
-                    onChange={(e) => setFeed(+e.target.value)}
-                  />
-                </label>
-                <label>
-                  主轴转速 (rpm)
-                  <input
-                    type="number"
-                    step="any"
-                    min="1"
-                    max="100000"
-                    required
-                    value={rpm}
-                    onChange={(e) => setRPM(+e.target.value)}
-                  />
-                </label>
-                <button disabled={!hole || active}>生成参考刀路</button>
-              </form>
-              <button
-                disabled={!holes.length || active}
-                onClick={() => void plan()}
-              >
-                按刀库自动规划全部孔
-              </button>
-            </>
-          ) : (
-            <fieldset className="pocketFields" disabled={active || !model}>
-              {mode === "pocket" && model && (
-                <label>
-                  区域来源
-                  <select
-                    value={manual}
-                    onChange={(e) => {
-                      setManual(e.target.value as typeof manual);
-                      setFloor("");
-                      setShowStock(false);
-                    }}
-                  >
-                    <option value="">自动识别</option>
-                    <option value="pocket">由底面补腔</option>
-                    <option value="slot">由底面补槽</option>
-                  </select>
-                </label>
-              )}
-              {mode === "pocket" && manual && model ? (
-                <>
-                  <label>
-                    加工底面
-                    <select
-                      value={floor}
-                      onChange={(e) => setFloor(e.target.value)}
-                    >
-                      <option value="">点击模型底面或选择面号</option>
-                      {faces.map((f) => (
-                        <option key={f.id}>{f.id}</option>
-                      ))}
-                    </select>
-                  </label>
-                  {floor && (
-                    <PlanningControls
-                      key={manual + floor}
-                      feature={{
-                        id: "manual-" + manual + "-" + floor,
-                        kind: "pocket",
-                        faces: [floor],
-                      }}
-                      cutters={library ? libraryTools : tools}
-                      plan={plan}
-                    />
-                  )}
-                </>
-              ) : !model ? (
-                <p>上传 STEP 或打开历史模型以识别{regionLabel}。</p>
-              ) : featureState === "loading" ? (
-                <p role="status">正在识别{regionLabel}…</p>
-              ) : featureState === "error" ? (
-                <>
-                  <p role="alert">{featureError}</p>
-                  <button onClick={() => retry((n) => n + 1)}>重新识别</button>
-                </>
-              ) : region ? (
-                <>
-                  <label>
-                    {regionLabel}
-                    {mode === "engrave" ? "方向" : "区域"}
-                    <select
-                      value={region.id}
-                      onChange={(e) => setRegionID(e.target.value)}
-                    >
-                      {regions.map((f, i) => (
-                        <option key={f.id} value={f.id}>
-                          {f.id === "engrave-all"
-                            ? "全部六面装夹"
-                            : regionLabel + " " + (i + 1) + " · " + f.id}
-                        </option>
-                      ))}
-                    </select>
-                  </label>
-                  <PlanningControls
-                    key={region.id}
-                    feature={region}
-                    cutters={library ? libraryTools : tools}
-                    plan={plan}
-                  />
-                </>
-              ) : (
-                <p>该模型未识别到{regionLabel}。</p>
-              )}
-            </fieldset>
-          )}
-          {recognition && (
-            <details className="setupRow">
-              <summary>三轴识别明细</summary>
-              <label>
+            )}
+            {model && (
+              <label className="upload primary">
+                <Upload size={16} /> 上传 STEP
                 <input
-                  type="checkbox"
-                  checked={colorFeatures}
-                  onChange={(e) => setColorFeatures(e.target.checked)}
-                />{" "}
-                按特征着色
+                  aria-label="上传 STEP"
+                  disabled={active}
+                  type="file"
+                  accept=".step,.stp"
+                  onChange={(e) => {
+                    const f = e.target.files?.[0];
+                    if (f) void upload(f);
+                    e.target.value = "";
+                  }}
+                />
               </label>
-              <p>孔壁（绿） · 槽腔（橙） · 外轮廓（蓝） · 通结构（紫）</p>
-              <p>通结构面 {recognition.throughFaces.join("、") || "无"}</p>
-              {recognition.axes.map((a) => (
-                <p key={a.axis}>
-                  {a.axis} · 根面 {a.roots} · 盲槽 {a.slots} · 盲腔 {a.pockets}{" "}
-                  · 跟踪面 {a.faces}
-                </p>
-              ))}
-            </details>
-          )}
-          {planningJob && (
-            <div role="status">
-              正在规划{regionLabel}…{" "}
-              <button
-                onClick={() =>
-                  void request("/api/jobs/" + planningJob.id, {
-                    method: "DELETE",
-                  }).catch((e) => setError(String(e)))
-                }
-              >
-                取消规划
-              </button>
-            </div>
-          )}
-          {job && !planningJob && (
-            <section aria-live="polite">
-              <h2>任务状态</h2>
-              <p>
-                {
-                  states[
-                    job.state === "running" && job.stage ? job.stage : job.state
-                  ]
-                }
-              </p>
-              {active && (
-                <button
-                  className="secondary"
-                  onClick={() =>
-                    request("/api/jobs/" + job.id, { method: "DELETE" }).catch(
-                      (e) => setError(String(e)),
-                    )
-                  }
+            )}
+          </div>
+        </div>
+        {!model ? (
+          <ModelStart busy={active} upload={upload} error={setError} />
+        ) : (
+          <div className="workGrid">
+            <section className="explorer">
+              <div className="cardHeading">
+                <h2>
+                  <PanelLeft />
+                  特征浏览器
+                </h2>
+              </div>
+              <div className="explorerScroll">
+                <h3 className="groupLabel">加工类型</h3>
+                <div
+                  role="group"
+                  aria-label="加工类型"
+                  className="featureModes"
                 >
-                  取消任务
-                </button>
-              )}
-            </section>
-          )}
-          {review && job && (
-            <section>
-              <h2>参考 NC</h2>
-              <p>
-                {review.operation || review.hole} {review.tool}
-              </p>
-              <p>
-                {review.moves} 段移动 · {review.validation}
-              </p>
-              {!review.operation && (
-                <p>
-                  孔覆盖审计 {review.coverageComplete ? "完成" : "未完成"}
-                  ，实体扫掠审计 {review.sweepComplete ? "完成" : "未完成"}。
-                </p>
-              )}
-              <a href={"/api/jobs/" + job.id + "/files/reference.nc"} download>
-                下载本次参考 NC
-              </a>
-              {job.files?.includes("toolpath.jsonl") && (
-                <a href={artifact(job.id, "toolpath.jsonl")} download>
-                  下载槽腔刀路 JSONL
-                </a>
-              )}
-              {job.files?.includes("project.oapjob") && (
-                <a href={artifact(job.id, "project.oapjob")} download>
-                  下载加工项目
-                </a>
-              )}
-              {!!review.issues?.length && (
-                <details>
-                  <summary>验证详情</summary>
-                  <ul>
-                    {review.issues.map((issue, i) => (
-                      <li key={i}>
-                        {issue.code} · {issue.message}
-                      </li>
+                  {modes.map(({ key, label, icon: Icon, count }) => (
+                    <button
+                      key={key}
+                      aria-pressed={mode === key}
+                      onClick={() => {
+                        setMode(key);
+                        setInspector("settings");
+                        setShowStock(false);
+                      }}
+                    >
+                      <Icon size={17} />
+                      <span>{label}</span>
+                      <small>{count}</small>
+                    </button>
+                  ))}
+                </div>
+                <div className="listHeading">
+                  <h3 className="groupLabel">
+                    {mode === "hole"
+                      ? "孔段"
+                      : mode === "engrave"
+                        ? "装夹方向"
+                        : "识别区域"}
+                  </h3>
+                  <span>{items.length}</span>
+                </div>
+                <div
+                  className="featureList"
+                  role="group"
+                  aria-label="选择加工特征"
+                >
+                  {items.map((item) => (
+                    <button
+                      key={item.id}
+                      aria-pressed={
+                        (mode === "hole" ? hole?.id : region?.id) === item.id
+                      }
+                      onClick={() => {
+                        if (mode === "hole") select(item.id);
+                        else {
+                          setRegionID(item.id);
+                          setManual("");
+                        }
+                        setInspector("settings");
+                        setShowStock(false);
+                      }}
+                    >
+                      <span className="treeDot" />
+                      <span>{item.label}</span>
+                      <small>{item.detail}</small>
+                    </button>
+                  ))}
+                  {!items.length && (
+                    <p>
+                      {featureState === "loading"
+                        ? "正在识别…"
+                        : "暂无匹配特征"}
+                    </p>
+                  )}
+                </div>
+                {recognition && (
+                  <details className="setupRow">
+                    <summary>三轴识别明细</summary>
+                    <label>
+                      <input
+                        type="checkbox"
+                        checked={colorFeatures}
+                        onChange={(e) => setColorFeatures(e.target.checked)}
+                      />{" "}
+                      按特征着色
+                    </label>
+                    <p>孔壁（绿） · 槽腔（橙） · 外轮廓（蓝） · 通结构（紫）</p>
+                    <p>
+                      通结构面 {recognition.throughFaces.join("、") || "无"}
+                    </p>
+                    {recognition.axes.map((a) => (
+                      <p key={a.axis}>
+                        {a.axis} · 根面 {a.roots} · 盲槽 {a.slots} · 盲腔{" "}
+                        {a.pockets} · 跟踪面 {a.faces}
+                      </p>
                     ))}
-                  </ul>
-                </details>
-              )}
+                  </details>
+                )}
+              </div>
             </section>
+            <section className="viewerCard workspace">
+              <div className="cardHeading">
+                <h2>
+                  <Box />
+                  {stock && showStock ? "仿真视图" : "模型视图"}
+                </h2>
+                <span className="viewUnit">
+                  {stock && showStock ? "IPW" : "STEP"}
+                </span>
+              </div>
+              <Viewport
+                cameraTools
+                inspectStock={
+                  review?.operation && !active ? inspectStock : undefined
+                }
+                faces={
+                  showStock && stock
+                    ? (stock.differences?.[stockView] ?? stock.mesh)
+                    : faces
+                }
+                colors={
+                  colorFeatures && !showStock
+                    ? Object.fromEntries([
+                        ...features.flatMap((f) =>
+                          f.faces.map((id) => [
+                            id,
+                            f.kind === "pocket" ? 0xe8af60 : 0x82a9ce,
+                          ]),
+                        ),
+                        ...(recognition?.throughFaces || []).map((id) => [
+                          id,
+                          0xc89cbe,
+                        ]),
+                        ...holes.flatMap((h) =>
+                          h.faces.map((id) => [id, 0x59b29d]),
+                        ),
+                      ])
+                    : undefined
+                }
+                highlighted={
+                  mode === "pocket" && manual
+                    ? floor
+                      ? [floor]
+                      : []
+                    : (mode === "hole" ? hole?.faces : region?.faces) || []
+                }
+                path={mode !== "hole" && !review?.operation ? [] : path}
+                onPick={(id) => {
+                  if (showStock) return;
+                  if (mode === "pocket" && manual) {
+                    setInspector("settings");
+                    setFloor(id);
+                    return;
+                  }
+                  if (mode !== "hole") {
+                    const hit = regions.find((f) => f.faces.includes(id));
+                    if (hit) {
+                      setInspector("settings");
+                      setRegionID(hit.id);
+                    }
+                    return;
+                  }
+                  const h =
+                    holes.find((v) => v.id === id) ||
+                    holes.find((v) => v.faces.includes(id));
+                  if (h) {
+                    setInspector("settings");
+                    select(h.id);
+                  }
+                }}
+              />
+              <footer>
+                <MousePointer2 size={14} /> 拖动旋转 · 滚轮缩放{" "}
+                <span className="viewHint">/</span>{" "}
+                {mode === "engrave"
+                  ? "从列表选择装夹方向"
+                  : mode === "hole"
+                    ? "点击孔壁"
+                    : "点击" + regionLabel + "面"}
+              </footer>
+            </section>
+            <aside className="inspector">
+              <div className="cardHeading">
+                <h2>
+                  <Settings2 />
+                  加工面板
+                </h2>
+              </div>
+              <div className="inspectorTabs" role="group" aria-label="加工面板">
+                <button
+                  aria-pressed={inspector === "settings"}
+                  onClick={() => setInspector("settings")}
+                >
+                  参数设置
+                </button>
+                <button
+                  aria-pressed={inspector === "results"}
+                  onClick={() => setInspector("results")}
+                >
+                  加工结果{(stock || review) && <b className="resultDot" />}
+                </button>
+              </div>
+              <div className="inspectorBody" hidden={inspector !== "settings"}>
+                <div className="selectionTitle">
+                  <span className="sectionGlyph">
+                    <ModeIcon size={19} />
+                  </span>
+                  <div>
+                    <small>当前特征</small>
+                    <h3>
+                      {mode === "hole"
+                        ? hole?.kind || "孔加工"
+                        : regionLabel + "加工"}{" "}
+                      <code>
+                        {mode === "hole"
+                          ? hole?.id
+                          : manual && mode === "pocket"
+                            ? floor
+                            : region?.id}
+                      </code>
+                    </h3>
+                  </div>
+                </div>
+                {mode === "hole" ? (
+                  <>
+                    {hole && (
+                      <p>
+                        {hole.kind && hole.kind + " · "}孔深{" "}
+                        {hole.depth.toFixed(2)} mm
+                      </p>
+                    )}
+                    <form
+                      onSubmit={(e) => {
+                        e.preventDefault();
+                        void generate();
+                      }}
+                    >
+                      <h3>切削参数</h3>
+                      <label>
+                        {library ? "活动刀库" : "模拟刀库"}
+                        <select
+                          required
+                          value={tool}
+                          onChange={(e) => {
+                            const chosen = (
+                              library ? libraryTools : tools
+                            ).find((t) => t.id === e.target.value);
+                            setTool(e.target.value);
+                            if (chosen?.feed) setFeed(chosen.feed);
+                            if (chosen?.rpm) setRPM(chosen.rpm);
+                          }}
+                        >
+                          <option value="">选择刀具</option>
+                          {(library ? libraryTools : tools).map((t) => (
+                            <option key={t.id} value={t.id}>
+                              {t.name}
+                            </option>
+                          ))}
+                        </select>
+                      </label>
+                      <label>
+                        进给 (mm/min)
+                        <input
+                          type="number"
+                          step="any"
+                          min=".001"
+                          max="100000"
+                          required
+                          value={feed}
+                          onChange={(e) => setFeed(+e.target.value)}
+                        />
+                      </label>
+                      <label>
+                        主轴转速 (rpm)
+                        <input
+                          type="number"
+                          step="any"
+                          min="1"
+                          max="100000"
+                          required
+                          value={rpm}
+                          onChange={(e) => setRPM(+e.target.value)}
+                        />
+                      </label>
+                      <button className="primary" disabled={!hole || active}>
+                        <Route size={15} />
+                        生成参考刀路
+                      </button>
+                    </form>
+                    <button
+                      disabled={!holes.length || active}
+                      onClick={() => void plan()}
+                    >
+                      按刀库自动规划全部孔
+                    </button>
+                  </>
+                ) : (
+                  <fieldset
+                    className="pocketFields"
+                    disabled={active || !model}
+                  >
+                    {mode === "pocket" && model && (
+                      <label>
+                        区域来源
+                        <select
+                          value={manual}
+                          onChange={(e) => {
+                            setManual(e.target.value as typeof manual);
+                            setFloor("");
+                            setShowStock(false);
+                          }}
+                        >
+                          <option value="">自动识别</option>
+                          <option value="pocket">由底面补腔</option>
+                          <option value="slot">由底面补槽</option>
+                        </select>
+                      </label>
+                    )}
+                    {mode === "pocket" && manual && model ? (
+                      <>
+                        <label>
+                          加工底面
+                          <select
+                            value={floor}
+                            onChange={(e) => setFloor(e.target.value)}
+                          >
+                            <option value="">点击模型底面或选择面号</option>
+                            {faces.map((f) => (
+                              <option key={f.id}>{f.id}</option>
+                            ))}
+                          </select>
+                        </label>
+                        {floor && (
+                          <PlanningControls
+                            key={manual + floor}
+                            feature={{
+                              id: "manual-" + manual + "-" + floor,
+                              kind: "pocket",
+                              faces: [floor],
+                            }}
+                            cutters={library ? libraryTools : tools}
+                            plan={plan}
+                          />
+                        )}
+                      </>
+                    ) : !model ? (
+                      <p>上传 STEP 或打开历史模型以识别{regionLabel}。</p>
+                    ) : featureState === "loading" ? (
+                      <p role="status">正在识别{regionLabel}…</p>
+                    ) : featureState === "error" ? (
+                      <>
+                        <p role="alert">{featureError}</p>
+                        <button onClick={() => retry((n) => n + 1)}>
+                          重新识别
+                        </button>
+                      </>
+                    ) : region ? (
+                      <>
+                        <PlanningControls
+                          key={region.id}
+                          feature={region}
+                          cutters={library ? libraryTools : tools}
+                          plan={plan}
+                        />
+                      </>
+                    ) : (
+                      <p>该模型未识别到{regionLabel}。</p>
+                    )}
+                  </fieldset>
+                )}
+              </div>
+              <div
+                className="inspectorBody results"
+                hidden={inspector !== "results"}
+              >
+                {!stock && !review && (
+                  <div className="emptyResults">
+                    <Route />
+                    <p>生成刀路或运行仿真后，可在这里查看和下载结果。</p>
+                  </div>
+                )}
+                {stock?.comparison && (
+                  <details className="stockAudit">
+                    <summary>余量与过切对比</summary>
+                    <label>
+                      查看区域
+                      <select
+                        value={stockView}
+                        onChange={(e) => {
+                          setStockView(e.target.value);
+                          setShowStock(true);
+                        }}
+                      >
+                        <option value="">仿真毛坯</option>
+                        {Object.keys(stock.differences || {}).map((key) => (
+                          <option key={key} value={key}>
+                            {
+                              {
+                                allowance: "剩余加工余量",
+                                overcut: "过切区域",
+                                missing: "初始毛坯缺料",
+                              }[key]
+                            }
+                          </option>
+                        ))}
+                      </select>
+                    </label>
+                    <p>
+                      剩余加工余量 {stock.comparison.allowance.toFixed(3)} mm³ ·
+                      初始缺料 {stock.comparison.missing.toFixed(3)} mm³
+                    </p>
+                    <p>
+                      过切上界 {stock.comparison.overcut.toFixed(3)}{" "}
+                      mm³，其中确定过切{" "}
+                      {stock.comparison.certainOvercut.toFixed(3)}{" "}
+                      mm³，边界不确定量{" "}
+                      {stock.comparison.boundaryUncertainty.toFixed(3)} mm³。
+                    </p>
+                    {stock.comparison.attribution.map((a) => (
+                      <p key={a.operation}>
+                        工序 {a.sequence + 1} · {a.operation} · 过切上界{" "}
+                        {a.volume.toFixed(3)} mm³
+                      </p>
+                    ))}
+                  </details>
+                )}
+                {stock && (
+                  <div className="stockSummary">
+                    <button onClick={() => setShowStock(!showStock)}>
+                      {showStock ? "显示零件" : "显示余料"}
+                    </button>
+                    {stock.throughOperation ? "阶段余料" : "最终余料"} · 已仿真{" "}
+                    {stock.operations} 道完整工序
+                    {stock.completedMoves !== undefined &&
+                      " · 当前工序移动 " +
+                        stock.completedMoves +
+                        " / " +
+                        stock.totalMoves}{" "}
+                    · 剩余体积 {stock.volume.toFixed(2)} mm³
+                    {stock.removedVolume !== undefined &&
+                      " · 去除 " + stock.removedVolume.toFixed(2) + " mm³"}
+                  </div>
+                )}
+                {review && job && (
+                  <section>
+                    <h2>参考 NC</h2>
+                    <p>
+                      {review.operation || review.hole} {review.tool}
+                    </p>
+                    <p>
+                      {review.moves} 段移动 · {review.validation}
+                    </p>
+                    {!review.operation && (
+                      <p>
+                        孔覆盖审计 {review.coverageComplete ? "完成" : "未完成"}
+                        ，实体扫掠审计{" "}
+                        {review.sweepComplete ? "完成" : "未完成"}。
+                      </p>
+                    )}
+                    <a
+                      href={"/api/jobs/" + job.id + "/files/reference.nc"}
+                      download
+                    >
+                      下载本次参考 NC
+                    </a>
+                    {job.files?.includes("toolpath.jsonl") && (
+                      <a href={artifact(job.id, "toolpath.jsonl")} download>
+                        下载槽腔刀路 JSONL
+                      </a>
+                    )}
+                    {job.files?.includes("project.oapjob") && (
+                      <a href={artifact(job.id, "project.oapjob")} download>
+                        下载加工项目
+                      </a>
+                    )}
+                    {!!review.issues?.length && (
+                      <details>
+                        <summary>验证详情</summary>
+                        <ul>
+                          {review.issues.map((issue, i) => (
+                            <li key={i}>
+                              {issue.code} · {issue.message}
+                            </li>
+                          ))}
+                        </ul>
+                      </details>
+                    )}
+                  </section>
+                )}
+              </div>
+            </aside>
+          </div>
+        )}
+        <div className="statusStrip" role="status">
+          <span
+            className={"statusDot " + (error ? "bad" : active ? "pending" : "")}
+          />
+          <strong>
+            {planningJob
+              ? "正在规划" + regionLabel
+              : active
+                ? (job && states[job.stage || job.state]) || "处理中"
+                : error
+                  ? "任务提示"
+                  : "就绪"}
+          </strong>
+          {(planningJob || (active && job)) && (
+            <button
+              onClick={() =>
+                void request("/api/jobs/" + (planningJob || job)!.id, {
+                  method: "DELETE",
+                }).catch((e) => setError(String(e)))
+              }
+            >
+              取消任务
+            </button>
           )}
-          {error && <pre role="alert">{error}</pre>}
-        </aside>
+          <span className="statusFile">{model ? name : "当前未打开模型"}</span>
+          <span className="statusUnits">
+            长度单位 <b>mm</b>
+          </span>
+        </div>
+        {error && <pre role="alert">{error}</pre>}
       </main>
       {panel && (
         <WorkspacePanel
