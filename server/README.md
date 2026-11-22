@@ -24,8 +24,10 @@ Pop-Location
 
 ```powershell
 Push-Location build/cam-server-package
-.\oap-server.exe -worker bin/oap-worker.exe -web web -data ../cam-data
+.\oap-server.exe -listen 127.0.0.1:8080 -worker bin/oap-worker.exe -web web -data ../cam-data
 ```
+
+本机后续更新统一使用 8080。等正在执行的任务结束，停止该实例，更新 `build/cam-server-package` 中的服务、worker 和网页，再用上面的命令启动，沿用 `build/cam-data` 中的会话与任务记录。
 
 在浏览器打开 `http://127.0.0.1:8080`。上传 STEP 后，点击孔壁或从列表选孔，选择模拟刀库中的刀具，填写进给和转速，再点击“生成参考刀路”。例如，测试件中的 Ø6 mm 通孔可选直径 6 mm 的钻头。完成后可以回放刀路、查看本次验证结果和下载参考 NC。网页标明本次导出的孔与刀具，以及孔覆盖和实体扫掠审计状态。
 
