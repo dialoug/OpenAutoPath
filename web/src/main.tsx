@@ -2,8 +2,13 @@ import { useEffect, useState } from "react";
 import { createRoot } from "react-dom/client";
 import { Viewport, type Face, type Segment } from "./Viewport";
 import "./style.css";
+import type { CamFeature, Cutter } from "./PlanningForm";
+import { WorkspacePanel } from "./WorkspacePanel";
+import { assignedTools, artifact, json, type Library } from "./workspace";
 
 type Job = {
+  name?: string;
+  files?: string[];
   id: string;
   modelId: string;
   action: string;
@@ -12,8 +17,9 @@ type Job = {
   error?: string;
 };
 type Hole = { id: string; diameter: number; depth: number; faces: string[] };
-type Tool = { id: string; name: string; diameter: number; type: string };
+type Tool = Cutter;
 type Review = {
+  operation?: string;
   toolId: string;
   feed: number;
   rpm: number;
@@ -42,6 +48,41 @@ async function request(url: string, options?: RequestInit) {
   return response;
 }
 function App() {
+  const [panel, setPanel] = useState<"project" | "library" | null>(null);
+  const [library, setLibrary] = useState(
+    () => localStorage.getItem("cam.library") || "",
+  );
+  const [libraryTools, setLibraryTools] = useState<Tool[]>([]);
+  useEffect(() => {
+    let live = true;
+    if (library)
+      json<Library>(artifact(library, "library.oaptl"))
+        .then((doc) => {
+          if (live) setLibraryTools(assignedTools(doc));
+        })
+        .catch((e) => {
+          if (live) setError(String(e));
+        });
+    return () => {
+      live = false;
+    };
+  }, [library]);
+  const [modelListVersion, refreshModels] = useState(0);
+  const [models, setModels] = useState<Job[]>([]);
+  useEffect(() => {
+    let live = true;
+    request("/api/session")
+      .then(() => json<Job[]>("/api/workspace"))
+      .then((items) => {
+        if (live) setModels(items.filter((j) => j.action === "analyze"));
+      })
+      .catch((e) => {
+        if (live) setError(String(e));
+      });
+    return () => {
+      live = false;
+    };
+  }, [modelListVersion]);
   const [saved, setSaved] = useState(
     () => localStorage.getItem("cam.job") || "",
   );
@@ -54,6 +95,7 @@ function App() {
   const [job, setJob] = useState<Job | null>(null);
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
+  const [features, setFeatures] = useState<CamFeature[]>([]);
   const [holes, setHoles] = useState<Hole[]>([]);
   const [selected, select] = useState("");
   const [tools, setTools] = useState<Tool[]>([]);
@@ -62,9 +104,15 @@ function App() {
   const [rpm, setRPM] = useState(3000);
   const [faces, setFaces] = useState<Face[]>([]);
   const [path, setPath] = useState<Segment[]>([]);
+  const [stock, setStock] = useState<{
+    mesh: Face[];
+    volume: number;
+    operations: number;
+  } | null>(null);
+  const [showStock, setShowStock] = useState(false);
   const [review, setReview] = useState<Review | null>(null);
   useEffect(() => {
-    if (!review || !holes.length) return;
+    if (!review || review.operation || !holes.length) return;
     select(review.hole);
     setTool(review.toolId);
     setFeed(review.feed);
@@ -75,9 +123,11 @@ function App() {
     busy ||
     Boolean(
       saved &&
-      (!job || job.id !== saved || ["queued", "running"].includes(job.state)),
+        (!job || job.id !== saved || ["queued", "running"].includes(job.state)),
     );
   function track(j: Job) {
+    setStock(null);
+    setShowStock(false);
     setJob(j);
     localStorage.setItem("cam.job", j.id);
     setSaved(j.id);
@@ -103,6 +153,20 @@ function App() {
         if (j.action === "analyze") {
           localStorage.setItem("cam.model", j.id);
           setModel(j.id);
+          refreshModels((n) => n + 1);
+        } else if (j.action === "simulate") {
+          const [r, mesh] = await Promise.all([
+            json<{ volume: number; operations: number }>(
+              artifact(j.id, "result.json"),
+            ),
+            json<Face[]>(artifact(j.id, "stock.json")),
+          ]);
+          if (live) {
+            setStock({ ...r, mesh });
+            setShowStock(true);
+            setReview(null);
+            setPath([]);
+          }
         } else {
           const base = "/api/jobs/" + j.id + "/files/";
           const [r, p] = await Promise.all(
@@ -140,15 +204,18 @@ function App() {
     )
       .then(([result, mesh]) => {
         if (live) {
+          setFeatures(result.features || []);
           setTools(result.tools);
           setHoles(result.holes);
           setFaces(mesh);
           select(result.holes[0]?.id || "");
-          const match = result.tools.find(
-            (t: Tool) =>
-              t.type === "drill" &&
-              Math.abs(t.diameter - result.holes[0]?.diameter) < 0.001,
-          );
+          const match =
+            !localStorage.getItem("cam.library") &&
+            result.tools.find(
+              (t: Tool) =>
+                t.type === "drill" &&
+                Math.abs(t.diameter - result.holes[0]?.diameter) < 0.001,
+            );
           setTool(match?.id || "");
         }
       })
@@ -165,8 +232,12 @@ function App() {
     try {
       await request("/api/session");
       const j: Job = await (
-        await request("/api/models", { method: "POST", body: file })
+        await request("/api/models?name=" + encodeURIComponent(file.name), {
+          method: "POST",
+          body: file,
+        })
       ).json();
+      setFeatures([]);
       setHoles([]);
       select("");
       setFaces([]);
@@ -191,7 +262,13 @@ function App() {
         await request("/api/models/" + model + "/toolpaths", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ hole: selected, tool, feed, rpm }),
+          body: JSON.stringify({
+            hole: selected,
+            tool,
+            feed,
+            rpm,
+            libraryId: library,
+          }),
         })
       ).json();
       setReview(null);
@@ -207,12 +284,53 @@ function App() {
     <>
       <header>
         <b>OpenAutoPath</b>
-        <span>孔加工工作台</span>
+        <span>加工工作台</span>
+        <nav>
+          <button
+            disabled={active || !model}
+            onClick={() => setPanel("project")}
+          >
+            加工项目
+          </button>
+          <button disabled={active} onClick={() => setPanel("library")}>
+            刀库管理
+          </button>
+        </nav>
       </header>
       <main>
         <section className="workspace">
           <div className="bar">
             <h1>{name || "模型视图"}</h1>
+            {models.length > 0 && (
+              <select
+                aria-label="历史模型"
+                value={model}
+                disabled={active}
+                onChange={(e) => {
+                  const chosen = models.find((m) => m.id === e.target.value);
+                  if (!chosen) return;
+                  const title = chosen.name || "model.step";
+                  setName(title);
+                  localStorage.setItem("cam.name", title);
+                  setPath([]);
+                  setReview(null);
+                  setFaces([]);
+                  setHoles([]);
+                  setFeatures([]);
+                  setError("");
+                  track(chosen);
+                }}
+              >
+                <option value="" disabled>
+                  历史模型
+                </option>
+                {models.map((m) => (
+                  <option key={m.id} value={m.id}>
+                    {m.name || "model.step"} · {m.id.slice(0, 6)}
+                  </option>
+                ))}
+              </select>
+            )}
             <label className="upload">
               上传 STEP
               <input
@@ -229,7 +347,7 @@ function App() {
             </label>
           </div>
           <Viewport
-            faces={faces}
+            faces={showStock && stock ? stock.mesh : faces}
             highlighted={hole?.faces || []}
             path={path}
             onPick={(id) => {
@@ -240,6 +358,15 @@ function App() {
             }}
           />
           <footer>旋转 · 拖动　　缩放 · 滚轮　　选择 · 点击孔壁</footer>
+          {stock && (
+            <footer>
+              <button onClick={() => setShowStock(!showStock)}>
+                {showStock ? "显示零件" : "显示余料"}
+              </button>
+              已仿真 {stock.operations} 道工序 · 剩余体积{" "}
+              {stock.volume.toFixed(2)} mm³
+            </footer>
+          )}
         </section>
         <aside>
           <h2>
@@ -267,14 +394,21 @@ function App() {
           >
             <h2>加工参数</h2>
             <label>
-              模拟刀库
+              {library ? "活动刀库" : "模拟刀库"}
               <select
                 required
                 value={tool}
-                onChange={(e) => setTool(e.target.value)}
+                onChange={(e) => {
+                  const chosen = (library ? libraryTools : tools).find(
+                    (t) => t.id === e.target.value,
+                  );
+                  setTool(e.target.value);
+                  if (chosen?.feed) setFeed(chosen.feed);
+                  if (chosen?.rpm) setRPM(chosen.rpm);
+                }}
               >
                 <option value="">选择刀具</option>
-                {tools.map((t) => (
+                {(library ? libraryTools : tools).map((t) => (
                   <option key={t.id} value={t.id}>
                     {t.name}
                   </option>
@@ -335,18 +469,25 @@ function App() {
             <section>
               <h2>参考 NC</h2>
               <p>
-                {review.hole} · {review.tool}
+                {review.operation || review.hole} {review.tool}
               </p>
               <p>
                 {review.moves} 段移动 · {review.validation}
               </p>
-              <p>
-                孔覆盖审计 {review.coverageComplete ? "完成" : "未完成"}
-                ，实体扫掠审计 {review.sweepComplete ? "完成" : "未完成"}。
-              </p>
+              {!review.operation && (
+                <p>
+                  孔覆盖审计 {review.coverageComplete ? "完成" : "未完成"}
+                  ，实体扫掠审计 {review.sweepComplete ? "完成" : "未完成"}。
+                </p>
+              )}
               <a href={"/api/jobs/" + job.id + "/files/reference.nc"} download>
                 下载本次参考 NC
               </a>
+              {job.files?.includes("project.oapjob") && (
+                <a href={artifact(job.id, "project.oapjob")} download>
+                  下载加工项目
+                </a>
+              )}
               {!!review.issues?.length && (
                 <details>
                   <summary>验证详情</summary>
@@ -364,6 +505,27 @@ function App() {
           {error && <pre role="alert">{error}</pre>}
         </aside>
       </main>
+      {panel && (
+        <WorkspacePanel
+          key={panel + model}
+          mode={panel}
+          model={model}
+          features={features}
+          cutters={library ? libraryTools : tools}
+          library={library}
+          close={() => setPanel(null)}
+          preview={(j) => {
+            setReview(null);
+            setPath([]);
+            track(j);
+          }}
+          activate={(id) => {
+            setLibrary(id);
+            localStorage.setItem("cam.library", id);
+            setTool("");
+          }}
+        />
+      )}
     </>
   );
 }

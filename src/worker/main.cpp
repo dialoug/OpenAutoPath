@@ -1,4 +1,6 @@
 #include "analysis/AnalysisPipeline.h"
+#include "Project.h"
+#include "Planning.h"
 #include "recognition/FeatureRecognizer.h"
 #include "tooling/adapter/hole/HoleMachiningInputMapper.h"
 #include "tooling/adapter/hole/HoleAutomaticToolpath.h"
@@ -102,7 +104,7 @@ QJsonObject generate(const RecognizedHoleGeometry& hole, const QJsonObject& requ
     const auto* bit = library.toolById(toolId);
     const auto* slot = library.slotForTool(toolId);
     if (!bit || !slot)
-        throw std::runtime_error("Unknown tool in simulation library");
+        throw std::runtime_error("Unknown or unassigned tool in the selected library");
     params.tool.diameter = bit->geometry.diameter;
     params.tool.vertFeed = positive(request, "feed");
     params.tool.horizFeed = params.tool.vertFeed;
@@ -114,7 +116,9 @@ QJsonObject generate(const RecognizedHoleGeometry& hole, const QJsonObject& requ
     tooling::ToolLibrary selectedLibrary(library.id(), library.name());
     if (!selectedLibrary.upsertTool(*bit) || !selectedLibrary.assignToolToSlot(selectedSlot))
         throw std::runtime_error("Cannot assign selected cutter");
-    const auto batch = tooling::HoleAutomaticToolpath().generate(selectedLibrary, {input}, params, &context).batch;
+    const std::vector<toolpath::HoleMachiningInput> inputs{input};
+    const auto generated = tooling::HoleAutomaticToolpath().generate(selectedLibrary, inputs, params, &context);
+    const auto& batch = generated.batch;
     const auto program = batch.toProgram();
     if (program.empty() || !batch.validation.ok())
         throw std::runtime_error("Hole generation failed: " + batch.validation.summary() +
@@ -137,6 +141,7 @@ QJsonObject generate(const RecognizedHoleGeometry& hole, const QJsonObject& requ
             segments.append(QJsonArray{xyz(move.from), xyz(move.to)});
     }
     writeJson("path.json", QJsonDocument(segments));
+    worker::captureProject(request, generated, inputs, frames, library);
     QJsonArray issues;
     for (const auto& issue : batch.validation.issues) {
         issues.append(QJsonObject{{"code", QString::fromStdString(issue.code)},
@@ -156,8 +161,26 @@ void run(const QString& fileName)
         throw std::runtime_error("Cannot open request");
     const auto request = QJsonDocument::fromJson(file.readAll()).object();
     const auto action = request.value("action").toString();
-    if (request.value("version").toInt() != 1 || (action != "analyze" && action != "generate"))
+    if (request.value("version").toInt() != 1 || (action != "analyze" && action != "generate" &&
+        action != "library" && action != "project" && action != "rebuild" && action != "simulate" && action != "plan"))
         throw std::runtime_error("Unsupported worker request");
+    tooling::ToolLibrary library;
+    QString libraryError;
+    if (action == "library" && request.contains("document")) {
+        if (!tooling::ToolLibraryStorage::deserializeLibrary(
+                QJsonDocument(request["document"].toObject()).toJson(), library, &libraryError))
+            throw std::runtime_error(libraryError.toStdString());
+    } else if (!tooling::ToolLibraryStorage::loadLibrary(
+                   request["libraryFile"].toString(":/tools/general-simulation.oaptl"), library, &libraryError))
+        throw std::runtime_error(libraryError.toStdString());
+    if (action == "library" || action == "analyze") {
+        if (!tooling::ToolLibraryStorage::saveLibrary("library.oaptl", library, &libraryError))
+            throw std::runtime_error(libraryError.toStdString());
+    }
+    if (action == "library") {
+        writeJson("result.json", QJsonDocument(QJsonObject{{"version", 1}, {"name", library.name()}}));
+        return;
+    }
     stage("analyzing");
     Model model;
     Document document;
@@ -166,11 +189,6 @@ void run(const QString& fileName)
                                                    document.value, index, model);
     if (!report.ok())
         throw std::runtime_error("STEP analysis failed");
-    const auto geometries = FeatureRecognizer().recognizeHoleGeometries(model, index).geometries;
-    tooling::ToolLibrary library;
-    QString libraryError;
-    if (!tooling::ToolLibraryStorage::loadLibrary(":/tools/general-simulation.oaptl", library, &libraryError))
-        throw std::runtime_error(libraryError.toStdString());
     BRep_Builder builder;
     TopoDS_Compound part;
     builder.MakeCompound(part);
@@ -182,6 +200,18 @@ void run(const QString& fileName)
         }
     }
     context.obstacleShape = part;
+    if (action == "project" || action == "rebuild" || action == "simulate" || action == "plan") {
+        Bbox bounds;
+        for (const auto& unit : model.units) bounds.merge(unit.bbox);
+        const auto frame = MoldCoordinateFrame::fromBounds(bounds);
+        const auto frames = toolpath::MoldSetupWorkFrames::fromMold(bounds, frame);
+        context.moldFrame = &frame;
+        auto project = worker::processProject(request, index, model, library, frames, context);
+        project.insert("version", 1);
+        writeJson("result.json", QJsonDocument(project));
+        return;
+    }
+    const auto geometries = FeatureRecognizer().recognizeHoleGeometries(model, index).geometries;
     QJsonArray holes;
     const RecognizedHoleGeometry* selected = nullptr;
     for (const auto& hole : geometries) {
@@ -201,6 +231,13 @@ void run(const QString& fileName)
         stage("meshing");
         writeMesh(index, part);
         result.insert("holes", holes);
+        const auto trace=worker::traceRegions(model,index,geometries);
+        result.insert("features",worker::planningFeatures(trace));
+        if(!trace.ok()) result.insert("featureError",QString::fromStdString(trace.error));
+        QJsonArray units;
+        for(const auto& unit:model.units) units.append(QJsonObject{{"id",QString::fromStdString(unit.unit_id)},
+            {"name",QString::fromStdString(unit.decoded_name)},{"faces",static_cast<int>(unit.face_ids.size())}});
+        result.insert("units",units);
         QJsonArray tools;
         for (const auto& item : library.assignedTools()) {
             tools.append(QJsonObject{{"id", item.tool.id}, {"name", item.tool.name},

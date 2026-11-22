@@ -162,3 +162,82 @@ pre {
   bottom: 16px;
   left: 16px;
 }
+.docBackdrop {
+  position: fixed;
+  inset: 0;
+  background: #122d3580;
+  z-index: 4;
+  display: flex;
+  justify-content: flex-end;
+}
+.docPanel {
+  width: min(640px, 100%);
+  background: white;
+  overflow: auto;
+  padding: 24px;
+  box-shadow: -8px 0 38px #142d3530;
+}
+.docTitle,
+.docActions,
+header nav {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+.docTitle {
+  justify-content: space-between;
+  margin-bottom: 16px;
+}
+.docTitle h2 {
+  margin: 0;
+}
+.docActions {
+  margin: 12px 0;
+}
+.docPanel fieldset {
+  border: 0;
+  padding: 0;
+  margin: 0;
+  min-width: 0;
+}
+.docPanel label {
+  display: block;
+  font-size: 13px;
+  margin: 8px 0;
+}
+.docPanel input:not([type="checkbox"]):not([type="file"]),
+.docPanel select {
+  display: block;
+  width: 100%;
+  padding: 8px;
+  border: 1px solid #b5c6c9;
+  border-radius: 4px;
+}
+.docGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(100px, 1fr));
+  gap: 8px;
+}
+.docActions button,
+.docActions a,
+.docActions .upload {
+  font-size: 12px;
+  margin: 0;
+}
+.opRow {
+  border-top: 1px solid #d4e1e0;
+  padding: 8px 0;
+}
+.docPanel details {
+  margin: 16px 0;
+}
+.docPanel summary {
+  cursor: pointer;
+}
+header nav {
+  margin-left: auto;
+}
+header nav button {
+  font-size: 13px;
+}

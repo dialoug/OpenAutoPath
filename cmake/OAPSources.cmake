@@ -17,4 +17,6 @@ include(${CMAKE_CURRENT_LIST_DIR}/modules/OAPToolpathSources.cmake)
 include(${CMAKE_CURRENT_LIST_DIR}/modules/OAPToolingSources.cmake)
 include(${CMAKE_CURRENT_LIST_DIR}/modules/OAPManufacturingSources.cmake)
 include(${CMAKE_CURRENT_LIST_DIR}/modules/OAPAppSources.cmake)
-oap_module_sources(oap-worker OAP_WORKER_SOURCES src/worker/main.cpp)
+oap_module_sources(oap-worker OAP_WORKER_SOURCES
+    src/worker/main.cpp src/worker/Project.cpp src/worker/Project.h
+    src/worker/Planning.cpp src/worker/Planning.h)

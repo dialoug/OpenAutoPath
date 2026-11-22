@@ -11,7 +11,8 @@ set(OAP_FIRST_PARTY_LIBRARY_TARGETS ${OAP_FIRST_PARTY_TARGETS})
 list(REMOVE_ITEM OAP_FIRST_PARTY_LIBRARY_TARGETS OpenAutoPathApp oap-worker)
 set(OAP_INTERNAL_DEPS_oap-worker
     oap_analysis oap_recognition oap_toollibrary oap_toolpath_adapter oap_toolpath_core
-    oap_toolpath_hole oap_toolpath_workflow oap_toolpath_program)
+    oap_toolpath_hole oap_toolpath_pocket oap_toolpath_profile oap_toolpath_finishing
+    oap_toolpath_workflow oap_toolpath_program oap_manufacturing)
 
 set(OAP_INTERNAL_DEPS_oap_analysis)
 set(OAP_INTERNAL_DEPS_oap_recognition

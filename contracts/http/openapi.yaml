@@ -23,10 +23,13 @@ components:
       properties:
         id: {type: string}
         modelId: {type: string}
-        action: {enum: [analyze, generate]}
+        action: {enum: [analyze, generate, library, project, plan, rebuild, simulate]}
         state: {enum: [queued, running, done, cancelled, failed]}
-        stage: {enum: [analyzing, meshing, generating]}
+        stage: {type: string}
         error: {type: string}
+        name: {type: string}
+        created: {type: string, format: date-time}
+        files: {type: array, items: {type: string}}
   responses:
     Accepted:
       description: Request saved and queued
@@ -41,6 +44,8 @@ paths:
         '204': {description: Browser session ready}
   /api/models:
     post:
+      parameters:
+        - {name: name, in: query, schema: {type: string}, description: Original STEP filename}
       requestBody:
         required: true
         content:
@@ -64,13 +69,125 @@ paths:
               required: [hole, tool, feed, rpm]
               properties:
                 hole: {type: string, description: Hole ID from this model version}
-                tool: {type: string, description: Tool ID from the simulation library}
+                tool: {type: string, description: Assigned tool ID from the selected library}
+                libraryId: {type: string, description: Saved library version ID}
                 feed: {type: number, exclusiveMinimum: 0, maximum: 100000}
                 rpm: {type: number, exclusiveMinimum: 0, maximum: 100000}
       responses:
         '202': {$ref: '#/components/responses/Accepted'}
         '400': {description: Invalid parameters}
         '404': {description: Model unavailable in this session}
+        '429': {description: Queue full}
+  /api/workspace:
+    get:
+      responses:
+        '200':
+          description: Completed jobs owned by this session, newest first
+          content:
+            application/json:
+              schema: {type: array, items: {$ref: '#/components/schemas/Job'}}
+  /api/libraries:
+    post:
+      summary: Create a default library or save an imported or edited library
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              properties:
+                document: {type: object}
+      responses:
+        '202': {$ref: '#/components/responses/Accepted'}
+        '400': {description: Invalid request}
+        '404': {description: Referenced resource is unavailable in this session}
+        '429': {description: Queue full}
+  /api/models/{id}/projects:
+    parameters:
+      - {$ref: '#/components/parameters/id'}
+    post:
+      summary: Create or save a project bound to the current STEP
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              properties:
+                document: {type: object}
+                appendId: {type: string}
+      responses:
+        '202': {$ref: '#/components/responses/Accepted'}
+        '400': {description: Invalid request}
+        '404': {description: Referenced resource is unavailable in this session}
+        '429': {description: Queue full}
+  /api/models/{id}/projects/plan:
+    parameters:
+      - {$ref: '#/components/parameters/id'}
+    post:
+      summary: Plan the selected feature and save the project
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [document, feature, tool, strategy, step]
+              properties:
+                document: {type: object}
+                feature: {type: string}
+                tool: {type: string}
+                strategy: {type: string}
+                step: {type: number, exclusiveMinimum: 0, maximum: 1000}
+                libraryId: {type: string}
+      responses:
+        '202': {$ref: '#/components/responses/Accepted'}
+        '400': {description: Invalid request}
+        '404': {description: Referenced resource is unavailable in this session}
+        '429': {description: Queue full}
+  /api/models/{id}/projects/rebuild:
+    parameters:
+      - {$ref: '#/components/parameters/id'}
+    post:
+      summary: Rebuild one enabled operation and export reference NC
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [document, operation]
+              properties:
+                document: {type: object}
+                operation: {type: string}
+      responses:
+        '202': {$ref: '#/components/responses/Accepted'}
+        '400': {description: Invalid request}
+        '404': {description: Referenced resource is unavailable in this session}
+        '429': {description: Queue full}
+  /api/models/{id}/projects/simulate:
+    parameters:
+      - {$ref: '#/components/parameters/id'}
+    post:
+      summary: Simulate enabled operations and return the remaining stock
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [document]
+              properties:
+                document: {type: object}
+      responses:
+        '202': {$ref: '#/components/responses/Accepted'}
+        '400': {description: Invalid request}
+        '404': {description: Referenced resource is unavailable in this session}
         '429': {description: Queue full}
   /api/jobs/{id}:
     parameters:
@@ -93,7 +210,7 @@ paths:
       - name: name
         in: path
         required: true
-        schema: {enum: [result.json, mesh.json, path.json, reference.nc]}
+        schema: {enum: [result.json, mesh.json, path.json, reference.nc, library.oaptl, project.oapjob, stock.json]}
     get:
       responses:
         '200': {description: Completed job artifact}

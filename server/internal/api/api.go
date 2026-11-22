@@ -6,6 +6,8 @@ import (
 	"io"
 	"net/http"
 	"os"
+	"path/filepath"
+	"strings"
 
 	"openautopath/server/internal/jobs"
 )
@@ -32,9 +34,62 @@ func Handler(manager *jobs.Manager, web string) http.Handler {
 	})
 	api := http.NewServeMux()
 	owner := func(r *http.Request) string { c, _ := r.Cookie("oap_session"); return c.Value }
+	api.HandleFunc("GET /api/workspace", func(w http.ResponseWriter, r *http.Request) {
+		items, err := manager.List(owner(r))
+		if err != nil {
+			http.Error(w, "cannot read workspace", 500)
+			return
+		}
+		respond(w, 200, items)
+	})
+	documentJob := func(action string) http.HandlerFunc {
+		return func(w http.ResponseWriter, r *http.Request) {
+			var input struct {
+				Document                           json.RawMessage `json:"document"`
+				Operation                          string          `json:"operation"`
+				AppendID                           string          `json:"appendId"`
+				Feature, Tool, Strategy, LibraryID string
+				Step                               float64
+			}
+			dec := json.NewDecoder(http.MaxBytesReader(w, r.Body, 32<<20))
+			dec.DisallowUnknownFields()
+			if err := dec.Decode(&input); err != nil || dec.Decode(new(any)) != io.EOF ||
+				(action == "rebuild" && input.Operation == "") ||
+				(action != "library" && action != "project" && len(input.Document) == 0) ||
+				(action == "plan" && (input.Feature == "" || input.Tool == "" || input.Step <= 0 || input.Step > 1000)) {
+				http.Error(w, "invalid document request", 400)
+				return
+			}
+			req := jobs.Request{Action: action, Document: input.Document, Operation: input.Operation, AppendID: input.AppendID,
+				Feature: input.Feature, Tool: input.Tool, Strategy: input.Strategy, LibraryID: input.LibraryID, Step: input.Step}
+			job, err := manager.Submit(owner(r), r.PathValue("id"), req, nil)
+			if errors.Is(err, os.ErrNotExist) {
+				http.NotFound(w, r)
+				return
+			}
+			if errors.Is(err, jobs.ErrBusy) {
+				http.Error(w, err.Error(), 429)
+				return
+			}
+			if err != nil {
+				http.Error(w, "cannot create job", 500)
+				return
+			}
+			respond(w, 202, job)
+		}
+	}
+	api.HandleFunc("POST /api/libraries", documentJob("library"))
+	api.HandleFunc("POST /api/models/{id}/projects", documentJob("project"))
+	api.HandleFunc("POST /api/models/{id}/projects/rebuild", documentJob("rebuild"))
+	api.HandleFunc("POST /api/models/{id}/projects/simulate", documentJob("simulate"))
+	api.HandleFunc("POST /api/models/{id}/projects/plan", documentJob("plan"))
 	api.HandleFunc("POST /api/models", func(w http.ResponseWriter, r *http.Request) {
 		r.Body = http.MaxBytesReader(w, r.Body, 128<<20)
-		job, err := manager.Submit(owner(r), "", jobs.Request{Action: "analyze"}, r.Body)
+		name := filepath.Base(strings.ReplaceAll(r.URL.Query().Get("name"), "\\", "/"))
+		if name == "." || len(name) > 255 {
+			name = "model.step"
+		}
+		job, err := manager.Submit(owner(r), "", jobs.Request{Action: "analyze", SourceName: name}, r.Body)
 		if err != nil {
 			var size *http.MaxBytesError
 			if errors.Is(err, jobs.ErrBusy) {
@@ -52,6 +107,7 @@ func Handler(manager *jobs.Manager, web string) http.Handler {
 		var input struct {
 			Hole      string
 			Tool      string
+			LibraryID string
 			Feed, RPM float64
 		}
 		dec := json.NewDecoder(http.MaxBytesReader(w, r.Body, 4096))
@@ -60,7 +116,7 @@ func Handler(manager *jobs.Manager, web string) http.Handler {
 			http.Error(w, "invalid machining parameters", 400)
 			return
 		}
-		job, err := manager.Submit(owner(r), r.PathValue("id"), jobs.Request{Action: "generate", Hole: input.Hole, Tool: input.Tool, Feed: input.Feed, RPM: input.RPM}, nil)
+		job, err := manager.Submit(owner(r), r.PathValue("id"), jobs.Request{Action: "generate", Hole: input.Hole, Tool: input.Tool, Feed: input.Feed, RPM: input.RPM, LibraryID: input.LibraryID}, nil)
 		if errors.Is(err, os.ErrNotExist) {
 			http.NotFound(w, r)
 			return
@@ -97,8 +153,8 @@ func Handler(manager *jobs.Manager, web string) http.Handler {
 			http.NotFound(w, r)
 			return
 		}
-		if name == "reference.nc" {
-			w.Header().Set("Content-Disposition", `attachment; filename="reference.nc"`)
+		if name == "reference.nc" || name == "project.oapjob" || name == "library.oaptl" {
+			w.Header().Set("Content-Disposition", `attachment; filename="`+name+`"`)
 		}
 		http.ServeFile(w, r, file)
 	})

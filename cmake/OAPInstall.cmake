@@ -71,6 +71,10 @@ if(OAP_BUILD_WORKER)
     list(APPEND oap_license_components ServerWorker)
     install(TARGETS oap-worker RUNTIME_DEPENDENCY_SET oap_worker_runtime
         RUNTIME DESTINATION bin COMPONENT ServerWorker)
+    install(TARGETS oap_opencamlib
+        RUNTIME DESTINATION bin COMPONENT ServerWorker
+        LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR} COMPONENT ServerWorker
+        ARCHIVE DESTINATION ${CMAKE_INSTALL_LIBDIR} COMPONENT Development)
     if(WIN32)
         set(worker_dll_dirs "${OAP_QT_BIN_DIR}" "${OAP_OCCT_RUNTIME_DIR}")
         foreach(dll IN LISTS OAP_THIRDPARTY_DLLS OAP_VCOMP_RUNTIME_DLL)

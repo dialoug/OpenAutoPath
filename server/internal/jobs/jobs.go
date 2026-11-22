@@ -14,27 +14,42 @@ import (
 	"os/exec"
 	"path/filepath"
 	"regexp"
+	"slices"
+	"sort"
 	"sync"
 	"time"
 )
 
 type Request struct {
-	Version int     `json:"version"`
-	Action  string  `json:"action"`
-	Model   string  `json:"model"`
-	Hole    string  `json:"hole,omitempty"`
-	Tool    string  `json:"tool,omitempty"`
-	Feed    float64 `json:"feed,omitempty"`
-	RPM     float64 `json:"rpm,omitempty"`
+	Feature     string          `json:"feature,omitempty"`
+	Strategy    string          `json:"strategy,omitempty"`
+	Step        float64         `json:"step,omitempty"`
+	Document    json.RawMessage `json:"document,omitempty"`
+	Operation   string          `json:"operation,omitempty"`
+	SourceName  string          `json:"sourceName,omitempty"`
+	LibraryID   string          `json:"-"`
+	LibraryFile string          `json:"libraryFile,omitempty"`
+	AppendID    string          `json:"-"`
+	AppendFile  string          `json:"appendFile,omitempty"`
+	Version     int             `json:"version"`
+	Action      string          `json:"action"`
+	Model       string          `json:"model"`
+	Hole        string          `json:"hole,omitempty"`
+	Tool        string          `json:"tool,omitempty"`
+	Feed        float64         `json:"feed,omitempty"`
+	RPM         float64         `json:"rpm,omitempty"`
 }
 
 type Job struct {
-	Stage   string `json:"stage,omitempty"`
-	ID      string `json:"id"`
-	ModelID string `json:"modelId"`
-	Action  string `json:"action"`
-	State   string `json:"state"`
-	Error   string `json:"error,omitempty"`
+	Files   []string  `json:"files,omitempty"`
+	Name    string    `json:"name,omitempty"`
+	Created time.Time `json:"created,omitempty"`
+	Stage   string    `json:"stage,omitempty"`
+	ID      string    `json:"id"`
+	ModelID string    `json:"modelId"`
+	Action  string    `json:"action"`
+	State   string    `json:"state"`
+	Error   string    `json:"error,omitempty"`
 }
 
 type Manager struct {
@@ -137,10 +152,27 @@ func (m *Manager) Submit(owner, modelID string, req Request, upload io.Reader) (
 	}
 	if upload != nil {
 		modelID = id
-	} else {
+	} else if req.Action != "library" {
 		model, err := m.Load(owner, modelID)
 		if err != nil || model.State != "done" || model.Action != "analyze" {
 			return Job{}, os.ErrNotExist
+		}
+		req.SourceName = model.Name
+	}
+	if req.LibraryID != "" {
+		req.LibraryFile, err = m.Artifact(owner, req.LibraryID, "library.oaptl")
+		if err != nil {
+			return Job{}, err
+		}
+	}
+	if req.AppendID != "" {
+		source, e := m.Load(owner, req.AppendID)
+		if e != nil || source.Action != "generate" || source.ModelID != modelID {
+			return Job{}, os.ErrNotExist
+		}
+		req.AppendFile, err = m.Artifact(owner, req.AppendID, "project.oapjob")
+		if err != nil {
+			return Job{}, err
 		}
 	}
 	dir := m.dir(owner, id)
@@ -180,7 +212,7 @@ func (m *Manager) Submit(owner, modelID string, req Request, upload io.Reader) (
 	if err = os.WriteFile(filepath.Join(dir, "request.json"), data, 0600); err != nil {
 		return Job{}, err
 	}
-	j := Job{ID: id, ModelID: modelID, Action: req.Action, State: "queued"}
+	j := Job{ID: id, ModelID: modelID, Action: req.Action, State: "queued", Name: req.SourceName, Created: time.Now().UTC()}
 	m.mu.Lock()
 	defer m.mu.Unlock()
 	if err = save(dir, j); err != nil {
@@ -262,20 +294,24 @@ func (m *Manager) run(ctx context.Context, dir string, j Job) {
 		if err != nil {
 			return err
 		}
-		var result struct{ Version int }
+		var result struct {
+			Version int
+			Name    string
+		}
 		if json.Unmarshal(data, &result) != nil || result.Version != 1 {
 			return errors.New("invalid worker result")
 		}
-		files := []string{"mesh.json"}
-		if j.Action == "generate" {
-			files = []string{"path.json", "reference.nc"}
+		if result.Name != "" {
+			j.Name = result.Name
 		}
+		files := outputs(j.Action)
 		for _, name := range files {
 			info, err := os.Stat(filepath.Join(dir, name))
 			if err != nil || info.Size() == 0 {
 				return fmt.Errorf("missing worker output %s", name)
 			}
 		}
+		j.Files = files
 		return nil
 	}
 	err := execute()
@@ -312,9 +348,57 @@ func (m *Manager) Artifact(owner, id, name string) (string, error) {
 	if err != nil || j.State != "done" {
 		return "", os.ErrNotExist
 	}
-	allowed := name == "result.json" || (j.Action == "analyze" && name == "mesh.json") || (j.Action == "generate" && (name == "path.json" || name == "reference.nc"))
+	allowed := name == "result.json" || slices.Contains(outputs(j.Action), name)
 	if !allowed {
 		return "", os.ErrNotExist
 	}
 	return filepath.Join(m.dir(owner, id), name), nil
+}
+
+func outputs(action string) []string {
+	switch action {
+	case "analyze":
+		return []string{"mesh.json", "library.oaptl"}
+	case "generate", "rebuild":
+		return []string{"path.json", "reference.nc", "project.oapjob"}
+	case "project", "plan":
+		return []string{"project.oapjob"}
+	case "simulate":
+		return []string{"project.oapjob", "stock.json"}
+	case "library":
+		return []string{"library.oaptl"}
+	default:
+		return nil
+	}
+}
+
+func (m *Manager) List(owner string) ([]Job, error) {
+	if !ValidID(owner) {
+		return nil, os.ErrNotExist
+	}
+	list := []Job{}
+	entries, err := os.ReadDir(filepath.Join(m.root, owner))
+	if errors.Is(err, os.ErrNotExist) {
+		return list, nil
+	}
+	if err != nil {
+		return nil, err
+	}
+	for _, entry := range entries {
+		if !entry.IsDir() || !ValidID(entry.Name()) {
+			continue
+		}
+		j, err := m.Load(owner, entry.Name())
+		if errors.Is(err, os.ErrNotExist) {
+			continue
+		}
+		if err != nil {
+			return nil, err
+		}
+		if j.State == "done" {
+			list = append(list, j)
+		}
+	}
+	sort.Slice(list, func(i, k int) bool { return list[i].Created.After(list[k].Created) })
+	return list, nil
 }
