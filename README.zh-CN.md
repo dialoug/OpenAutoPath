@@ -9,6 +9,7 @@ OpenAutoPath 是一个基于 **C++20、Qt 和 Open CASCADE（OCCT）** 的 CAD/C
 尚未提供桌面应用发布包。
 
 [下载 Windows 版](https://github.com/dialoug/OpenAutoPath/releases/latest) ·
+[构建浏览器孔加工工作台](server/README.md) ·
 [构建说明](BUILDING.md) · [项目架构](ARCHITECTURE.md) ·
 [CI 与发布记录](https://github.com/dialoug/OpenAutoPath/actions) ·
 [问题反馈](https://github.com/dialoug/OpenAutoPath/issues)

@@ -1,0 +1,5 @@
+{
+  "version": 1,
+  "action": "analyze",
+  "model": "/absolute/path/to/cam_feature_test.stp"
+}

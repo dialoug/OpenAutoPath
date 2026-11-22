@@ -1,0 +1,100 @@
+openapi: 3.1.0
+info:
+  title: OpenAutoPath CAM
+  version: '1'
+security:
+  - browserSession: []
+components:
+  securitySchemes:
+    browserSession:
+      type: apiKey
+      in: cookie
+      name: oap_session
+  parameters:
+    id:
+      name: id
+      in: path
+      required: true
+      schema: {type: string, pattern: '^[0-9a-f]{32}$'}
+  schemas:
+    Job:
+      type: object
+      required: [id, modelId, action, state]
+      properties:
+        id: {type: string}
+        modelId: {type: string}
+        action: {enum: [analyze, generate]}
+        state: {enum: [queued, running, done, cancelled, failed]}
+        stage: {enum: [analyzing, meshing, generating]}
+        error: {type: string}
+  responses:
+    Accepted:
+      description: Request saved and queued
+      content:
+        application/json:
+          schema: {$ref: '#/components/schemas/Job'}
+paths:
+  /api/session:
+    get:
+      security: []
+      responses:
+        '204': {description: Browser session ready}
+  /api/models:
+    post:
+      requestBody:
+        required: true
+        content:
+          application/octet-stream:
+            schema: {type: string, format: binary}
+      responses:
+        '202': {$ref: '#/components/responses/Accepted'}
+        '413': {description: Upload exceeds 128 MiB}
+        '429': {description: Queue full}
+  /api/models/{id}/toolpaths:
+    parameters:
+      - {$ref: '#/components/parameters/id'}
+    post:
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [hole, tool, feed, rpm]
+              properties:
+                hole: {type: string, description: Hole ID from this model version}
+                tool: {type: string, description: Tool ID from the simulation library}
+                feed: {type: number, exclusiveMinimum: 0, maximum: 100000}
+                rpm: {type: number, exclusiveMinimum: 0, maximum: 100000}
+      responses:
+        '202': {$ref: '#/components/responses/Accepted'}
+        '400': {description: Invalid parameters}
+        '404': {description: Model unavailable in this session}
+        '429': {description: Queue full}
+  /api/jobs/{id}:
+    parameters:
+      - {$ref: '#/components/parameters/id'}
+    get:
+      responses:
+        '200':
+          description: Current job status
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/Job'}
+        '404': {description: Unknown job}
+    delete:
+      responses:
+        '204': {description: Cancellation requested or job already finished}
+        '404': {description: Unknown job}
+  /api/jobs/{id}/files/{name}:
+    parameters:
+      - {$ref: '#/components/parameters/id'}
+      - name: name
+        in: path
+        required: true
+        schema: {enum: [result.json, mesh.json, path.json, reference.nc]}
+    get:
+      responses:
+        '200': {description: Completed job artifact}
+        '404': {description: Artifact unavailable}

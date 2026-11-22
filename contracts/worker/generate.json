@@ -1,0 +1,9 @@
+{
+  "version": 1,
+  "action": "generate",
+  "model": "/absolute/path/to/cam_feature_test.stp",
+  "hole": "F10",
+  "tool": "sim-v1-drill-d6",
+  "feed": 100,
+  "rpm": 3000
+}

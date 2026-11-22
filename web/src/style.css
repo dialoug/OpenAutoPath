@@ -1,0 +1,164 @@
+* {
+  box-sizing: border-box;
+}
+body {
+  font-family: Inter, "Microsoft YaHei", sans-serif;
+  color: #18313a;
+  background: #f5f7f7;
+}
+header,
+.bar,
+footer {
+  display: flex;
+  align-items: center;
+}
+header {
+  height: 58px;
+  background: #16343c;
+  color: white;
+  padding: 0 28px;
+  gap: 20px;
+}
+header b {
+  font-size: 21px;
+}
+header span {
+  font-size: 14px;
+  color: #b7dbd8;
+}
+main {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 310px;
+  min-height: calc(100vh - 58px);
+}
+.workspace {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+.bar {
+  padding: 12px 22px;
+  gap: 12px;
+  justify-content: space-between;
+}
+h1 {
+  font-size: 18px;
+  overflow-wrap: anywhere;
+}
+h2 {
+  font-size: 16px;
+  margin: 0 0 14px;
+}
+small {
+  color: #46716e;
+}
+.viewport {
+  position: relative;
+  min-height: 340px;
+  flex: 1;
+  background: #e9eff1;
+  display: grid;
+  place-items: center;
+}
+.viewport canvas {
+  position: absolute;
+  inset: 0;
+}
+.viewport span,
+footer {
+  color: #536b71;
+  font-size: 13px;
+}
+footer {
+  padding: 12px 20px;
+}
+aside {
+  background: white;
+  border-left: 1px solid #cfdbdb;
+  padding: 24px;
+}
+form,
+aside section {
+  border-top: 1px solid #dee6e7;
+  margin-top: 20px;
+  padding-top: 18px;
+}
+aside label {
+  display: block;
+  font-size: 13px;
+  margin-bottom: 12px;
+}
+select,
+input[type="number"] {
+  width: 100%;
+  margin-top: 5px;
+  border: 1px solid #afc0c3;
+  border-radius: 4px;
+  padding: 8px;
+  color: inherit;
+}
+button,
+.upload,
+a {
+  font: inherit;
+  font-size: 14px;
+  cursor: pointer;
+  border: 0;
+  border-radius: 4px;
+  background: #086c66;
+  color: white;
+  padding: 9px 14px;
+  display: inline-block;
+  text-decoration: none;
+}
+.upload {
+  position: relative;
+  overflow: hidden;
+}
+.upload input {
+  position: absolute;
+  inset: 0;
+  opacity: 0;
+  cursor: pointer;
+  width: 100%;
+}
+.upload:focus-within {
+  outline: 2px solid #125991;
+}
+.secondary {
+  background: #546970;
+}
+button:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+p,
+pre {
+  font-size: 13px;
+  line-height: 1.55;
+}
+pre {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  color: #97391c;
+}
+@media (max-width: 760px) {
+  main {
+    grid-template-columns: 1fr;
+  }
+  .viewport {
+    height: 50vh;
+  }
+  aside {
+    border-top: 1px solid #cfdbdb;
+  }
+  .bar {
+    padding: 8px 16px;
+  }
+}
+.viewport .replay {
+  position: absolute;
+  z-index: 1;
+  bottom: 16px;
+  left: 16px;
+}

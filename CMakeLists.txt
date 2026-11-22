@@ -143,6 +143,17 @@ oap_enable_utf8(oap_manufacturing)
 oap_enable_core_guideline_warnings(oap_manufacturing)
 oap_group_sources(oap_manufacturing)
 
+option(OAP_BUILD_WORKER "Build the headless CAM worker" OFF)
+if(OAP_BUILD_WORKER)
+    add_executable(oap-worker ${OAP_WORKER_SOURCES})
+    qt_add_resources(oap-worker "worker_tools"
+        PREFIX "/tools" BASE "resources/tool-libraries"
+        FILES resources/tool-libraries/general-simulation.oaptl)
+    target_link_libraries(oap-worker PRIVATE Qt6::Core ${OAP_INTERNAL_DEPS_oap-worker})
+    oap_enable_utf8(oap-worker)
+    oap_enable_core_guideline_warnings(oap-worker)
+endif()
+
 if(OAP_BUILD_GUI)
 add_library(oap_app_view STATIC ${OAP_APP_VIEW_SOURCES})
 add_library(OAP::AppView ALIAS oap_app_view)

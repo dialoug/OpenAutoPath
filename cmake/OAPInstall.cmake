@@ -66,7 +66,29 @@ if(OAP_BUILD_GUI)
     endif()
 endif()
 
-foreach(component Runtime Development)
+set(oap_license_components Runtime Development)
+if(OAP_BUILD_WORKER)
+    list(APPEND oap_license_components ServerWorker)
+    install(TARGETS oap-worker RUNTIME_DEPENDENCY_SET oap_worker_runtime
+        RUNTIME DESTINATION bin COMPONENT ServerWorker)
+    if(WIN32)
+        set(worker_dll_dirs "${OAP_QT_BIN_DIR}" "${OAP_OCCT_RUNTIME_DIR}")
+        foreach(dll IN LISTS OAP_THIRDPARTY_DLLS OAP_VCOMP_RUNTIME_DLL)
+            get_filename_component(dll_dir "${dll}" DIRECTORY)
+            list(APPEND worker_dll_dirs "${dll_dir}")
+        endforeach()
+        install(RUNTIME_DEPENDENCY_SET oap_worker_runtime
+            DIRECTORIES ${worker_dll_dirs}
+            PRE_EXCLUDE_REGEXES "^(api|ext)-ms-"
+            POST_EXCLUDE_REGEXES "[/\\\\][Ss]ystem32[/\\\\]"
+            RUNTIME DESTINATION bin COMPONENT ServerWorker)
+        install(DIRECTORY "${PROJECT_SOURCE_DIR}/licenses/runtime/"
+            DESTINATION ${CMAKE_INSTALL_DATADIR}/licenses/OpenAutoPath/runtime
+            COMPONENT ServerWorker)
+    endif()
+endif()
+
+foreach(component IN LISTS oap_license_components)
     install(FILES "${PROJECT_SOURCE_DIR}/LICENSE"
         "${PROJECT_SOURCE_DIR}/THIRD_PARTY_NOTICES.md"
         "${PROJECT_SOURCE_DIR}/licenses/AnalysisSitus-BSD-3-Clause.txt"

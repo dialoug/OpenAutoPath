@@ -8,7 +8,10 @@
 include(${CMAKE_CURRENT_LIST_DIR}/OAPSources.cmake)
 set(OAP_FIRST_PARTY_TARGETS ${OAP_SOURCE_TARGETS})
 set(OAP_FIRST_PARTY_LIBRARY_TARGETS ${OAP_FIRST_PARTY_TARGETS})
-list(REMOVE_ITEM OAP_FIRST_PARTY_LIBRARY_TARGETS OpenAutoPathApp)
+list(REMOVE_ITEM OAP_FIRST_PARTY_LIBRARY_TARGETS OpenAutoPathApp oap-worker)
+set(OAP_INTERNAL_DEPS_oap-worker
+    oap_analysis oap_recognition oap_toollibrary oap_toolpath_adapter oap_toolpath_core
+    oap_toolpath_hole oap_toolpath_workflow oap_toolpath_program)
 
 set(OAP_INTERNAL_DEPS_oap_analysis)
 set(OAP_INTERNAL_DEPS_oap_recognition
