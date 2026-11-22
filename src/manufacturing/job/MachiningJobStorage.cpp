@@ -624,7 +624,7 @@ QJsonObject definitionToJson(const MachiningJobDefinition& value)
     QJsonArray pocketOperations;
     for (const PocketOperationDefinition& operation :
          value.pocketOperations) {
-        pocketOperations.append(QJsonObject{
+        QJsonObject entry{
             {QStringLiteral("id"), fromUtf8(operation.id)},
             {QStringLiteral("setup_id"), fromUtf8(operation.setupId)},
             {QStringLiteral("tool_controller_id"),
@@ -658,7 +658,10 @@ QJsonObject definitionToJson(const MachiningJobDefinition& value)
             {QStringLiteral("state"), static_cast<int>(operation.state)},
             {QStringLiteral("input_fingerprint"),
              fromUtf8(operation.inputFingerprint)},
-        });
+        };
+        if (operation.parameters)
+            entry.insert(QStringLiteral("parameters"), parametersToJson(*operation.parameters));
+        pocketOperations.append(entry);
     }
 
     QJsonArray profileOperations;
@@ -910,6 +913,8 @@ MachiningJobDefinition definitionFromJson(const QJsonObject& object)
     for (const QJsonValue& value : pocketOperations) {
         const QJsonObject item = value.toObject();
         PocketOperationDefinition operation;
+        if (item.contains(QStringLiteral("parameters")))
+            operation.parameters = parametersFromJson(item.value(QStringLiteral("parameters")));
         operation.id = toUtf8(item.value(QStringLiteral("id")));
         operation.setupId = toUtf8(item.value(QStringLiteral("setup_id")));
         operation.toolControllerId = toUtf8(
@@ -1164,6 +1169,15 @@ QString validateCurrentShape(const QJsonObject& job)
             return QStringLiteral("V4 recognized hole fields are incomplete");
         }
     }
+    for (const auto& value : job.value(QStringLiteral("pocket_operations")).toArray()) {
+        const auto params = value.toObject().value(QStringLiteral("parameters"));
+        if (params.isUndefined()) continue;
+        if (job.value(QStringLiteral("schema_version")).toInt() < 13)
+            return QStringLiteral("Independent pocket parameters require V13");
+        const auto normalized = parametersToJson(parametersFromJson(params));
+        if (!params.isObject() || normalized != params.toObject())
+            return QStringLiteral("Invalid pocket operation parameters");
+    }
     const QJsonValue operationsValue =
         job.value(QStringLiteral("hole_operations"));
     if (!operationsValue.isArray())
@@ -1345,10 +1359,15 @@ QByteArray MachiningJobStorage::serializeDefinition(
 {
     // 输出 {format, schema_version, job} 根结构，job 内嵌定义 JSON；
     // 定义指纹直接以此完整序列化结果为输入。
+    auto job = definitionToJson(definition);
+    const bool hasPocketOverrides = std::any_of(definition.pocketOperations.begin(), definition.pocketOperations.end(),
+        [](const PocketOperationDefinition& op) { return op.parameters.has_value(); });
+    const int fileVersion = hasPocketOverrides ? kMachiningJobSchemaVersion : 12;
+    job.insert(QStringLiteral("schema_version"), fileVersion);
     const QJsonObject root{
         {QStringLiteral("format"), QString::fromLatin1(kFormatId)},
-        {QStringLiteral("schema_version"), kMachiningJobSchemaVersion},
-        {QStringLiteral("job"), definitionToJson(definition)},
+        {QStringLiteral("schema_version"), fileVersion},
+        {QStringLiteral("job"), job},
     };
     return QJsonDocument(root).toJson(QJsonDocument::Indented);
 }
@@ -1377,7 +1396,7 @@ bool MachiningJobStorage::deserializeDefinition(
         if (error) *error = finishingShapeError;
         return false;
     }
-    if (sourceVersion == kMachiningJobSchemaVersion) {
+    if (sourceVersion >= 12) {
         const QString shapeError = validateCurrentShape(jobObject);
         if (!shapeError.isEmpty()) {
             if (error)

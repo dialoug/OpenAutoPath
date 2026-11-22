@@ -1,20 +1,26 @@
 import { useState } from "react";
 import { families, type Family, type Project, type Job } from "./workspace";
+import type { Cutter } from "./PlanningForm";
+import { MillingToolPicker } from "./MillingToolPicker";
 type Props = {
+  cutters: Cutter[];
   value: Project;
   change: (doc: Project) => void;
   generated: Job[];
   append: (id: string) => void;
-  rebuild: (id: string) => void;
+  rebuild: (id: string, tool?: string) => void;
 };
 export function ProjectEditor({
   value,
   change,
   generated,
+  cutters,
   append,
   rebuild,
 }: Props) {
   const [appendID, setAppendID] = useState("");
+  const [changing, setChanging] = useState("");
+  const [replacement, setReplacement] = useState("");
   const def = value.job;
   function edit(fn: (d: Project["job"]) => void) {
     const next = structuredClone(value);
@@ -108,6 +114,50 @@ export function ProjectEditor({
                 ?.tool.tool_name
             }
           </small>
+          {family === "pocket_operations" && (
+            <>
+              <p>
+                {[op.target?.root_face_id, op.target?.root_wire_id]
+                  .filter(Boolean)
+                  .join(" / ")}{" "}
+                ·{" "}
+                {
+                  ["偏置", "往复", "螺旋", "FreePath"][
+                    (op.parameters || def.pocket_parameters).clearing.pattern
+                  ]
+                }{" "}
+                · 层深{" "}
+                {(op.parameters || def.pocket_parameters).depth.step_down} mm
+              </p>
+              {changing === op.id ? (
+                <div>
+                  <MillingToolPicker
+                    cutters={cutters}
+                    label="替换刀具"
+                    value={replacement}
+                    select={setReplacement}
+                  />
+                  <button
+                    disabled={!op.enabled || !replacement}
+                    onClick={() => rebuild(op.id, replacement)}
+                  >
+                    换刀并重算此工序
+                  </button>
+                  <button onClick={() => setChanging("")}>取消换刀</button>
+                </div>
+              ) : (
+                <button
+                  disabled={!op.enabled}
+                  onClick={() => {
+                    setChanging(op.id);
+                    setReplacement("");
+                  }}
+                >
+                  更换刀具
+                </button>
+              )}
+            </>
+          )}
           <div className="docActions">
             <button disabled={!op.enabled} onClick={() => rebuild(op.id)}>
               重算并预览

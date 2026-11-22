@@ -185,6 +185,7 @@ void planFeature(MachiningJob &job, const QJsonObject &request, const Model &mod
         std::vector<PocketTargetReference> targets(planned.batch.operations.size(), target);
         PocketJobCaptureRequest capture{&planned.batch.operations, &targets, &planned.batch.effectiveParams,
                                         &frames, libraryId};
+        capture.append = true;
         if (!PocketMachiningJobService().capture(job, capture, &error))
             throw std::runtime_error(error);
         return;

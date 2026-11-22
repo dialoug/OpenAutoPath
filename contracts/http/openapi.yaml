@@ -152,7 +152,7 @@ paths:
     parameters:
       - {$ref: '#/components/parameters/id'}
     post:
-      summary: Rebuild one enabled operation and export reference NC
+      summary: Rebuild one enabled operation, optionally replacing its pocket cutter, and export reference NC
       requestBody:
         required: true
         content:
@@ -164,6 +164,8 @@ paths:
               properties:
                 document: {type: object}
                 operation: {type: string}
+                tool: {type: string, description: Optional replacement milling cutter for this pocket operation}
+                libraryId: {type: string, description: Saved version supplying the replacement cutter}
       responses:
         '202': {$ref: '#/components/responses/Accepted'}
         '400': {description: Invalid request}

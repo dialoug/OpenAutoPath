@@ -15,6 +15,7 @@
 
 #include <QCryptographicHash>
 #include <QDateTime>
+#include <QUuid>
 
 #include "manufacturing/job/MachiningJobStorage.h"
 #include "toolpath/pocket/geometry/PocketRegionBuilder.h"
@@ -424,9 +425,12 @@ bool PocketMachiningJobService::capture(
     // 捕获策略:在 Job 定义的副本上工作,先清空旧槽腔工序与参数,再按预览
     // 批次逐条创建定义;全部成功后才原子替换正式定义,避免半更新状态。
     MachiningJobDefinition candidate = job.definition();
-    clearOldPocketOperations(candidate);
+    if (!request.append)
+        clearOldPocketOperations(candidate);
+    const auto firstNew = candidate.pocketOperations.size();
     candidate.schemaVersion = kMachiningJobSchemaVersion;
-    candidate.pocketParameters = *request.parameters;
+    if (firstNew == 0)
+        candidate.pocketParameters = *request.parameters;
     candidate.modifiedAt =
         QDateTime::currentDateTimeUtc()
             .toString(Qt::ISODateWithMs).toStdString();
@@ -443,6 +447,12 @@ bool PocketMachiningJobService::capture(
          candidate.profileOperations) {
         nextSequence =
             std::max(nextSequence, operation.sequence + 1);
+    }
+    if (request.append) {
+        for (const auto& op : candidate.pocketOperations)
+            nextSequence = std::max(nextSequence, op.sequence + 1);
+        for (const auto& op : candidate.finishingOperations)
+            nextSequence = std::max(nextSequence, op.sequence + 1);
     }
     const std::string parameterHash =
         parametersFingerprint(*request.parameters);
@@ -464,7 +474,8 @@ bool PocketMachiningJobService::capture(
         const toolpath::ToolpathToolContext operationTool = generated.tool;
         const std::string toolHash =
             toolFingerprint(operationTool);
-        const std::string controllerId =
+        const auto uniqueId = request.append ? QUuid::createUuid().toString(QUuid::WithoutBraces).toStdString() : std::string{};
+        const std::string controllerId = request.append ? "tool-controller-pocket-" + uniqueId :
             "tool-controller-pocket-" +
             toolHash.substr(0, 12) + (request.toolLibraryId && request.toolLibraryId->empty() ? "-direct" : "");
         const bool controllerExists = std::any_of(
@@ -523,6 +534,10 @@ bool PocketMachiningJobService::capture(
             operation.target.geometryFingerprint.substr(0, 12) +
             "-t" + std::to_string(operationTool.toolNumber) +
             "-s" + std::to_string(nextSequence);
+        if (request.append) {
+            operation.id = "pocket-operation-" + uniqueId;
+            operation.parameters = *request.parameters;
+        }
         operation.sequence = nextSequence++;
         operation.state = JobOperationState::Generated;
         operation.inputFingerprint = operationFingerprint(
@@ -532,22 +547,24 @@ bool PocketMachiningJobService::capture(
         candidate.pocketOperations.push_back(
             std::move(operation));
     }
-    std::stable_sort(
-        candidate.profileOperations.begin(),
-        candidate.profileOperations.end(),
-        [](const ProfileOperationDefinition& left,
-           const ProfileOperationDefinition& right) {
-            return left.sequence < right.sequence;
-        });
-    for (ProfileOperationDefinition& operation :
-         candidate.profileOperations) {
-        operation.sequence = nextSequence++;
+    if (!request.append) {
+        std::stable_sort(
+            candidate.profileOperations.begin(),
+            candidate.profileOperations.end(),
+            [](const ProfileOperationDefinition& left,
+               const ProfileOperationDefinition& right) {
+                return left.sequence < right.sequence;
+            });
+        for (ProfileOperationDefinition& operation :
+             candidate.profileOperations) {
+            operation.sequence = nextSequence++;
+        }
+        // 回收不再被任何工序(含孔)引用的 Setup 与 ToolController。
+        std::stable_sort(candidate.finishingOperations.begin(), candidate.finishingOperations.end(),
+            [](const auto& a, const auto& b) { return a.sequence < b.sequence; });
+        for (auto& operation : candidate.finishingOperations) operation.sequence = nextSequence++;
+        discardUnreferencedResources(candidate);
     }
-    // 回收不再被任何工序(含孔)引用的 Setup 与 ToolController。
-    std::stable_sort(candidate.finishingOperations.begin(), candidate.finishingOperations.end(),
-        [](const auto& a, const auto& b) { return a.sequence < b.sequence; });
-    for (auto& operation : candidate.finishingOperations) operation.sequence = nextSequence++;
-    discardUnreferencedResources(candidate);
 
     toolpath::PocketToolpathBatch batch;
     batch.effectiveParams = *request.parameters;
@@ -565,8 +582,8 @@ bool PocketMachiningJobService::capture(
         toolpath::PocketToolpathValidator().validate(
             batch.operations, batch.effectiveParams);
     const JobOperationState state = generatedState(batch);
-    for (PocketOperationDefinition& operation :
-         candidate.pocketOperations) {
+    for (std::size_t i = firstNew; i < candidate.pocketOperations.size(); ++i) {
+        auto& operation = candidate.pocketOperations[i];
         const auto setup = std::find_if(
             candidate.setups.begin(), candidate.setups.end(),
             [&operation](const SetupDefinition& item) {
@@ -593,6 +610,10 @@ bool PocketMachiningJobService::capture(
     }
 
     job.definition() = std::move(candidate);
+    if (firstNew > 0) {
+        job.clearPocketResult(); // The new preview covers only the appended operations.
+        return true;
+    }
     job.setPocketResult(
         std::move(batch),
         MachiningJobStorage::pocketExecutionFingerprint(
@@ -627,8 +648,8 @@ PocketMachiningJobService::regenerate(
             return left->sequence < right->sequence;
         });
     result.regionOutcomes.resize(operations.size());
-    const std::string parameterHash = parametersFingerprint(
-        job.definition().pocketParameters);
+    const auto& defaults = job.definition().pocketParameters;
+    const std::string defaultParameterHash = parametersFingerprint(defaults);
     if (control)
         control->progress(0, operations.size());
 
@@ -690,10 +711,11 @@ PocketMachiningJobService::regenerate(
             continue;
         }
 
-        toolpath::ToolpathParams operationParams =
-            paramsForTool(
-                job.definition().pocketParameters,
-                controller->tool);
+        const auto& parameters = definition.parameters ? *definition.parameters : defaults;
+        const auto parameterHash = definition.parameters ? parametersFingerprint(parameters) : defaultParameterHash;
+        toolpath::ToolpathParams operationParams = paramsForTool(parameters, controller->tool);
+        if (operations.size() == 1)
+            result.effectiveParams = operationParams;
         operationParams.clearing
             .restMachiningPreviousToolDiameter =
             definition.restMachiningPreviousToolDiameter;
@@ -788,7 +810,7 @@ PocketMachiningJobService::regenerate(
         if (smallestTool != result.operations.end() &&
             smallestTool->tool.valid) {
             result.effectiveParams = paramsForTool(
-                job.definition().pocketParameters,
+                result.effectiveParams,
                 smallestTool->tool);
         }
     }

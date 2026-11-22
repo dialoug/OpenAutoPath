@@ -28,6 +28,7 @@ struct PocketJobCaptureRequest {
     const toolpath::ToolpathParams* parameters = nullptr;
     const toolpath::MoldSetupWorkFrames* setupFrames = nullptr;
     std::optional<std::string> toolLibraryId;
+    bool append = false;  // Preserve existing operations and their machining parameters.
 };
 
 // 槽腔工序的服务层：capture() 把预览结果固化到 Job 定义（仅替换槽腔工序），

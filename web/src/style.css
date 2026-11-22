@@ -241,3 +241,13 @@ header nav {
 header nav button {
   font-size: 13px;
 }
+
+.regionPlanner {
+  width: 100%;
+}
+.regionPlanner .viewport,
+.docPanel [aria-label="刀具尺寸预览"] .viewport {
+  height: 230px;
+  min-height: 180px;
+  margin: 8px 0;
+}

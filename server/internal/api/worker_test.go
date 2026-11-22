@@ -230,6 +230,89 @@ func TestNativeCAMWorkflow(t *testing.T) {
 	if millingTool == "" {
 		t.Fatal("missing end mill")
 	}
+	// Exercise two physical pockets in the same saved project.
+	{
+		type pocket struct {
+			ID         string
+			Sequence   int
+			Controller string `json:"tool_controller_id"`
+			Target     struct {
+				Wire string `json:"root_wire_id"`
+			}
+			Parameters struct {
+				Depth struct {
+					Step float64 `json:"step_down"`
+				}
+				Clearing struct{ Pattern int }
+			}
+		}
+		type controller struct {
+			ID   string
+			Tool struct {
+				ID string `json:"tool_id"`
+			}
+		}
+		read := func(j jobs.Job) ([]pocket, map[string]string) {
+			var doc struct {
+				Job struct {
+					Pockets     []pocket     `json:"pocket_operations"`
+					Controllers []controller `json:"tool_controllers"`
+				}
+			}
+			if err := json.Unmarshal(readProject(j), &doc); err != nil {
+				t.Fatal(err)
+			}
+			ids := map[string]string{}
+			for _, c := range doc.Job.Controllers {
+				ids[c.ID] = c.Tool.ID
+			}
+			return doc.Job.Pockets, ids
+		}
+		var pockets []string
+		for _, f := range result.Features {
+			if f.Kind == "pocket" {
+				pockets = append(pockets, f.ID)
+			}
+		}
+		if len(pockets) < 2 {
+			t.Fatal("need two distinct pockets")
+		}
+		plan := func(j jobs.Job, feature, tool, strategy string, step float64) jobs.Job {
+			return wait(call("POST", projectURL+"/plan", docRequest(readProject(j), map[string]any{"feature": feature, "tool": tool, "step": step, "strategy": strategy}), 202), "done")
+		}
+		calc := func(j jobs.Job, id, tool string) jobs.Job {
+			return wait(call("POST", projectURL+"/rebuild", docRequest(readProject(j), map[string]any{"operation": id, "tool": tool}), 202), "done")
+		}
+		ncFor := func(j jobs.Job) []byte { return call("GET", "/api/jobs/"+j.ID+"/files/reference.nc", nil, 200) }
+		one := plan(blank, pockets[0], millingTool, "offset", 2)
+		ops, _ := read(one)
+		if len(ops) != 1 {
+			t.Fatal("first pocket missing")
+		}
+		first := ops[0]
+		firstBefore := calc(one, first.ID, "")
+		pathFor := func(j jobs.Job) []byte { return call("GET", "/api/jobs/"+j.ID+"/files/path.json", nil, 200) }
+		two := plan(one, pockets[1], "sim-v1-end_mill-d4", "zigzag", 1)
+		ops, tools := read(two)
+		if len(ops) != 2 || first.Parameters.Depth.Step != 2 || first.Parameters.Clearing.Pattern != 0 || ops[1].Parameters.Clearing.Pattern != 1 || ops[0] != first || ops[1].Target.Wire == first.Target.Wire || ops[1].Parameters.Depth.Step != 1 || tools[ops[1].Controller] != "sim-v1-end_mill-d4" {
+			t.Fatalf("unexpected pocket pair: %+v", ops)
+		}
+		before := calc(two, ops[1].ID, "")
+		switched := calc(two, ops[1].ID, "sim-v1-end_mill-d3")
+		after, tools := read(switched)
+		if len(after) != 2 || after[0] != first || after[1].ID != ops[1].ID || after[1].Parameters != ops[1].Parameters || tools[after[1].Controller] != "sim-v1-end_mill-d3" {
+			t.Fatal("switching cutter changed unrelated inputs")
+		}
+		firstAfter := calc(switched, first.ID, "")
+		if bytes.Equal(pathFor(before), pathFor(switched)) || !bytes.Equal(pathFor(firstBefore), pathFor(firstAfter)) || bytes.Equal(ncFor(before), ncFor(switched)) || !bytes.Equal(ncFor(firstBefore), ncFor(firstAfter)) {
+			t.Fatal("unexpected NC after changing the second cutter")
+		}
+		stockJob := wait(call("POST", projectURL+"/simulate", docRequest(readProject(switched), nil), 202), "done")
+		if json.Unmarshal(call("GET", "/api/jobs/"+stockJob.ID+"/files/result.json", nil, 200), &stock) != nil || stock.Operations != 2 || stock.Volume <= 0 {
+			t.Fatal("dual pocket simulation incomplete")
+		}
+		wait(call("POST", projectURL+"/rebuild", docRequest(readProject(switched), map[string]any{"operation": after[1].ID, "tool": toolID}), 202), "failed")
+	}
 	plannedKinds := map[string]bool{}
 	for _, feature := range result.Features {
 		if plannedKinds[feature.Kind] {

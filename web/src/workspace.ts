@@ -13,6 +13,8 @@ export type Bit = {
   id: string;
   name: string;
   type: string;
+  note?: string;
+  through_coolant?: boolean;
   geometry: {
     diameter: number;
     cutting_edge_length: number;
@@ -27,9 +29,14 @@ export type Bit = {
 export type Slot = {
   tool_number: number;
   tool_id: string;
+  coolant?: string;
   cutting: {
     vertical_feed: number;
     horizontal_feed: number;
+    horizontal_rapid?: number;
+    vertical_rapid?: number;
+    peck_depth?: number;
+    drill_cycle?: string;
     spindle_speed: number;
   };
 };
@@ -44,7 +51,13 @@ export type Library = {
     controllers: Slot[];
   };
 };
+type PocketSettings = {
+  depth: { step_down: number };
+  clearing: { pattern: number };
+};
 export type Op = {
+  target?: { root_face_id?: string; root_wire_id?: string };
+  parameters?: PocketSettings;
   id: string;
   enabled: boolean;
   sequence: number;
@@ -62,6 +75,7 @@ export const families = {
 export type Family = keyof typeof families;
 export type Definition = Record<Family, Op[]> & {
   name: string;
+  pocket_parameters: PocketSettings;
   part: { source_path: string };
   stock: {
     source_kind: number;

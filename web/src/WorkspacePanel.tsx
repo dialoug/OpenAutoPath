@@ -8,6 +8,7 @@ import {
   type Project,
   type Library,
 } from "./workspace";
+import type { Face } from "./Viewport";
 import { LibraryEditor } from "./LibraryEditor";
 import { ProjectEditor } from "./ProjectEditor";
 import { PlanningForm, type CamFeature, type Cutter } from "./PlanningForm";
@@ -17,6 +18,7 @@ type Props = {
   model: string;
   library: string;
   features: CamFeature[];
+  faces: Face[];
   cutters: Cutter[];
   close: () => void;
   activate: (id: string) => void;
@@ -27,6 +29,7 @@ export function WorkspacePanel({
   model,
   library,
   features,
+  faces,
   cutters,
   close,
   activate,
@@ -188,18 +191,28 @@ export function WorkspacePanel({
           {doc && (
             <>
               {isLib ? (
-                <LibraryEditor value={doc as Library} change={edit} />
+                <LibraryEditor
+                  value={doc as Library}
+                  change={edit}
+                  versions={saved.filter((j) => j.id !== version)}
+                />
               ) : (
                 <ProjectEditor
                   value={doc as Project}
                   change={edit}
+                  cutters={cutters}
                   generated={generated}
                   append={(id) => void work(() => save(doc, id))}
-                  rebuild={(operation) =>
+                  rebuild={(operation, tool) =>
                     void work(async () => {
                       const j = await submit(
                         url + "/rebuild",
-                        { document: doc, operation },
+                        {
+                          document: doc,
+                          operation,
+                          tool,
+                          libraryId: tool ? library : undefined,
+                        },
                         life.current.signal,
                         setPending,
                       );
@@ -214,6 +227,7 @@ export function WorkspacePanel({
                 {!isLib && (
                   <PlanningForm
                     features={features}
+                    faces={faces}
                     cutters={cutters}
                     plan={(options) =>
                       void work(async () => {

@@ -511,6 +511,7 @@ function App() {
           mode={panel}
           model={model}
           features={features}
+          faces={faces}
           cutters={library ? libraryTools : tools}
           library={library}
           close={() => setPanel(null)}

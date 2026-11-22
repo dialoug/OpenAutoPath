@@ -1,4 +1,6 @@
 import { useState } from "react";
+import { Viewport, type Face } from "./Viewport";
+import { MillingToolPicker } from "./MillingToolPicker";
 export type CamFeature = {
   id: string;
   kind: "pocket" | "profile" | "engrave";
@@ -38,28 +40,74 @@ const patterns = {
 export function PlanningForm({
   features,
   cutters,
+  faces,
   plan,
 }: {
   features: CamFeature[];
+  faces: Face[];
   cutters: Cutter[];
   plan: (o: PlanOptions) => void;
 }) {
+  const [expanded, setExpanded] = useState(false);
+  const [picked, setPicked] = useState("");
   const [id, setId] = useState("");
   const [strategy, setStrategy] = useState("");
   const [tool, setTool] = useState("");
   const [step, setStep] = useState(1);
   const chosen = features.find((f) => f.id === id);
-  const mills = cutters.filter((c) =>
-    ["end_mill", "ball_end_mill", "bull_nose"].includes(c.type),
-  );
+
+  const candidates = picked
+    ? features.filter((f) => f.faces.includes(picked))
+    : [];
   return (
-    <details>
+    <details
+      className="regionPlanner"
+      onToggle={(e) => setExpanded(e.currentTarget.open)}
+    >
       <summary>规划槽腔、外轮廓或雕刻工序</summary>
+      {expanded && faces.length > 0 && (
+        <>
+          <Viewport
+            faces={faces}
+            highlighted={chosen?.faces || []}
+            path={[]}
+            onPick={(face) => {
+              setPicked(face);
+              const matches = features.filter((f) => f.faces.includes(face));
+              if (matches.length === 1) {
+                setId(matches[0].id);
+                setStrategy("");
+              } else {
+                setId("");
+                setStrategy("");
+              }
+            }}
+          />
+          {picked && (
+            <div>
+              所选面 {picked} · {candidates.length} 个加工区域
+              {candidates.length > 1 &&
+                candidates.map((f) => (
+                  <button
+                    key={f.id}
+                    onClick={() => {
+                      setId(f.id);
+                      setStrategy("");
+                    }}
+                  >
+                    {names[f.kind]} · {f.id}
+                  </button>
+                ))}
+            </div>
+          )}
+        </>
+      )}
       <label>
         加工区域
         <select
           value={id}
           onChange={(e) => {
+            setPicked("");
             setId(e.target.value);
             setStrategy("");
           }}
@@ -87,17 +135,12 @@ export function PlanningForm({
               ))}
             </select>
           </label>
-          <label>
-            规划刀具
-            <select value={tool} onChange={(e) => setTool(e.target.value)}>
-              <option value="">选择铣刀</option>
-              {mills.map((c) => (
-                <option value={c.id} key={c.id}>
-                  {c.name}
-                </option>
-              ))}
-            </select>
-          </label>
+          <MillingToolPicker
+            label="规划刀具"
+            cutters={cutters}
+            value={tool}
+            select={setTool}
+          />
           <label>
             {chosen.kind === "engrave" ? "扫描行距" : "每层切深"} (mm)
             <input
@@ -121,7 +164,9 @@ export function PlanningForm({
           >
             {chosen.kind === "engrave"
               ? "追加雕刻工序"
-              : "更新项目的" + names[chosen.kind] + "工序"}
+              : chosen.kind === "pocket"
+                ? "追加槽腔工序"
+                : "更新项目的外轮廓工序"}
             并保存新版本
           </button>
         </>

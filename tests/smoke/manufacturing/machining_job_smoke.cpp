@@ -777,7 +777,7 @@ bool jobStorageMigratesAndSavesAtomically()
     const QByteArray v4 =
         manufacturing::MachiningJobStorage::serializeDefinition(migrated);
     const QJsonObject currentRoot = QJsonDocument::fromJson(v4).object();
-    if (!expect(currentRoot.value(QStringLiteral("schema_version")).toInt() == manufacturing::kMachiningJobSchemaVersion &&
+    if (!expect(currentRoot.value(QStringLiteral("schema_version")).toInt() == 12 &&
                     !currentRoot.value(QStringLiteral("job")).toObject()
                          .contains(QStringLiteral("surface_operations")),
                 "current schema must omit removed legacy surface operations")) {

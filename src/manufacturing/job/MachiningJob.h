@@ -4,6 +4,7 @@
 
 #include <cstdint>
 #include <memory>
+#include <optional>
 #include <string>
 #include <utility>
 #include <vector>
@@ -30,7 +31,8 @@ inline constexpr int kMinimumSupportedMachiningJobSchemaVersion = 1;
 // V10 introduces OpenCAMLib finishing with a new schema, distinct from removed legacy surfaces.
 // V12 preserves layered engraving inputs; older executables must not silently
 // regenerate a stock-removal operation as finish-only.
-inline constexpr int kMachiningJobSchemaVersion = 12;
+// V13 persists independent pocket parameters. Earlier readers must reject these jobs.
+inline constexpr int kMachiningJobSchemaVersion = 13;
 
 // 与 OCCT gp_Pnt/gp_Dir 互转的稳定 XYZ 表示，用于 JSON 持久化与指纹计算。
 struct JobVector3 {
@@ -204,6 +206,7 @@ struct PocketOperationDefinition {
     std::string algorithmId;
     double restMachiningPreviousToolDiameter = 0.0;
     PocketTargetReference target;
+    std::optional<toolpath::ToolpathParams> parameters;
     bool enabled = true;
     // sequence 与孔工序共享同一个全局序号空间。
     int sequence = 0;
