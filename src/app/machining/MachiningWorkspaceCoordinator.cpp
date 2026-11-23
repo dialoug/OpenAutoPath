@@ -420,6 +420,43 @@ bool MachiningWorkspaceCoordinator::saveProject(
         filePath, m_session.job().definition(), error);
 }
 
+std::optional<manufacturing::MachiningJob> MachiningWorkspaceCoordinator::projectVersion(
+    const MachiningProjectSaveRequest& request, QString* error) const
+{
+    auto draft = m_session.job();
+    if (!MachiningProjectController::ensureDefinition(draft, request.definition, error))
+        return std::nullopt;
+    auto& definition = draft.definition();
+    const auto markDirty = [](auto& operations) {
+        for (auto& operation : operations) {
+            if (operation.enabled)
+                operation.state = manufacturing::JobOperationState::Dirty;
+        }
+    };
+    if (definition.holeOperations.empty() || m_session.toolpathNeedsRegeneration(ActiveToolpathPreview::Hole)) {
+        definition.holeParameters = m_configuration.holeParams();
+        draft.clearHoleResult();
+        markDirty(definition.holeOperations);
+    }
+    if (definition.pocketOperations.empty() || m_session.toolpathNeedsRegeneration(ActiveToolpathPreview::Pocket)) {
+        definition.pocketParameters = m_configuration.pocketParams();
+        draft.clearPocketResult();
+        markDirty(definition.pocketOperations);
+    }
+    if (definition.profileOperations.empty() || m_session.toolpathNeedsRegeneration(ActiveToolpathPreview::Profile)) {
+        definition.profileParameters = m_configuration.profileParams();
+        draft.clearProfileResult();
+        markDirty(definition.profileOperations);
+    }
+    if (m_session.toolpathNeedsRegeneration(ActiveToolpathPreview::SurfaceFinishing)) {
+        draft.clearFinishingResult();
+        markDirty(definition.finishingOperations);
+    }
+    if (!MachiningProjectController::synchronizeForSave(draft, request, error))
+        return std::nullopt;
+    return draft;
+}
+
 MachiningWorkspaceStatus
 MachiningWorkspaceCoordinator::status() const noexcept
 {
@@ -715,15 +752,11 @@ ToolLibraryApplyResult MachiningWorkspaceCoordinator::applyToolLibraryChange(
             if (library.id() == id) return tooling::ToolLibraryStorage::serializeLibrary(library);
         return QByteArray{};
     };
-    const auto activeBefore = snapshot({});
     const auto engravingBefore = snapshot(m_configuration.engravingSettings().libraryId);
     auto result = apply();
     if (!result.ok) return result;
-    if (activeBefore != snapshot({})) {
-        if (m_configuration.holeToolSelectionMode() == ToolSelectionMode::AutomaticLibrary) markHoleRegenerationRequired();
-        if (m_configuration.pocketToolSelectionMode() == ToolSelectionMode::AutomaticLibrary) markPocketRegenerationRequired();
-        if (m_configuration.profileToolSelectionMode() == ToolSelectionMode::AutomaticLibrary) markProfileRegenerationRequired();
-    }
+    // Formal hole, pocket, and profile operations own their tool snapshots.
+    // The active catalog supplies candidates when planning or explicitly replacing a tool.
     if (m_configuration.engravingSettings().toolMode == EngravingToolMode::AutomaticLibrary &&
         engravingBefore != snapshot(m_configuration.engravingSettings().libraryId))
         markEngravingRegenerationRequired();

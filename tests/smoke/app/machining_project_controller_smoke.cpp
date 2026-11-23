@@ -339,6 +339,56 @@ bool migratesCombinedPocketProfileSettings()
         "schema 2 profile values should seed the independent profile page");
 }
 
+bool operationEditsInvalidateOnlyAffectedFamilies()
+{
+    using namespace oap::manufacturing;
+    using Controller = oap::app::MachiningProjectController;
+    MachiningJob job;
+    auto& definition = job.definition();
+    HoleOperationDefinition hole;
+    hole.id = "hole";
+    hole.sequence = 2;
+    hole.state = JobOperationState::Generated;
+    definition.holeOperations.push_back(hole);
+    PocketOperationDefinition pocket;
+    pocket.id = "pocket";
+    pocket.sequence = 4;
+    pocket.state = JobOperationState::Generated;
+    definition.pocketOperations.push_back(pocket);
+    ProfileOperationDefinition profile;
+    profile.id = "profile";
+    profile.sequence = 9;
+    profile.state = JobOperationState::Generated;
+    definition.profileOperations.push_back(profile);
+    oap::toolpath::PocketToolpathBatch pockets;
+    pockets.operations.emplace_back();
+    oap::toolpath::ProfileToolpathBatch profiles;
+    profiles.operations.emplace_back();
+    job.setPocketResult(std::move(pockets), "pocket");
+    job.setProfileResult(std::move(profiles), "profile");
+
+    auto rows = MachiningOperationService::operations(definition);
+    std::swap(rows[0], rows[1]);
+    rows[0].enabled = false;
+    auto duplicate = rows;
+    duplicate[2].id = duplicate[0].id;
+    QString error;
+    if (!expect(!Controller::applyOperationOrder(job, duplicate, &error) &&
+                !error.isEmpty() && job.pocketResult() && definition.pocketOperations.front().enabled,
+                "reject a duplicate operation without altering the project"))
+        return false;
+    if (!expect(Controller::applyOperationOrder(job, rows, &error),
+                "accept a complete project operation edit"))
+        return false;
+    const auto saved = MachiningOperationService::operations(definition);
+    return expect(saved[0].id == "pocket" && saved[0].sequence == 2 && !saved[0].enabled &&
+                  saved[0].state == JobOperationState::Dirty && !job.pocketResult() &&
+                  saved[1].id == "hole" && saved[1].sequence == 4 && saved[1].state == JobOperationState::Dirty &&
+                  saved[2].id == "profile" && saved[2].sequence == 9 &&
+                  saved[2].state == JobOperationState::Generated && job.profileResult(),
+                  "reorder and disable globally while retaining unrelated runtime");
+}
+
 bool ownsConfigurationAndProjectPolicies()
 {
     QTemporaryDir temporary;
@@ -404,12 +454,34 @@ bool ownsConfigurationAndProjectPolicies()
     }
 
     const QString projectPath = temporary.filePath("part.oapjob");
-    if (!expect(
-            oap::manufacturing::MachiningJobStorage::save(
-                projectPath, job.definition(), &error),
-            "project definition should be saveable")) {
+    job.definition().pocketParameters.depth.stepDown = 1.25;
+    using Storage = oap::manufacturing::MachiningJobStorage;
+    if (!expect(Storage::saveNewVersion(projectPath, job.definition(), &error),
+                "project version should be saved as a new file")) {
+        std::cerr << error.toStdString() << '\n';
         return false;
     }
+    job.definition().pocketParameters.depth.stepDown = 3.5;
+    if (!expect(!Storage::saveNewVersion(projectPath, job.definition(), &error) && !error.isEmpty(),
+                "saving a version over an existing file should fail"))
+        return false;
+    oap::Model model;
+    model.faces.emplace_back();
+    oap::StepIndexer indexer;
+    oap::toolpath::MoldSetupWorkFrames frames;
+    oap::app::MachiningProjectLoadRequest draft;
+    draft.filePath = projectPath;
+    draft.currentSourcePath = sourcePath;
+    draft.model = &model;
+    draft.indexer = &indexer;
+    draft.setupFrames = &frames;
+    draft.definitionsOnly = true;
+    const auto loaded = oap::app::MachiningProjectController::loadAndRegenerate(draft);
+    if (!expect(loaded.ok() && loaded.definitionsOnly &&
+                loaded.job.definition().pocketParameters.depth.stepDown == 1.25 &&
+                !loaded.job.holeResult() && !loaded.job.pocketResult() && !loaded.job.profileResult(),
+                "opening an unplanned version should restore its original settings without computation"))
+        return false;
     oap::app::MachiningProjectLoadRequest missingPart;
     missingPart.filePath = projectPath;
     const auto missingPartResult =
@@ -425,16 +497,7 @@ bool ownsConfigurationAndProjectPolicies()
                 "temporary source should be replaceable")) {
         return false;
     }
-    oap::Model model;
-    model.faces.emplace_back();
-    oap::StepIndexer indexer;
-    oap::toolpath::MoldSetupWorkFrames frames;
-    oap::app::MachiningProjectLoadRequest mismatch;
-    mismatch.filePath = projectPath;
-    mismatch.currentSourcePath = sourcePath;
-    mismatch.model = &model;
-    mismatch.indexer = &indexer;
-    mismatch.setupFrames = &frames;
+    const auto& mismatch = draft;
     const auto mismatchResult =
         oap::app::MachiningProjectController::loadAndRegenerate(mismatch);
     return expect(
@@ -456,6 +519,7 @@ int main()
         !directToolSettingsAreCompleteAndAtomic() ||
         !directToolChangesInvalidateOnlyTheirFamily() ||
         !migratesCombinedPocketProfileSettings() ||
+        !operationEditsInvalidateOnlyAffectedFamilies() ||
         !ownsConfigurationAndProjectPolicies())
         return 1;
     std::cout << "machining project controller smoke tests passed\n";

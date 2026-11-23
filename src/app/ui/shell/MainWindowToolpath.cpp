@@ -18,6 +18,9 @@
 #include "app/workflows/shared/ToolpathExportController.h"
 #include "app/playback/PlaybackWorkspaceCoordinator.h"
 #include "app/dialogs/ToolpathParameterDialog.h"
+#include "manufacturing/job/MachiningJobStorage.h"
+#include "manufacturing/pocket/PocketMachiningJobService.h"
+#include "tooling/adapter/AssignedToolContext.h"
 #include "toolpath/pocket/planning/PocketClearing.h"
 #include "toolpath/pocket/program/PocketToolpathExport.h"
 #include "toolpath/program/validation/ToolpathProgramValidator.h"
@@ -32,17 +35,25 @@
 
 #include <QAction>
 #include <QCoreApplication>
+#include <QDateTime>
+#include <QDialog>
+#include <QDialogButtonBox>
 #include <QDir>
 #include <QElapsedTimer>
 #include <QFile>
 #include <QFileDialog>
 #include <QFileInfo>
+#include <QHeaderView>
+#include <QHBoxLayout>
 #include <QInputDialog>
 #include <QMessageBox>
 #include <QSaveFile>
 #include <QSignalBlocker>
 #include <QStatusBar>
 #include <QStringList>
+#include <QPushButton>
+#include <QTreeWidget>
+#include <QVBoxLayout>
 
 namespace {
 constexpr int kPocketPreviewCutMoveBudget = 50000;
@@ -421,12 +432,9 @@ void MainWindow::openToolLibrary()
     if (!selectedLibrary)
         return;
     statusBar()->showMessage(
-        QCoreApplication::translate("OpenAutoPath", "刀库目录已保存；活动刀库保持为“%1”（%2 把已分配 T 刀具）。%3")
+        QCoreApplication::translate("OpenAutoPath", "刀库目录已保存。活动刀库为“%1”（%2 把已分配 T 刀具）。")
             .arg(selectedLibrary->name())
-            .arg(selectedLibrary->assignedTools().size())
-            .arg(m_machiningWorkspace->hasPendingRegeneration()
-                ? QCoreApplication::translate("OpenAutoPath", "依赖变更刀库的工序已标记为待重新生成。")
-                : QString()));
+            .arg(selectedLibrary->assignedTools().size()));
     refreshCamWorkflowPanel();
 }
 
@@ -458,12 +466,9 @@ void MainWindow::selectToolLibrary()
     if (!selectedLibrary)
         return;
     statusBar()->showMessage(
-        QCoreApplication::translate("OpenAutoPath", "已选择 CAM 活动刀库“%1”：%2 把已分配 T 刀具。%3")
+        QCoreApplication::translate("OpenAutoPath", "已选择活动刀库“%1”（%2 把已分配 T 刀具）。后续自动选刀将使用该刀库。")
             .arg(selectedLibrary->name())
-            .arg(selectedLibrary->assignedTools().size())
-            .arg(m_machiningWorkspace->hasPendingRegeneration()
-                ? QCoreApplication::translate("OpenAutoPath", "依赖变更刀库的工序已标记为待重新生成。")
-                : QCoreApplication::translate("OpenAutoPath", "后续自动选刀将使用该刀库。")));
+            .arg(selectedLibrary->assignedTools().size()));
     refreshCamWorkflowPanel();
 }
 
@@ -997,9 +1002,254 @@ void MainWindow::saveMachiningJob()
     refreshCamWorkflowPanel();
 }
 
+void MainWindow::saveMachiningJobVersion()
+{
+    if (m_uiBusy)
+        return;
+    const auto title = QCoreApplication::translate("OpenAutoPath", "保存项目版本");
+    if (currentPath().isEmpty()) {
+        QMessageBox::information(this, title, QCoreApplication::translate("OpenAutoPath", "请先打开 STEP 文件。"));
+        return;
+    }
+
+    QString error;
+    const auto draft = m_machiningWorkspace->projectVersion(
+        {machiningProjectDefinitionContext(), &moldSetupWorkFrames()}, &error);
+    if (!draft) {
+        QMessageBox::warning(this, title, error);
+        return;
+    }
+    const QFileInfo source(m_currentMachiningJobPath.isEmpty() ? currentPath() : m_currentMachiningJobPath);
+    // Use the STEP name as the stem so repeatedly saving a version cannot grow the name.
+    const QString suggested = source.dir().filePath(QFileInfo(currentPath()).completeBaseName() +
+        QLatin1Char('-') + QDateTime::currentDateTime().toString(QStringLiteral("yyyyMMdd-HHmmss-zzz")) +
+        QStringLiteral(".oapjob"));
+    QString path = QFileDialog::getSaveFileName(this, title, suggested,
+        QCoreApplication::translate("OpenAutoPath", "OpenAutoPath 加工项目 (*.oapjob)"),
+        nullptr, QFileDialog::DontConfirmOverwrite);
+    if (path.isEmpty())
+        return;
+    if (QFileInfo(path).suffix().isEmpty())
+        path += QStringLiteral(".oapjob");
+    if (QFileInfo::exists(path)) {
+        QMessageBox::information(this, title, QCoreApplication::translate("OpenAutoPath", "此版本已存在，请使用新的文件名。"));
+        return;
+    }
+    if (!oap::manufacturing::MachiningJobStorage::saveNewVersion(path, draft->definition(), &error)) {
+        QMessageBox::warning(this, title, error);
+        return;
+    }
+    m_currentMachiningJobPath = path;
+    statusBar()->showMessage(QCoreApplication::translate("OpenAutoPath", "项目版本已保存：%1").arg(path));
+    refreshCamWorkflowPanel();
+}
+
+void MainWindow::editMachiningProjectOperations()
+{
+    using namespace oap::manufacturing;
+    if (m_uiBusy || model().faces.empty())
+        return;
+    const auto title = QCoreApplication::translate("OpenAutoPath", "编辑项目工序");
+    QString error;
+    auto candidate = m_machiningWorkspace->projectVersion(
+        {machiningProjectDefinitionContext(), &moldSetupWorkFrames()}, &error);
+    if (!candidate) {
+        QMessageBox::warning(this, title, error);
+        return;
+    }
+    const auto operations = MachiningOperationService::operations(candidate->definition());
+    if (operations.empty()) {
+        QMessageBox::information(this, title, QCoreApplication::translate("OpenAutoPath", "请先向项目添加加工工序。"));
+        return;
+    }
+
+    QDialog dialog(this);
+    dialog.setWindowTitle(title);
+    dialog.resize(750, 420);
+    auto* layout = new QVBoxLayout(&dialog);
+    auto* tree = new QTreeWidget(&dialog);
+    tree->setRootIsDecorated(false);
+    tree->setHeaderLabels({
+        QCoreApplication::translate("OpenAutoPath", "工序"),
+        QCoreApplication::translate("OpenAutoPath", "类型"),
+        QCoreApplication::translate("OpenAutoPath", "装夹"),
+        QCoreApplication::translate("OpenAutoPath", "刀具")});
+    tree->header()->setSectionResizeMode(QHeaderView::ResizeToContents);
+    const auto toolText = [](const JobToolController* controller) {
+        return controller ? QStringLiteral("T%1 · %2").arg(controller->tool.toolNumber)
+            .arg(QString::fromStdString(controller->tool.toolName)) : QString{};
+    };
+    const auto operationType = [](JobOperationKind kind) {
+        switch (kind) {
+        case JobOperationKind::Hole: return QCoreApplication::translate("OpenAutoPath", "孔加工");
+        case JobOperationKind::Pocket: return QCoreApplication::translate("OpenAutoPath", "槽腔加工");
+        case JobOperationKind::Profile: return QCoreApplication::translate("OpenAutoPath", "外轮廓加工");
+        case JobOperationKind::SurfaceFinishing: return QCoreApplication::translate("OpenAutoPath", "雕刻加工");
+        }
+        return QString{};
+    };
+    for (std::size_t i = 0; i < operations.size(); ++i) {
+        const auto& operation = operations[i];
+        auto* row = new QTreeWidgetItem(tree, {
+            QString::fromStdString(operation.id),
+            operationType(operation.kind),
+            QString::fromStdString(operation.setupId),
+            toolText(candidate->toolControllerById(operation.toolControllerId))});
+        row->setData(0, Qt::UserRole, static_cast<int>(i));
+        row->setCheckState(0, operation.enabled ? Qt::Checked : Qt::Unchecked);
+    }
+    tree->setCurrentItem(tree->topLevelItem(0));
+    layout->addWidget(tree);
+    auto* buttons = new QHBoxLayout();
+    const auto add = [&](const QString& label) {
+        auto* button = new QPushButton(label, &dialog);
+        buttons->addWidget(button);
+        return button;
+    };
+    const auto move = [&](int offset) {
+        const int index = tree->indexOfTopLevelItem(tree->currentItem());
+        const int next = index + offset;
+        if (index >= 0 && next >= 0 && next < tree->topLevelItemCount()) {
+            auto* row = tree->takeTopLevelItem(index);
+            tree->insertTopLevelItem(next, row);
+            tree->setCurrentItem(row);
+        }
+    };
+    connect(add(QCoreApplication::translate("OpenAutoPath", "上移")), &QPushButton::clicked, &dialog, [&] { move(-1); });
+    connect(add(QCoreApplication::translate("OpenAutoPath", "下移")), &QPushButton::clicked, &dialog, [&] { move(1); });
+
+    auto* replace = add(QCoreApplication::translate("OpenAutoPath", "从活动刀库换刀…"));
+    // Keep proposed replacements separate until the user applies the whole edit.
+    std::vector<QString> replacements(operations.size());
+    connect(replace, &QPushButton::clicked, &dialog, [&] {
+        auto* row = tree->currentItem();
+        if (!row)
+            return;
+        const auto index = row->data(0, Qt::UserRole).toInt();
+        if (operations[index].kind != JobOperationKind::Pocket || row->checkState(0) != Qt::Checked) {
+            QMessageBox::information(&dialog, title, QCoreApplication::translate("OpenAutoPath", "请选择已启用的槽腔工序。"));
+            return;
+        }
+        const auto* library = activeToolLibrary();
+        QStringList names;
+        std::vector<QString> ids;
+        if (library) {
+            for (const auto& assigned : library->assignedTools()) {
+                if (!oap::tooling::hasSupportedMillingGeometry(assigned.tool))
+                    continue;
+                names.push_back(QStringLiteral("T%1 · %2").arg(assigned.slot.toolNumber).arg(assigned.tool.name));
+                ids.push_back(assigned.tool.id);
+            }
+        }
+        if (names.empty()) {
+            QMessageBox::information(&dialog, title, QCoreApplication::translate("OpenAutoPath", "活动刀库没有已分配刀位的铣刀。"));
+            return;
+        }
+        bool accepted = false;
+        const QString selected = QInputDialog::getItem(&dialog, title, library->name(), names, 0, false, &accepted);
+        const auto toolIndex = names.indexOf(selected);
+        if (accepted && toolIndex >= 0) {
+            replacements[index] = ids[static_cast<std::size_t>(toolIndex)];
+            row->setText(3, selected);
+        }
+    });
+    auto* rebuild = add(QCoreApplication::translate("OpenAutoPath", "应用并重算所选加工类型"));
+    const auto updateButtons = [&] {
+        const auto* row = tree->currentItem();
+        const bool enabled = row && row->checkState(0) == Qt::Checked;
+        rebuild->setEnabled(enabled);
+        replace->setEnabled(enabled && operations[row->data(0, Qt::UserRole).toInt()].kind == JobOperationKind::Pocket);
+    };
+    connect(tree, &QTreeWidget::currentItemChanged, &dialog, updateButtons);
+    connect(tree, &QTreeWidget::itemChanged, &dialog, updateButtons);
+    updateButtons();
+    bool rebuildSelected = false;
+    connect(rebuild, &QPushButton::clicked, &dialog, [&] {
+        rebuildSelected = true;
+        dialog.accept();
+    });
+    layout->addLayout(buttons);
+    auto* actions = new QDialogButtonBox(QDialogButtonBox::Apply | QDialogButtonBox::Cancel, &dialog);
+    connect(actions->button(QDialogButtonBox::Apply), &QPushButton::clicked, &dialog, &QDialog::accept);
+    connect(actions, &QDialogButtonBox::rejected, &dialog, &QDialog::reject);
+    layout->addWidget(actions);
+    if (dialog.exec() != QDialog::Accepted)
+        return;
+
+    std::vector<JobOperationDescriptor> ordered;
+    bool edited = false;
+    for (int i = 0; i < tree->topLevelItemCount(); ++i) {
+        const auto* row = tree->topLevelItem(i);
+        const auto index = row->data(0, Qt::UserRole).toInt();
+        auto operation = operations[index];
+        operation.enabled = row->checkState(0) == Qt::Checked;
+        edited |= index != i || operation.enabled != operations[index].enabled ||
+            (operation.enabled && !replacements[index].isEmpty());
+        ordered.push_back(std::move(operation));
+    }
+    if (!edited && !rebuildSelected)
+        return;
+    if (!oap::app::MachiningProjectController::applyOperationOrder(*candidate, ordered, &error)) {
+        QMessageBox::warning(this, title, error);
+        return;
+    }
+    for (int i = 0; i < tree->topLevelItemCount(); ++i) {
+        const auto index = tree->topLevelItem(i)->data(0, Qt::UserRole).toInt();
+        if (!ordered[i].enabled || replacements[index].isEmpty())
+            continue;
+        const auto* library = activeToolLibrary();
+        const auto* bit = library ? library->toolById(replacements[index]) : nullptr;
+        const auto* slot = library ? library->slotForTool(replacements[index]) : nullptr;
+        std::string detail;
+        if (!bit || !slot || !PocketMachiningJobService().replaceTool(
+                *candidate, ordered[i].id, library->id().toStdString(),
+                oap::tooling::makeToolpathToolContext({*bit, *slot}), &detail)) {
+            QMessageBox::warning(this, title, detail.empty()
+                ? QCoreApplication::translate("OpenAutoPath", "所选刀具已不存在。")
+                : QCoreApplication::translate("OpenAutoPath", detail.c_str()));
+            return;
+        }
+    }
+
+    oap::app::MachiningProjectLoadResult loaded;
+    const auto* selection = rebuildSelected ? &operations[tree->currentItem()->data(0, Qt::UserRole).toInt()] : nullptr;
+    if (selection) {
+        oap::app::MachiningProjectLoadRequest request;
+        request.model = &model();
+        request.indexer = &stepIndexer();
+        request.moldFrame = &moldFrame();
+        request.setupFrames = &moldSetupWorkFrames();
+        loaded = oap::app::MachiningProjectController::regenerateJob(std::move(*candidate), request, selection->kind);
+    } else {
+        loaded = oap::app::MachiningProjectController::restoreSnapshot(std::move(*candidate));
+    }
+    if (!loaded.ok()) {
+        QMessageBox::warning(this, title, loaded.error);
+        return;
+    }
+    clearOverlay(false);
+    m_workspaceCoordinator->installProject(std::move(loaded));
+    if (selection) {
+        oap::toolpath::ToolpathProgram program;
+        m_machiningWorkspace->activateOperationPreview(selection->id, program, nullptr);
+    }
+    const bool shown = showInstalledMachiningProject(title);
+    m_undoHistory.clear();
+    refreshCamWorkflowPanel();
+    if (shown)
+        statusBar()->showMessage(QCoreApplication::translate("OpenAutoPath", "项目工序已更新。"));
+}
+
 void MainWindow::openMachiningJob()
 {
-    const QString title = QCoreApplication::translate("OpenAutoPath", "打开加工项目");
+    openMachiningJobFile(false);
+}
+
+void MainWindow::openMachiningJobFile(bool definitionsOnly)
+{
+    const QString title = definitionsOnly
+        ? QCoreApplication::translate("OpenAutoPath", "打开项目版本")
+        : QCoreApplication::translate("OpenAutoPath", "打开加工项目");
     if (m_uiBusy)
         return;
     const QString path = QFileDialog::getOpenFileName(
@@ -1013,6 +1263,7 @@ void MainWindow::openMachiningJob()
 
     oap::app::MachiningProjectLoadRequest request;
     request.filePath = path;
+    request.definitionsOnly = definitionsOnly;
     request.currentSourcePath = currentPath();
     request.model = &model();
     request.indexer = &stepIndexer();
@@ -1042,6 +1293,28 @@ void MainWindow::openMachiningJob()
             << "[OpenAutoPath] project restore:"
             << QCoreApplication::translate("OpenAutoPathDiagnostic", QString::fromStdString(warning).toUtf8().constData());
     }
+    if (!showInstalledMachiningProject(title))
+        return;
+    m_undoHistory.clear();
+    m_currentMachiningJobPath = path;
+    if (definitionsOnly) {
+        statusBar()->showMessage(QCoreApplication::translate("OpenAutoPath", "项目版本已打开，可编辑工序后按需重算。"));
+        refreshCamWorkflowPanel();
+        return;
+    }
+    statusBar()->showMessage(
+        QCoreApplication::translate("OpenAutoPath", "加工项目已加载并重建：孔 %1 道，槽腔 %2 道，外轮廓 %3 道，雕刻 %4 道，%5 个装夹")
+            .arg(installed.holeOperationCount)
+            .arg(installed.pocketOperationCount)
+            .arg(installed.profileOperationCount)
+            .arg(installed.finishingOperationCount)
+            .arg(installed.setupCount));
+    refreshCamWorkflowPanel();
+}
+
+
+bool MainWindow::showInstalledMachiningProject(const QString& title)
+{
     const auto activePreview = m_machiningWorkspace->activePreview();
     if (activePreview == ActiveToolpathPreview::SurfaceFinishing) {
         const auto program = m_machiningWorkspace->finishingPreviewProgram();
@@ -1061,7 +1334,7 @@ void MainWindow::openMachiningJob()
             QMessageBox::warning(
                 this, title,
                 QCoreApplication::translate("OpenAutoPath", "外轮廓刀路已重建，但无法创建显示对象。"));
-            return;
+            return false;
         }
         if (m_actHolePaths) {
             QSignalBlocker block(m_actHolePaths);
@@ -1078,7 +1351,7 @@ void MainWindow::openMachiningJob()
             QMessageBox::warning(
                 this, title,
                 QCoreApplication::translate("OpenAutoPath", "槽腔刀路已重建，但无法创建显示对象。"));
-            return;
+            return false;
         }
         if (m_actHolePaths) {
             QSignalBlocker block(m_actHolePaths);
@@ -1100,17 +1373,9 @@ void MainWindow::openMachiningJob()
         rebuildHoleToolTree();
     }
     m_view->view()->Redraw();
-    m_undoHistory.clear();
-    m_currentMachiningJobPath = path;
-    statusBar()->showMessage(
-        QCoreApplication::translate("OpenAutoPath", "加工项目已加载并重建：孔 %1 道，槽腔 %2 道，外轮廓 %3 道，雕刻 %4 道，%5 个装夹")
-            .arg(installed.holeOperationCount)
-            .arg(installed.pocketOperationCount)
-            .arg(installed.profileOperationCount)
-            .arg(installed.finishingOperationCount)
-            .arg(installed.setupCount));
-    refreshCamWorkflowPanel();
+    return true;
 }
+
 
 void MainWindow::exportCurrentToolpathPreview()
 {

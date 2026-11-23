@@ -133,6 +133,10 @@ private slots:
     void exportCurrentToolpathPreview();             // 导出当前 Pocket/Hole 预览程序
     void saveMachiningJob();                         // 保存孔/槽腔加工定义，不保存预览几何
     void openMachiningJob();                         // 加载定义并从当前零件重建派生刀路
+    void saveMachiningJobVersion();
+    void editMachiningProjectOperations();
+    void openMachiningJobFile(bool definitionsOnly);
+    bool showInstalledMachiningProject(const QString& title);
     // 刀路播放器信号:走刀位置变化 -> 只重绘当前段 + 刀尖标记;
     // 已完成段隐藏，序列清空时清叠加。
     void clearHoleStageHighlights();

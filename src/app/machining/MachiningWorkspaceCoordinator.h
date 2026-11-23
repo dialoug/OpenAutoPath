@@ -173,6 +173,8 @@ public:
         QString* error = nullptr);
     // 持久化当前项目定义，不向 UI 暴露 MachiningJob 的存储结构。
     bool saveProject(const QString& filePath, QString* error = nullptr) const;
+    std::optional<manufacturing::MachiningJob> projectVersion(
+        const MachiningProjectSaveRequest& request, QString* error = nullptr) const;
     MachiningWorkspaceStatus status() const noexcept;
     bool hasHoleProgram() const noexcept;
     bool hasProjectContent() const noexcept;

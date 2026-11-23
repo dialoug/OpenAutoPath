@@ -47,6 +47,7 @@ CamUiController::CamUiController(
     connectCommand(m_panel, &CamWorkflowPanel::openPartRequested, this, callbacks.openPart);
     connectCommand(m_panel, &CamWorkflowPanel::openProjectRequested, this, callbacks.openProject);
     connectCommand(m_panel, &CamWorkflowPanel::saveProjectRequested, this, callbacks.saveProject);
+    connectCommand(m_panel, &CamWorkflowPanel::editProjectOperationsRequested, this, callbacks.editProjectOperations);
     connectCommand(m_panel, &CamWorkflowPanel::recognizeFeaturesRequested, this, callbacks.recognizeFeatures);
     connectCommand(m_panel, &CamWorkflowPanel::configureSetupRequested, this, callbacks.configureSetup);
     connectCommand(m_panel, &CamWorkflowPanel::selectToolsRequested, this, callbacks.selectTools);

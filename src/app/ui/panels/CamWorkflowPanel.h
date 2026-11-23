@@ -89,6 +89,7 @@ signals:
     void openPartRequested();
     void openProjectRequested();
     void saveProjectRequested();
+    void editProjectOperationsRequested();
     void recognizeFeaturesRequested();
     void configureSetupRequested();
     void selectToolsRequested();
@@ -125,6 +126,7 @@ private:
     QPushButton* m_openPart = nullptr;
     QPushButton* m_openProject = nullptr;
     QPushButton* m_saveProject = nullptr;
+    QPushButton* m_editProjectOperations = nullptr;
     QPushButton* m_recognizeFeatures = nullptr;
     QPushButton* m_configureSetup = nullptr;
     QPushButton* m_selectTools = nullptr;

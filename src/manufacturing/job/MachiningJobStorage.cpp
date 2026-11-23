@@ -13,13 +13,16 @@
 #include <utility>
 
 #include <QCryptographicHash>
+#include <QDir>
 #include <QFile>
+#include <QFileInfo>
 #include <QJsonArray>
 #include <QJsonDocument>
 #include <QJsonObject>
 #include <QSet>
 #include <QJsonParseError>
 #include <QSaveFile>
+#include <QTemporaryFile>
 
 namespace oap::manufacturing {
 namespace {
@@ -1477,6 +1480,23 @@ bool MachiningJobStorage::save(
         if (error) *error = file.errorString();
         return false;
     }
+    return true;
+}
+
+bool MachiningJobStorage::saveNewVersion(
+    const QString& filePath,
+    const MachiningJobDefinition& definition,
+    QString* error)
+{
+    if (error) error->clear();
+    const QByteArray data = serializeDefinition(definition);
+    QTemporaryFile file(QFileInfo(filePath).dir().filePath(QStringLiteral(".oapjob-XXXXXX")));
+    // Rename in the destination directory and fail if another writer created the version.
+    if (!file.open() || file.write(data) != data.size() || !file.flush() || !file.rename(filePath)) {
+        if (error) *error = file.errorString();
+        return false;
+    }
+    file.setAutoRemove(false);
     return true;
 }
 

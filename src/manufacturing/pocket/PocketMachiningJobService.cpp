@@ -18,6 +18,7 @@
 #include <QUuid>
 
 #include "manufacturing/job/MachiningJobStorage.h"
+#include "manufacturing/job/MachiningOperationService.h"
 #include "toolpath/pocket/geometry/PocketRegionBuilder.h"
 #include "toolpath/core/PocketToolBinding.h"
 #include "toolpath/pocket/validation/PocketToolpathValidator.h"
@@ -618,6 +619,48 @@ bool PocketMachiningJobService::capture(
         std::move(batch),
         MachiningJobStorage::pocketExecutionFingerprint(
             job.definition()).toStdString());
+    return true;
+}
+
+bool PocketMachiningJobService::replaceTool(
+    MachiningJob& job, const std::string& operationId, const std::string& libraryId,
+    const toolpath::ToolpathToolContext& tool, std::string* error) const
+{
+    if (error)
+        error->clear();
+    auto& definition = job.definition();
+    const auto operation = std::find_if(definition.pocketOperations.begin(),
+        definition.pocketOperations.end(), [&](const auto& item) {
+            return item.id == operationId && item.enabled;
+        });
+    if (operation == definition.pocketOperations.end() || !tool.valid) {
+        if (error)
+            *error = "请选择已启用的槽腔工序和有效铣刀";
+        return false;
+    }
+    const auto& params = operation->parameters ? *operation->parameters : definition.pocketParameters;
+    if (params.depth.stepDown > tool.cuttingEdgeLength) {
+        if (error)
+            *error = "工序层深超过所选刀具刃长";
+        return false;
+    }
+
+    const auto previous = operation->toolControllerId;
+    const auto replacement = "tool-controller-pocket-" +
+        QUuid::createUuid().toString(QUuid::WithoutBraces).toStdString();
+    definition.toolControllers.push_back({replacement, libraryId, tool});
+    operation->toolControllerId = replacement;
+    operation->state = JobOperationState::Dirty;
+    const auto operations = MachiningOperationService::operations(definition);
+    if (std::none_of(operations.begin(), operations.end(), [&](const auto& item) {
+            return item.toolControllerId == previous;
+        })) {
+        std::erase_if(definition.toolControllers, [&](const auto& item) {
+            return item.id == previous;
+        });
+    }
+    job.clearPocketResult();
+    job.ipwSession().clear();
     return true;
 }
 

@@ -173,8 +173,8 @@ CamWorkflowPanel::CamWorkflowPanel(QWidget* parent)
     m_openPart->setIcon(style()->standardIcon(QStyle::SP_DialogOpenButton));
     pageLayout->addWidget(m_openPart);
     auto* projectActions = new QHBoxLayout;
-    m_openProject = makeAction(QCoreApplication::translate("OpenAutoPath", "打开 Job…"), projectPage);
-    m_saveProject = makeAction(QCoreApplication::translate("OpenAutoPath", "保存 Job…"), projectPage);
+    m_openProject = makeAction(QCoreApplication::translate("OpenAutoPath", "打开项目版本…"), projectPage);
+    m_saveProject = makeAction(QCoreApplication::translate("OpenAutoPath", "保存项目版本…"), projectPage);
     m_saveProject->setObjectName(QStringLiteral("saveMachiningProjectAction"));
     m_openProject->setIcon(style()->standardIcon(QStyle::SP_DialogOpenButton));
     m_saveProject->setIcon(style()->standardIcon(QStyle::SP_DialogSaveButton));
@@ -260,6 +260,10 @@ CamWorkflowPanel::CamWorkflowPanel(QWidget* parent)
     m_generateFinishing->setToolTip(QCoreApplication::translate("OpenAutoPath", "按雕刻参数直接生成完整模型刀路；默认六面，也可选择任一单面"));
     generationActions->addWidget(m_generateFinishing, 1, 1);
     operationControlsLayout->addLayout(generationActions);
+    m_editProjectOperations = makeAction(
+        QCoreApplication::translate("OpenAutoPath", "编辑项目工序…"), operationControls);
+    m_editProjectOperations->setObjectName(QStringLiteral("editProjectOperationsAction"));
+    operationControlsLayout->addWidget(m_editProjectOperations);
     operationControlsLayout->addStretch(1);
     m_operationsSplitter->addWidget(operationControls);
     m_operationTree = new HoleToolTreePanel(m_operationsSplitter);
@@ -367,6 +371,8 @@ CamWorkflowPanel::CamWorkflowPanel(QWidget* parent)
             this, &CamWorkflowPanel::openProjectRequested);
     connect(m_saveProject, &QPushButton::clicked,
             this, &CamWorkflowPanel::saveProjectRequested);
+    connect(m_editProjectOperations, &QPushButton::clicked,
+            this, &CamWorkflowPanel::editProjectOperationsRequested);
     connect(m_recognizeFeatures, &QPushButton::clicked,
             this, &CamWorkflowPanel::recognizeFeaturesRequested);
     connect(m_configureSetup, &QPushButton::clicked,
@@ -547,12 +553,13 @@ void CamWorkflowPanel::setSummary(const CamWorkflowSummary& summary)
         : summary.pendingRegeneration ? QCoreApplication::translate("OpenAutoPath", "当前程序不可导出，请重新生成受影响工序")
                                       : QCoreApplication::translate("OpenAutoPath", "尚无可导出的活动刀路");
     if (summary.pendingRegeneration && summary.activeProgramAvailable)
-        outputState += QCoreApplication::translate("OpenAutoPath", "；项目中其他待重新生成工序须先更新，才能保存或运行项目 IPW");
+        outputState += QCoreApplication::translate("OpenAutoPath", "。待重算工序更新后可运行项目 IPW。");
     m_outputStatus->setText(QCoreApplication::translate("OpenAutoPath", "当前预览：%1｜%2").arg(activeProgramName, outputState));
 
     m_openPart->setEnabled(!summary.busy);
     m_openProject->setEnabled(summary.hasModel && !summary.busy);
-    m_saveProject->setEnabled(summary.hasProjectContent && !summary.pendingRegeneration && !summary.busy);
+    m_saveProject->setEnabled(summary.hasModel && !summary.busy);
+    m_editProjectOperations->setEnabled(summary.hasProjectContent && !summary.busy);
     m_recognizeFeatures->setEnabled(summary.hasModel && !summary.busy);
     m_configureSetup->setEnabled(summary.hasModel && !summary.busy);
     m_selectTools->setEnabled(!summary.busy);

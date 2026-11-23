@@ -228,6 +228,12 @@ void MainWindow::setupMenus()
     m_actSaveMachiningJob->setIconText(QCoreApplication::translate("OpenAutoPath", "保存 Job"));
     connect(m_actSaveMachiningJob, &QAction::triggered,
             this, &MainWindow::saveMachiningJob);
+    connect(camMenu->addAction(QCoreApplication::translate("OpenAutoPath", "打开项目版本…")),
+        &QAction::triggered, this, [this] { openMachiningJobFile(true); });
+    connect(camMenu->addAction(QCoreApplication::translate("OpenAutoPath", "保存项目版本…")),
+        &QAction::triggered, this, &MainWindow::saveMachiningJobVersion);
+    connect(camMenu->addAction(QCoreApplication::translate("OpenAutoPath", "编辑项目工序…")),
+        &QAction::triggered, this, &MainWindow::editMachiningProjectOperations);
     camMenu->addSeparator();
 
     m_actRecognizeCamFeatures = camMenu->addAction(

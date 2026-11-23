@@ -40,6 +40,12 @@ public:
                  const PocketJobCaptureRequest& request,
                  std::string* error = nullptr) const;
 
+    // Replace only the selected operation's immutable tool snapshot.
+    bool replaceTool(MachiningJob& job, const std::string& operationId,
+                     const std::string& libraryId,
+                     const toolpath::ToolpathToolContext& tool,
+                     std::string* error = nullptr) const;
+
     // 只刷新槽腔运行期缓存，不清除已重建的孔刀路。
     toolpath::PocketToolpathBatch regenerate(
         MachiningJob& job,

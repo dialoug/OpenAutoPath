@@ -198,36 +198,38 @@ int main(int argc, char** argv)
         return 1;
 
     auto* saveProject = cam.panel().findChild<QPushButton*>("saveMachiningProjectAction");
+    auto* editProject = cam.panel().findChild<QPushButton*>("editProjectOperationsAction");
     auto* exportProgram = cam.panel().findChild<QPushButton*>("exportCurrentProgramAction");
     auto* outputStatus = cam.panel().findChild<QLabel*>("camWorkflowOutputStatus");
-    if (!expect(saveProject && exportProgram && outputStatus, "project/output actions must expose stable identities")) return 1;
+    if (!expect(saveProject && editProject && exportProgram && outputStatus, "project/output actions must expose stable identities")) return 1;
     oap::app::CamWorkflowSummary outputSummary;
     outputSummary.hasModel = true;
     cam.panel().setSummary(outputSummary);
     if (!expect(!engravingIpwAction->isEnabled(), "no engraving program must disable engraving IPW")) return 1;
-    if (!expect(!saveProject->isEnabled() && !exportProgram->isEnabled() && !projectIpwAction->isEnabled(),
-                "a loaded model alone must not imply a savable or exportable program")) return 1;
+    if (!expect(saveProject->isEnabled() && !editProject->isEnabled() && !exportProgram->isEnabled() && !projectIpwAction->isEnabled(),
+                "a loaded model can save a project version before any operation exists")) return 1;
     outputSummary.hasProjectContent = true;
     cam.panel().setSummary(outputSummary);
-    if (!expect(saveProject->isEnabled() && !exportProgram->isEnabled() && !projectIpwAction->isEnabled(),
-                "disabled formal definitions may be saved without advertising runtime playback or IPW")) return 1;
+    if (!expect(saveProject->isEnabled() && editProject->isEnabled() && !exportProgram->isEnabled() && !projectIpwAction->isEnabled(),
+                "disabled formal definitions may be saved and edited without runtime playback or IPW")) return 1;
     outputSummary.pendingRegeneration = true;
     outputSummary.profileOperationCount = 1;
     outputSummary.activeProgramName = QStringLiteral("外轮廓");
     cam.panel().setSummary(outputSummary);
-    if (!expect(!saveProject->isEnabled() && !exportProgram->isEnabled() && !projectIpwAction->isEnabled() &&
+    if (!expect(saveProject->isEnabled() && !exportProgram->isEnabled() && !projectIpwAction->isEnabled() &&
                 outputStatus->text().contains(QStringLiteral("外轮廓")) && outputStatus->text().contains(QStringLiteral("重新生成")),
-                "pending project regeneration must block save/IPW and explain the unavailable active preview")) return 1;
+                "pending project regeneration must permit version saves and explain the unavailable active preview")) return 1;
     outputSummary.activeProgramAvailable = true;
     outputSummary.activeProgramName = QStringLiteral("雕刻加工");
     outputSummary.finishingOperationCount = 1;
     cam.panel().setSummary(outputSummary);
-    if (!expect(!saveProject->isEnabled() && exportProgram->isEnabled() && !projectIpwAction->isEnabled() &&
+    if (!expect(saveProject->isEnabled() && exportProgram->isEnabled() && !projectIpwAction->isEnabled() &&
                 outputStatus->text().contains(QStringLiteral("当前预览：雕刻加工")),
-                "an unaffected current family may export while other pending families block full project save/IPW")) return 1;
+                "an unaffected current family may export while pending families block project IPW")) return 1;
     outputSummary.busy = true;
     cam.panel().setSummary(outputSummary);
-    if (!expect(!exportProgram->isEnabled(), "busy state must override a valid active export program")) return 1;
+    if (!expect(!saveProject->isEnabled() && !editProject->isEnabled() && !exportProgram->isEnabled(),
+                "busy state disables version save, operation edits, and export")) return 1;
 
     treeBatch.setupLabel = QStringLiteral("+Z 装夹");
     treeBatch.toolLabel = QStringLiteral("T7");

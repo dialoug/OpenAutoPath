@@ -13,6 +13,7 @@
 #include "analysis/StepIndexer.h"
 #include "app/workflows/project/MachiningWorkspaceSession.h"
 #include "manufacturing/job/MachiningJob.h"
+#include "manufacturing/job/MachiningOperationService.h"
 #include "toolpath/pocket/geometry/PocketRegionBuilder.h"
 #include "toolpath/core/setup/MoldSetupWorkFrames.h"
 
@@ -81,6 +82,7 @@ struct MachiningProjectLoadRequest {
     const StepIndexer* indexer = nullptr;
     const MoldCoordinateFrame* moldFrame = nullptr;
     const toolpath::MoldSetupWorkFrames* setupFrames = nullptr;
+    bool definitionsOnly = false;
 };
 
 // 加载结果:失败原因 + 重建后的完整 Job 与孔/槽腔刀路批次。
@@ -93,6 +95,7 @@ struct MachiningProjectLoadResult {
     toolpath::PocketToolpathBatch pockets;
     toolpath::ProfileToolpathBatch profiles;
     toolpath::SurfaceFinishingBatch finishing;
+    bool definitionsOnly = false;
     bool hasHoleDefinitions = false;
     bool hasPocketDefinitions = false;
     bool hasProfileDefinitions = false;
@@ -138,7 +141,12 @@ public:
     // 在内存候选 Job 上重建全部已定义领域。IPW 由仿真工作流重新计算。
     static MachiningProjectLoadResult regenerateJob(
         manufacturing::MachiningJob job,
-        const MachiningProjectLoadRequest& request);
+        const MachiningProjectLoadRequest& request,
+        std::optional<manufacturing::JobOperationKind> family = std::nullopt);
+    // Apply the visible global order and enabled state to a candidate project.
+    static bool applyOperationOrder(manufacturing::MachiningJob& job,
+        const std::vector<manufacturing::JobOperationDescriptor>& ordered,
+        QString* error = nullptr);
     // 把撤销历史中的完整 Job 快照投影为安装器输入，不重新生成几何。
     static MachiningProjectLoadResult restoreSnapshot(
         manufacturing::MachiningJob job);

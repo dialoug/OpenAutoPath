@@ -27,6 +27,9 @@ public:
     static bool save(const QString& filePath,
                      const MachiningJobDefinition& definition,
                      QString* error = nullptr);
+    static bool saveNewVersion(const QString& filePath,
+                               const MachiningJobDefinition& definition,
+                               QString* error = nullptr);
     static bool load(const QString& filePath,
                      MachiningJobDefinition& definition,
                      QString* error = nullptr);

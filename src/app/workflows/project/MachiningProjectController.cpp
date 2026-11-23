@@ -5,6 +5,7 @@
 
 #include <algorithm>
 #include <utility>
+#include <unordered_map>
 
 #include <BRep_Builder.hxx>
 #include <QDateTime>
@@ -394,6 +395,11 @@ MachiningProjectController::loadAndRegenerate(
         definition, *request.setupFrames);
     manufacturing::MachiningJob job;
     job.definition() = std::move(definition);
+    if (request.definitionsOnly) {
+        auto snapshot = restoreSnapshot(std::move(job));
+        snapshot.definitionsOnly = true;
+        return snapshot;
+    }
     return regenerateJob(std::move(job), request);
 }
 
@@ -401,8 +407,10 @@ MachiningProjectController::loadAndRegenerate(
 // 失败只返回候选与诊断，活动工作区由调用方保持不变。
 MachiningProjectLoadResult MachiningProjectController::regenerateJob(
     manufacturing::MachiningJob job,
-    const MachiningProjectLoadRequest& request)
+    const MachiningProjectLoadRequest& request,
+    std::optional<manufacturing::JobOperationKind> family)
 {
+    using manufacturing::JobOperationKind;
     MachiningProjectLoadResult result;
     if (!request.model || request.model->faces.empty() ||
         !request.indexer || !request.setupFrames) {
@@ -410,9 +418,9 @@ MachiningProjectLoadResult MachiningProjectController::regenerateJob(
         result.error = QCoreApplication::translate("OpenAutoPath", "重建加工项目需要当前零件、拓扑索引和装夹坐标。");
         return result;
     }
-    if (!job.validationErrors().empty()) {
+    if (const auto errors = job.validationErrors(); !errors.empty()) {
         result.failure = MachiningProjectLoadFailure::File;
-        result.error = QCoreApplication::translate("OpenAutoPathDiagnostic", QString::fromStdString(job.validationErrors().front()).toUtf8().constData());
+        result.error = QCoreApplication::translate("OpenAutoPathDiagnostic", QString::fromStdString(errors.front()).toUtf8().constData());
         return result;
     }
     result.job = std::move(job);
@@ -432,32 +440,44 @@ MachiningProjectLoadResult MachiningProjectController::regenerateJob(
         return result;
     }
 
-    // 为孔刀路快速规划装配碰撞场景:把所有单位形状收集为障碍物,
-    // 供再生时做避让计算。
-    toolpath::HoleRapidPlanningContext rapidContext;
-    if (request.moldFrame && request.moldFrame->isValid)
-        rapidContext.moldFrame = request.moldFrame;
-    TopoDS_Compound obstacles;
-    BRep_Builder builder;
-    builder.MakeCompound(obstacles);
-    int obstacleCount = 0;
-    for (const Unit& unit : request.model->units) {
-        const TopoDS_Shape* shape =
-            request.indexer->shapeForUnit(unit.unit_id);
-        if (!shape || shape->IsNull())
-            continue;
-        builder.Add(obstacles, *shape);
-        rapidContext.collisionScene.addBody(
-            unit.unit_id, toolpath::CollisionBodyRole::Workpiece,
-            *shape);
-        ++obstacleCount;
-    }
-    if (obstacleCount > 0)
-        rapidContext.obstacleShape = obstacles;
+    const auto requested = [&](JobOperationKind kind) {
+        return !family || *family == kind;
+    };
+    const auto enabled = [](const auto& operations) {
+        return std::any_of(operations.begin(), operations.end(),
+            [](const auto& operation) { return operation.enabled; });
+    };
 
-    if (!result.hasHoleDefinitions)
+    result.job.ipwSession().clear();
+    if (!requested(JobOperationKind::Hole)) {
+        if (const auto* batch = result.job.holeResult())
+            result.holes = *batch;
+    } else if (!enabled(result.job.definition().holeOperations)) {
         result.job.clearHoleResult();
-    if (result.hasHoleDefinitions) {
+    } else {
+        // 为孔刀路快速规划装配碰撞场景:把所有单位形状收集为障碍物,
+        // 供再生时做避让计算。
+        toolpath::HoleRapidPlanningContext rapidContext;
+        if (request.moldFrame && request.moldFrame->isValid)
+            rapidContext.moldFrame = request.moldFrame;
+        TopoDS_Compound obstacles;
+        BRep_Builder builder;
+        builder.MakeCompound(obstacles);
+        int obstacleCount = 0;
+        for (const Unit& unit : request.model->units) {
+            const TopoDS_Shape* shape =
+                request.indexer->shapeForUnit(unit.unit_id);
+            if (!shape || shape->IsNull())
+                continue;
+            builder.Add(obstacles, *shape);
+            rapidContext.collisionScene.addBody(
+                unit.unit_id, toolpath::CollisionBodyRole::Workpiece,
+                *shape);
+            ++obstacleCount;
+        }
+        if (obstacleCount > 0)
+            rapidContext.obstacleShape = obstacles;
+
         result.holes = manufacturing::HoleMachiningJobService()
             .regenerate(result.job, &rapidContext);
         if (result.holes.cancelled || !result.job.hasHoleResult() ||
@@ -471,9 +491,12 @@ MachiningProjectLoadResult MachiningProjectController::regenerateJob(
             return result;
         }
     }
-    if (!result.hasPocketDefinitions)
+    if (!requested(JobOperationKind::Pocket)) {
+        if (const auto* batch = result.job.pocketResult())
+            result.pockets = *batch;
+    } else if (!enabled(result.job.definition().pocketOperations)) {
         result.job.clearPocketResult();
-    if (result.hasPocketDefinitions) {
+    } else {
         result.pockets = manufacturing::PocketMachiningJobService()
             .regenerate(result.job, *request.indexer);
         if (result.pockets.cancelled ||
@@ -488,9 +511,12 @@ MachiningProjectLoadResult MachiningProjectController::regenerateJob(
             return result;
         }
     }
-    if (!result.hasProfileDefinitions)
+    if (!requested(JobOperationKind::Profile)) {
+        if (const auto* batch = result.job.profileResult())
+            result.profiles = *batch;
+    } else if (!enabled(result.job.definition().profileOperations)) {
         result.job.clearProfileResult();
-    if (result.hasProfileDefinitions) {
+    } else {
         result.profiles = manufacturing::ProfileMachiningJobService()
             .regenerate(result.job, *request.indexer);
         const toolpath::ToolpathValidationReport validation =
@@ -505,17 +531,16 @@ MachiningProjectLoadResult MachiningProjectController::regenerateJob(
             return result;
         }
     }
-    if (!result.hasFinishingDefinitions)
+    if (!requested(JobOperationKind::SurfaceFinishing)) {
+        if (const auto* batch = result.job.finishingResult())
+            result.finishing = *batch;
+    } else if (!enabled(result.job.definition().finishingOperations)) {
         result.job.clearFinishingResult();
-    if (result.hasFinishingDefinitions) {
+    } else {
         result.finishing = manufacturing::SurfaceFinishingMachiningJobService()
             .regenerate(result.job, *request.indexer);
-        const bool hasEnabledFinishing = std::any_of(
-            result.job.definition().finishingOperations.begin(),
-            result.job.definition().finishingOperations.end(),
-            [](const auto& operation) { return operation.enabled; });
         if (result.finishing.cancelled || !result.finishing.validation.ok() ||
-            (hasEnabledFinishing && !result.job.currentFinishingResult())) {
+            !result.job.currentFinishingResult()) {
             result.failure = MachiningProjectLoadFailure::SurfaceFinishingRegeneration;
             result.error = QCoreApplication::translate("OpenAutoPath", "雕刻加工重建失败：%1")
                 .arg(validationMessage(result.finishing.validation));
@@ -523,6 +548,55 @@ MachiningProjectLoadResult MachiningProjectController::regenerateJob(
         }
     }
     return result;
+}
+
+bool MachiningProjectController::applyOperationOrder(
+    manufacturing::MachiningJob& job,
+    const std::vector<manufacturing::JobOperationDescriptor>& ordered, QString* error)
+{
+    const auto current = manufacturing::MachiningOperationService::operations(job.definition());
+    std::unordered_map<std::string, std::size_t> positions;
+    for (std::size_t i = 0; i < ordered.size(); ++i)
+        positions.emplace(ordered[i].id, i);
+    if (positions.size() != current.size() || positions.size() != ordered.size() ||
+        std::any_of(current.begin(), current.end(), [&](const auto& operation) {
+            return !positions.contains(operation.id);
+        })) {
+        assignError(error, QCoreApplication::translate("OpenAutoPath", "工序列表已变化，请重新打开编辑窗口。"));
+        return false;
+    }
+
+    bool changedOrder = false;
+    for (std::size_t i = 0; i < current.size(); ++i)
+        changedOrder |= current[i].id != ordered[i].id;
+
+    const auto update = [&](auto& operations) {
+        bool changed = false;
+        for (auto& operation : operations) {
+            const auto index = positions.at(operation.id);
+            const auto& row = ordered[index];
+            const int sequence = changedOrder ? current[index].sequence : operation.sequence;
+            if (operation.enabled == row.enabled && operation.sequence == sequence)
+                continue;
+            operation.enabled = row.enabled;
+            operation.sequence = sequence;
+            operation.state = manufacturing::JobOperationState::Dirty;
+            changed = true;
+        }
+        return changed;
+    };
+    auto& definition = job.definition();
+    const bool holeChanged = update(definition.holeOperations);
+    const bool pocketChanged = update(definition.pocketOperations);
+    const bool profileChanged = update(definition.profileOperations);
+    const bool finishingChanged = update(definition.finishingOperations);
+    if (holeChanged) job.clearHoleResult();
+    if (pocketChanged) job.clearPocketResult();
+    if (profileChanged) job.clearProfileResult();
+    if (finishingChanged) job.clearFinishingResult();
+    if (holeChanged || pocketChanged || profileChanged || finishingChanged)
+        job.ipwSession().clear();
+    return true;
 }
 
 MachiningProjectLoadResult MachiningProjectController::restoreSnapshot(

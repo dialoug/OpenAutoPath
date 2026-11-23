@@ -22,6 +22,7 @@ struct CamUiCallbacks {
     std::function<void()> openPart;
     std::function<void()> openProject;
     std::function<void()> saveProject;
+    std::function<void()> editProjectOperations;
     std::function<void()> recognizeFeatures;
     std::function<void()> configureSetup;
     std::function<void()> selectTools;

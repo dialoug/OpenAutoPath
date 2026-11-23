@@ -123,28 +123,16 @@ void appendGeneratedHole(MachiningJobDefinition &def, const QString &file)
 }
 void changePocketTool(MachiningJob& job, const QJsonObject& request, const tooling::ToolLibrary& library)
 {
-    auto& def = job.definition();
-    const auto id = request["operation"].toString().toStdString();
-    auto op = std::find_if(def.pocketOperations.begin(), def.pocketOperations.end(),
-                           [&](const auto& item) { return item.id == id && item.enabled; });
-    if (op == def.pocketOperations.end())
-        throw std::runtime_error("请选择已启用的槽腔工序");
     const auto toolId = request["tool"].toString();
     const auto* bit = library.toolById(toolId);
     const auto* slot = library.slotForTool(toolId);
     if (!bit || !slot || !tooling::hasSupportedMillingGeometry(*bit))
         throw std::runtime_error("请选择已分配刀位的铣刀");
-    const auto replacement = tooling::makeToolpathToolContext({*bit, *slot});
-    const auto& params = op->parameters ? *op->parameters : def.pocketParameters;
-    if (params.depth.stepDown > replacement.cuttingEdgeLength)
-        throw std::runtime_error("工序层深超过所选刀具刃长");
-    const auto oldId = op->toolControllerId;
-    op->toolControllerId = "tool-controller-pocket-" + QUuid::createUuid().toString(QUuid::WithoutBraces).toStdString();
-    def.toolControllers.push_back({op->toolControllerId, library.id().toStdString(), replacement});
-    const auto all = MachiningOperationService::operations(def);
-    if (std::none_of(all.begin(), all.end(), [&](const auto& item){return item.toolControllerId == oldId;}))
-        std::erase_if(def.toolControllers, [&](const auto& item){return item.id == oldId;});
-    op->state = JobOperationState::Dirty;
+    std::string error;
+    if (!PocketMachiningJobService().replaceTool(
+            job, request["operation"].toString().toStdString(),
+            library.id().toStdString(), tooling::makeToolpathToolContext({*bit, *slot}), &error))
+        throw std::runtime_error(error);
 }
 
 template <class T> void selectOperation(std::vector<T> &operations, const std::string &id)

@@ -97,30 +97,41 @@ MachiningProjectInstallResult MachiningProjectInstaller::install(
         setMode(ToolSelectionMode::SingleTool);
     };
     const auto& definition = workspace.job().definition();
-    if (!definition.holeOperations.empty()) configuration.holeParams() = definition.holeParameters;
-    if (!definition.pocketOperations.empty()) configuration.pocketParams() = definition.pocketParameters;
-    if (!definition.profileOperations.empty()) configuration.profileParams() = definition.profileParameters;
+    if (loaded.definitionsOnly || !definition.holeOperations.empty()) configuration.holeParams() = definition.holeParameters;
+    if (loaded.definitionsOnly || !definition.pocketOperations.empty()) configuration.pocketParams() = definition.pocketParameters;
+    if (loaded.definitionsOnly || !definition.profileOperations.empty()) configuration.profileParams() = definition.profileParameters;
     restoreSingle(definition.holeOperations, [&](auto mode) { configuration.setHoleToolSelectionMode(mode); }, configuration.holeSingleTool());
     restoreSingle(definition.pocketOperations, [&](auto mode) { configuration.setPocketToolSelectionMode(mode); }, configuration.pocketSingleTool());
     restoreSingle(definition.profileOperations, [&](auto mode) { configuration.setProfileToolSelectionMode(mode); }, configuration.profileSingleTool());
     result.stockDefinition = workspace.job().definition().stock;
     result.setupWorkFrames = currentSetupFrames;
-    workspace.holeToolpathNeedsRegeneration() = false;
-    workspace.setToolpathNeedsRegeneration(ActiveToolpathPreview::Pocket, false);
-    workspace.setToolpathNeedsRegeneration(ActiveToolpathPreview::Profile, false);
-    workspace.setToolpathNeedsRegeneration(ActiveToolpathPreview::SurfaceFinishing, false);
-    if (result.hasHoleDefinitions) {
+    const auto awaitingToolpath = [](const auto& operations) {
+        return std::any_of(operations.begin(), operations.end(),
+            [](const auto& operation) { return operation.enabled; });
+    };
+    workspace.holeToolpathNeedsRegeneration() = result.holeOperationCount == 0 &&
+        awaitingToolpath(definition.holeOperations);
+    workspace.setToolpathNeedsRegeneration(ActiveToolpathPreview::Pocket,
+        result.pocketOperationCount == 0 && awaitingToolpath(definition.pocketOperations));
+    workspace.setToolpathNeedsRegeneration(ActiveToolpathPreview::Profile,
+        result.profileOperationCount == 0 && awaitingToolpath(definition.profileOperations));
+    workspace.setToolpathNeedsRegeneration(ActiveToolpathPreview::SurfaceFinishing,
+        result.finishingOperationCount == 0 && awaitingToolpath(definition.finishingOperations));
+    workspace.hasHolePreviewParams() = false;
+    workspace.hasPocketPreviewParams() = false;
+    workspace.hasProfilePreviewParams() = false;
+    if (result.holeOperationCount > 0) {
         workspace.holePreviewParams() = loaded.holes.effectiveParams;
         workspace.hasHolePreviewParams() = true;
     }
-    if (result.hasPocketDefinitions) {
+    if (result.pocketOperationCount > 0) {
         workspace.pocketPreviewParams() =
             workspace.job().definition().pocketParameters;
         workspace.pocketPreviewEffectiveParams() =
             loaded.pockets.effectiveParams;
         workspace.hasPocketPreviewParams() = true;
     }
-    if (result.hasProfileDefinitions) {
+    if (result.profileOperationCount > 0) {
         workspace.profilePreviewParams() =
             workspace.job().definition().profileParameters;
         workspace.profilePreviewEffectiveParams() =
@@ -218,7 +229,7 @@ MachiningProjectInstallResult MachiningProjectInstaller::install(
         entry.operation = operation;
         workspace.pocketPreviewEntries().push_back(std::move(entry));
     }
-    workspace.pocketPreviewActive() = result.hasPocketDefinitions;
+    workspace.pocketPreviewActive() = result.pocketOperationCount > 0;
     workspace.profilePreviewOperations() =
         std::move(loaded.profiles.operations);
     workspace.activePreview() = workspace.job().currentFinishingResult()

@@ -65,8 +65,9 @@ void MainWindow::setupUiSlices()
 
     oap::app::CamUiCallbacks camCallbacks;
     camCallbacks.openPart = [this] { openStep(); };
-    camCallbacks.openProject = [this] { openMachiningJob(); };
-    camCallbacks.saveProject = [this] { saveMachiningJob(); };
+    camCallbacks.openProject = [this] { openMachiningJobFile(true); };
+    camCallbacks.saveProject = [this] { saveMachiningJobVersion(); };
+    camCallbacks.editProjectOperations = [this] { editMachiningProjectOperations(); };
     camCallbacks.recognizeFeatures = [this] {
         recognizeInnerOuterStructures();
     };
