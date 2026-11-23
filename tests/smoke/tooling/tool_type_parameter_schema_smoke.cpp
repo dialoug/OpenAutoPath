@@ -1,3 +1,5 @@
+#include <vector>
+#include <string>
 #include "tooling/library/ToolLibrary.h"
 
 #include <cmath>
@@ -64,24 +66,24 @@ bool normalizationRemovesInapplicableGeometry()
 bool validationUsesTheSelectedToolType()
 {
     oap::tooling::ToolGeometry drill;
-    const QStringList drillErrors =
+    const std::vector<std::string> drillErrors =
         oap::tooling::toolGeometryValidationErrors(
             oap::tooling::ToolType::Drill, drill);
-    const QStringList probeErrors =
+    const std::vector<std::string> probeErrors =
         oap::tooling::toolGeometryValidationErrors(
             oap::tooling::ToolType::Probe, drill);
 
     oap::tooling::ToolGeometry invalidBall;
     invalidBall.diameter = 10.0;
     invalidBall.cornerRadius = 4.0;
-    const QStringList ballErrors =
+    const std::vector<std::string> ballErrors =
         oap::tooling::toolGeometryValidationErrors(
             oap::tooling::ToolType::BallEndMill, invalidBall);
-    return expect(!drillErrors.isEmpty(),
+    return expect(!drillErrors.empty(),
                   "a drill must require a positive diameter") &&
-           expect(probeErrors.isEmpty(),
+           expect(probeErrors.empty(),
                   "an empty probe geometry remains backward compatible") &&
-           expect(!ballErrors.isEmpty(),
+           expect(!ballErrors.empty(),
                   "an explicitly inconsistent ball radius must be rejected");
 }
 

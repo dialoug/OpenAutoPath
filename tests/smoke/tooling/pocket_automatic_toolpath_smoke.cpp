@@ -1,3 +1,10 @@
+#include "analysis/Utf8Path.h"
+#include <filesystem>
+#include "analysis/ContentHash.h"
+#include "support/Json.h"
+#include <format>
+#include <string>
+#include <set>
 #include "tooling/adapter/pocket/PocketAutomaticToolpath.h"
 #include "toolpath/core/ToolpathParallel.h"
 #include "toolpath/core/ToolpathOcctParallel.h"
@@ -16,11 +23,6 @@
 #include <STEPControl_Reader.hxx>
 #include <STEPControl_Writer.hxx>
 #include <TopExp_Explorer.hxx>
-#include <QCryptographicHash>
-#include <QDir>
-#include <QFileInfo>
-#include <QJsonDocument>
-#include <QJsonObject>
 #include <gp_Ax3.hxx>
 #include <gp_Dir.hxx>
 
@@ -286,7 +288,7 @@ bool parallelizesIndependentSectionWiresDeterministically()
 
 void addTool(oap::tooling::ToolLibrary& library,
              int toolNumber,
-             const QString& id,
+             const std::string& id,
              double diameter,
              oap::tooling::ToolType type = oap::tooling::ToolType::EndMill,
              double cornerRadius = 0.0,
@@ -295,16 +297,16 @@ void addTool(oap::tooling::ToolLibrary& library,
 {
     oap::tooling::ToolBit tool;
     tool.id = id;
-    tool.name = QStringLiteral("T%1 D%2").arg(toolNumber).arg(diameter);
+    tool.name = std::format("T{0} D{1}", toolNumber, diameter);
     tool.type = type;
     tool.geometry.diameter = diameter;
     tool.geometry.cornerRadius = cornerRadius;
     tool.geometry.cuttingEdgeLength = cuttingEdgeLength;
     tool.geometry.overallLength = overallLength;
-    QString error;
+    std::string error;
     if (!library.upsertTool(tool, &error)) {
         std::cerr << "FAIL: could not add test tool: "
-                  << error.toStdString() << '\n';
+                  << error << '\n';
         return;
     }
 
@@ -316,20 +318,20 @@ void addTool(oap::tooling::ToolLibrary& library,
     slot.cuttingDefaults.verticalFeed = 150.0 + toolNumber;
     if (!library.assignToolToSlot(slot, &error)) {
         std::cerr << "FAIL: could not assign test tool: "
-                  << error.toStdString() << '\n';
+                  << error << '\n';
     }
 }
 
 oap::tooling::ToolLibrary testLibrary()
 {
     oap::tooling::ToolLibrary library(
-        QStringLiteral("pocket-test"),
-        QStringLiteral("Pocket Test"));
-    addTool(library, 1, QStringLiteral("flat-12"), 12.0);
-    addTool(library, 2, QStringLiteral("flat-6"), 6.0);
-    addTool(library, 3, QStringLiteral("flat-3"), 3.0);
+        std::string("pocket-test"),
+        std::string("Pocket Test"));
+    addTool(library, 1, std::string("flat-12"), 12.0);
+    addTool(library, 2, std::string("flat-6"), 6.0);
+    addTool(library, 3, std::string("flat-3"), 3.0);
     addTool(
-        library, 4, QStringLiteral("drill-2"), 2.0,
+        library, 4, std::string("drill-2"), 2.0,
         oap::tooling::ToolType::Drill, 0.0);
     return library;
 }
@@ -695,7 +697,7 @@ bool occtInternalParallelismRequiresExclusiveFullBudget()
 // Reproducible generated STEP corpus, deliberately independent of customer CAD.
 // The part STEP contains actual stock with pockets; per-region STEP files retain
 // the machining volumes so the benchmark isolates scheduling from recognition.
-int runParallelBenchmark(const std::string& sample, const QString& directory)
+int runParallelBenchmark(const std::string& sample, const std::string& directory)
 {
     const bool islands = sample == "islands";
     const bool manyTools = sample == "many_tools";
@@ -704,7 +706,7 @@ int runParallelBenchmark(const std::string& sample, const QString& directory)
     const bool stress = sample == "stress";
     if (!islands && !manyTools && !deep && !multi && !stress && sample != "small")
         return 2;
-    QDir().mkpath(directory);
+    std::filesystem::create_directories(oap::utf8Path(directory));
     const int count = stress ? 192 : (multi ? 24 : 1);
     const double depth = deep ? 40.0 : (stress ? 20.0 : (multi || islands ? 8.0 : 4.0));
     const double width = islands ? 100.0 : 50.0;
@@ -713,12 +715,12 @@ int runParallelBenchmark(const std::string& sample, const QString& directory)
     BRep_Builder builder;
     TopoDS_Compound parts;
     builder.MakeCompound(parts);
-    const QString partPath = directory + "/" + QString::fromStdString(sample) + ".step";
-    const bool createPart = !QFileInfo::exists(partPath);
-    const auto saveStep = [](const TopoDS_Shape& shape, const QString& path) {
+    const std::string partPath = directory + "/" + sample + ".step";
+    const bool createPart = !std::filesystem::exists(oap::utf8Path(partPath));
+    const auto saveStep = [](const TopoDS_Shape& shape, const std::string& path) {
         STEPControl_Writer writer;
         return writer.Transfer(shape, STEPControl_AsIs) == IFSelect_RetDone &&
-            writer.Write(path.toUtf8().constData()) == IFSelect_RetDone;
+            writer.Write(path.c_str()) == IFSelect_RetDone;
     };
     for (int i = 0; i < count; ++i) {
         auto region = manyTools ? lShapedPocket() : layeredRectangularPocket();
@@ -732,9 +734,9 @@ int runParallelBenchmark(const std::string& sample, const QString& directory)
                                       gp_Pnt2d(width, height), gp_Pnt2d(0, height)};
             region.boundary.signedArea = width * height;
         }
-        const QString regionPath = directory + "/" + QString::fromStdString(sample) +
-            "-region-" + QString::number(i) + ".step";
-        if (!QFileInfo::exists(regionPath) || createPart) {
+        const std::string regionPath = directory + "/" + sample +
+            "-region-" + std::to_string(i) + ".step";
+        if (!std::filesystem::exists(oap::utf8Path(regionPath)) || createPart) {
             BRepBuilderAPI_MakePolygon polygon;
             for (const auto& p : region.boundary.points)
                 polygon.Add(gp_Pnt(x + p.X(), y + p.Y(), 0));
@@ -763,7 +765,7 @@ int runParallelBenchmark(const std::string& sample, const QString& directory)
             }
         }
         STEPControl_Reader reader;
-        if (reader.ReadFile(regionPath.toUtf8().constData()) != IFSelect_RetDone ||
+        if (reader.ReadFile(regionPath.c_str()) != IFSelect_RetDone ||
             reader.TransferRoots() == 0) return 3;
         builder.MakeCompound(region.sectionShape);
         builder.Add(region.sectionShape, reader.OneShape());
@@ -773,7 +775,7 @@ int runParallelBenchmark(const std::string& sample, const QString& directory)
     auto library = testLibrary();
     if (manyTools) {
         for (int i = 0; i < 7; ++i)
-            addTool(library, 10 + i, QStringLiteral("bench-%1").arg(i), 5.0 + i);
+            addTool(library, 10 + i, std::format("bench-{0}", i), 5.0 + i);
     }
     auto params = roughingParams();
     const auto start = std::chrono::steady_clock::now();
@@ -822,16 +824,15 @@ int runParallelBenchmark(const std::string& sample, const QString& directory)
         occt += audit.occtInternalParallelCount;
         fallback += audit.occtSerialFallbackCount;
     }
-    QJsonObject output{{"sample", QString::fromStdString(sample)}, {"milliseconds", milliseconds},
-        {"hash", QString::fromLatin1(QCryptographicHash::hash(
-            QByteArray::fromStdString(canonical.str()), QCryptographicHash::Sha256).toHex())},
+    oap::JsonObject output{{"sample", sample}, {"milliseconds", milliseconds},
+        {"hash", std::string(oap::sha256Hex(std::string(canonical.str())))},
         {"moves", double(moves)}, {"primitives", double(primitives)},
         {"planning_peak", result.planningPeakParallelism}, {"region_peak", result.planningPeakRegionParallelism},
         {"cache_hits", double(result.batch.materialSectionCacheHits)},
         {"cache_misses", double(result.batch.materialSectionCacheMisses)},
         {"evaluated", result.evaluatedTransitionCount}, {"pruned", result.prunedTransitionCount},
         {"occt_parallel", double(occt)}, {"occt_fallback", double(fallback)}};
-    std::cout << "BENCHMARK " << QJsonDocument(output).toJson(QJsonDocument::Compact).constData() << '\n';
+    std::cout << "BENCHMARK " << oap::JsonDocument(output).toJson(oap::JsonDocument::Compact).c_str() << '\n';
     return 0;
 }
 
@@ -1465,9 +1466,9 @@ bool plansEachRegionWithoutCrossRegionToolRejection()
 bool reportsTheSmallestToolPlanningFailure()
 {
     oap::tooling::ToolLibrary library(
-        QStringLiteral("oversize-pocket-test"),
-        QStringLiteral("Oversize Pocket Test"));
-    addTool(library, 1, QStringLiteral("flat-12-only"), 12.0);
+        std::string("oversize-pocket-test"),
+        std::string("Oversize Pocket Test"));
+    addTool(library, 1, std::string("flat-12-only"), 12.0);
     const oap::tooling::PocketAutomaticToolpathResult result =
         oap::tooling::PocketAutomaticToolpath().generate(
             library, {narrowPocket()}, roughingParams(),
@@ -1524,16 +1525,16 @@ bool acceptsShorterFlutesForLayeredRoughing()
 bool plansDeepAndNarrowRegionsWithDifferentCompatibleTools()
 {
     oap::tooling::ToolLibrary library(
-        QStringLiteral("mixed-reach-pocket-test"),
-        QStringLiteral("Mixed Reach Pocket Test"));
+        std::string("mixed-reach-pocket-test"),
+        std::string("Mixed Reach Pocket Test"));
     addTool(
-        library, 1, QStringLiteral("long-flat-10"), 10.0,
+        library, 1, std::string("long-flat-10"), 10.0,
         oap::tooling::ToolType::EndMill, 0.0, 20.0, 70.0);
     addTool(
-        library, 2, QStringLiteral("short-flat-4"), 4.0,
+        library, 2, std::string("short-flat-4"), 4.0,
         oap::tooling::ToolType::EndMill, 0.0, 20.0, 50.0);
     addTool(
-        library, 3, QStringLiteral("short-flat-2"), 2.0,
+        library, 3, std::string("short-flat-2"), 2.0,
         oap::tooling::ToolType::EndMill, 0.0, 6.0, 50.0);
 
     oap::toolpath::PocketRegion deep = lShapedPocket();
@@ -1586,8 +1587,8 @@ bool plansDeepAndNarrowRegionsWithDifferentCompatibleTools()
 bool evaluatesIndependentTransitionsInParallel()
 {
     oap::tooling::ToolLibrary library = testLibrary();
-    addTool(library, 5, QStringLiteral("flat-10"), 10.0);
-    addTool(library, 6, QStringLiteral("flat-8"), 8.0);
+    addTool(library, 5, std::string("flat-10"), 10.0);
+    addTool(library, 6, std::string("flat-8"), 8.0);
     const oap::tooling::PocketAutomaticToolpathResult result =
         oap::tooling::PocketAutomaticToolpath().generate(
             library, {lShapedPocket()}, roughingParams(),
@@ -1636,7 +1637,7 @@ bool acceptsRoundedMillingTools()
         oap::tooling::ToolLibrary library;
         const double radius = type == oap::tooling::ToolType::BallEndMill ? 2.0 : 0.5;
         // Ball libraries may leave the derived radius at zero.
-        addTool(library, 1, QStringLiteral("rounded"), 4.0, type,
+        addTool(library, 1, std::string("rounded"), 4.0, type,
             type == oap::tooling::ToolType::BallEndMill ? 0.0 : radius);
         auto result = oap::tooling::PocketAutomaticToolpath().generate(
             library, {lShapedPocket()}, roughingParams(), "ROUNDED_");
@@ -1644,22 +1645,22 @@ bool acceptsRoundedMillingTools()
                 "rounded milling tool should generate: " + result.error)) return false;
         for (const auto& operation : result.batch.operations)
             if (!expect(operation.tool.cornerRadius == radius &&
-                        operation.tool.toolType == oap::tooling::toolTypeId(type).toStdString(),
+                        operation.tool.toolType == oap::tooling::toolTypeId(type),
                     "rounded cutter geometry was flattened")) return false;
         if (!expect(std::any_of(result.batch.diagnostics.begin(), result.batch.diagnostics.end(),
                 [](const auto& diagnostic) { return diagnostic.code ==
                     oap::toolpath::ToolpathDiagnosticCode::RoundedCutterResidual; }),
                 "rounded cutter must report possible residual material")) return false;
         // A same-diameter flat tool has fuller floor coverage even with a larger T number.
-        addTool(library, 2, QStringLiteral("flat"), 4.0);
+        addTool(library, 2, std::string("flat"), 4.0);
         result = oap::tooling::PocketAutomaticToolpath().generate(
             library, {lShapedPocket()}, roughingParams(), "SAME_DIAMETER_");
         if (!expect(result.ok() && result.batch.operations.front().tool.toolNumber == 2,
                 "same-diameter preference should preserve fuller floor coverage")) return false;
         oap::tooling::ToolLibrary roundedChain;
-        addTool(roundedChain, 1, QStringLiteral("large-rounded"), 12.0, type,
+        addTool(roundedChain, 1, std::string("large-rounded"), 12.0, type,
             type == oap::tooling::ToolType::BallEndMill ? 6.0 : 1.0);
-        addTool(roundedChain, 2, QStringLiteral("small-rounded"), 4.0, type, radius);
+        addTool(roundedChain, 2, std::string("small-rounded"), 4.0, type, radius);
         const auto chain = oap::tooling::PocketAutomaticToolpath().generate(
             roundedChain, {lShapedPocket()}, roughingParams(), "ROUNDED_CHAIN_");
         if (!expect(chain.ok(), "rounded chain failed: " + chain.error)) return false;
@@ -1668,9 +1669,9 @@ bool acceptsRoundedMillingTools()
                     "rounded predecessors must not claim flat-cylinder rest coverage")) return false;
     }
     oap::tooling::ToolLibrary mixedReach;
-    addTool(mixedReach, 1, QStringLiteral("short-flat"), 4.0,
+    addTool(mixedReach, 1, std::string("short-flat"), 4.0,
         oap::tooling::ToolType::EndMill, 0.0, 3.0, 3.0);
-    addTool(mixedReach, 2, QStringLiteral("long-ball"), 4.0,
+    addTool(mixedReach, 2, std::string("long-ball"), 4.0,
         oap::tooling::ToolType::BallEndMill, 2.0, 20.0, 60.0);
     auto deep = narrowPocket();
     deep.depth = 6.0;
@@ -1689,9 +1690,9 @@ int main(int argc, char** argv)
 {
     if (argc == 3 && std::string_view(argv[1]) == "--verify-benchmark-step") {
         for (const auto* sample : {"small", "multi", "deep", "islands", "many_tools", "stress"}) {
-            const QString path = QString::fromUtf8(argv[2]) + "/" + sample + ".step";
+            const std::string path = std::string(argv[2]) + "/" + sample + ".step";
             STEPControl_Reader reader;
-            if (reader.ReadFile(path.toUtf8().constData()) != IFSelect_RetDone ||
+            if (reader.ReadFile(path.c_str()) != IFSelect_RetDone ||
                 reader.TransferRoots() == 0 ||
                 !BRepCheck_Analyzer(reader.OneShape(), Standard_True, Standard_False).IsValid()) return 3;
             int solids = 0, faces = 0;
@@ -1702,7 +1703,7 @@ int main(int argc, char** argv)
         return 0;
     }
     if (argc == 4 && std::string_view(argv[1]) == "--parallel-benchmark")
-        return runParallelBenchmark(argv[2], QString::fromUtf8(argv[3]));
+        return runParallelBenchmark(argv[2], std::string(argv[3]));
     if (argc == 2 && std::string_view(argv[1]) == "--parallel-budget") {
         return inheritedBudgetCoversNestedValidation() &&
                 occtInternalParallelismRequiresExclusiveFullBudget() &&

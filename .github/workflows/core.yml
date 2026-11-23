@@ -1,4 +1,4 @@
-name: Linux and macOS core
+name: Linux and macOS native worker
 
 on:
   push:
@@ -30,7 +30,7 @@ jobs:
         shell: micromamba-shell {0}
     steps:
       - uses: actions/checkout@v4
-      - name: Install compiler, Qt and OCCT
+      - name: Install compiler and OCCT
         uses: mamba-org/setup-micromamba@v3
         with:
           environment-file: .github/ci/core-environment.yml
@@ -43,7 +43,7 @@ jobs:
           cmake --preset "$OAP_PRESET"
           "-DCMAKE_PREFIX_PATH=$CONDA_PREFIX"
           "-DFETCHCONTENT_BASE_DIR=$RUNNER_TEMP/oap-dependencies"
-      - name: Build core and tests
+      - name: Build worker and tests
         env:
           OAP_PRESET: ${{ matrix.preset }}
         run: cmake --build --preset "$OAP_PRESET"

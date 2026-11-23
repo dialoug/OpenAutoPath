@@ -2,7 +2,6 @@
 # fixtures so a clean source checkout can execute it deterministically.
 
 set(OAP_TEST_RUNTIME_DIRECTORIES
-    "${OAP_QT_BIN_DIR}"
     "${OAP_OCCT_RUNTIME_DIR}"
     "$<TARGET_FILE_DIR:oap_opencamlib>")
 foreach(runtime_dll IN LISTS OAP_THIRDPARTY_DLLS)
@@ -34,7 +33,4 @@ endfunction()
 
 include(${CMAKE_CURRENT_LIST_DIR}/tests/OAPTestHelpers.cmake)
 include(${CMAKE_CURRENT_LIST_DIR}/tests/OAPCoreTests.cmake)
-if(OAP_BUILD_GUI)
-    include(${CMAKE_CURRENT_LIST_DIR}/tests/OAPAppTests.cmake)
-endif()
 include(${CMAKE_CURRENT_LIST_DIR}/tests/OAPArchitectureTests.cmake)

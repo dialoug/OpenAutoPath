@@ -7,7 +7,6 @@ set(OAP_OCCT_CORE_LIBRARIES
     TKMesh TKShHealing TKTopAlgo TKGeomAlgo
     TKBO TKBool TKFillet TKOffset TKPrim
     TKBRep TKGeomBase TKG3d TKG2d TKMath TKernel)
-set(OAP_OCCT_VIEWER_LIBRARIES TKV3d TKOpenGl)
 
 function(oap_load_occt_windows_sdk sdk_root)
     if(NOT WIN32)
@@ -20,9 +19,6 @@ function(oap_load_occt_windows_sdk sdk_root)
         message(FATAL_ERROR "OAP_OCCT_ROOT must point to a valid Windows SDK: ${sdk_root}")
     endif()
     set(toolkits ${OAP_OCCT_CORE_LIBRARIES})
-    if(OAP_BUILD_GUI)
-        list(APPEND toolkits ${OAP_OCCT_VIEWER_LIBRARIES})
-    endif()
     foreach(toolkit IN LISTS toolkits)
         if(TARGET OCCT::${toolkit})
             continue()
@@ -57,9 +53,6 @@ function(oap_load_occt_package)
         FoundationClasses ModelingData ModelingAlgorithms Visualization
         ApplicationFramework DataExchange)
     set(toolkits ${OAP_OCCT_CORE_LIBRARIES})
-    if(OAP_BUILD_GUI)
-        list(APPEND toolkits ${OAP_OCCT_VIEWER_LIBRARIES})
-    endif()
     foreach(toolkit IN LISTS toolkits)
         if(TARGET OCCT::${toolkit})
             continue()

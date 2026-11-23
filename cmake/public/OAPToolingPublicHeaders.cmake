@@ -1,6 +1,5 @@
 # Public headers owned by the tooling module.
 list(APPEND OAP_PUBLIC_TARGET_HEADERS
-    src/tooling/library/ToolAssetCatalog.h
     src/tooling/library/ToolLibrary.h
     src/tooling/library/ToolLibraryStorage.h
     src/tooling/adapter/AssignedToolContext.h

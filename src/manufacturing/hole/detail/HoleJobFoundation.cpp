@@ -1,4 +1,7 @@
 // Stable hole feature identities, resource definitions and input fingerprints.
+#include "analysis/ContentHash.h"
+#include <vector>
+#include <string>
 #include "manufacturing/hole/HoleMachiningJobService.h"
 #include <algorithm>
 #include <cctype>
@@ -6,7 +9,6 @@
 #include <set>
 #include <sstream>
 #include <utility>
-#include <QCryptographicHash>
 #include "manufacturing/job/MachiningJobStorage.h"
 
 #include "manufacturing/hole/detail/HoleJobTypes.h"
@@ -19,9 +21,7 @@ namespace oap::manufacturing::hole_job_detail {
 
 std::string sha256(const std::string& value)
 {
-    return QCryptographicHash::hash(
-               QByteArray::fromStdString(value), QCryptographicHash::Sha256)
-        .toHex().toStdString();
+    return oap::sha256Hex(value);
 }
 
 std::string pointToken(const gp_Pnt& point)
@@ -140,7 +140,7 @@ SetupDefinition makeSetup(
         part.sourceFingerprint = partFingerprint;
         result.confirmation.confirmedInputFingerprint =
             MachiningJobStorage::setupInputFingerprint(part, result)
-                .toStdString();
+                ;
     }
     return result;
 }
@@ -263,7 +263,7 @@ std::string operationFingerprint(
     input << operation.setupId << '|'
           << (setup != definition.setups.end()
                   ? MachiningJobStorage::setupInputFingerprint(
-                        definition.part, *setup).toStdString()
+                        definition.part, *setup)
                   : std::string{}) << '|'
           << operation.toolControllerId << '|'
           << (controller != definition.toolControllers.end()

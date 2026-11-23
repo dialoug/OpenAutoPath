@@ -1,6 +1,10 @@
 // PocketMachiningJobService 的实现:槽腔捕获(capture)与重建(regenerate)。
 // 含刀具/参数/语义图元/目标几何指纹、Setup 工作坐标映射、无效资源回收与
 // 校验。属于 oap_manufacturing 模块。
+#include "analysis/ContentHash.h"
+#include "support/Identity.h"
+#include <vector>
+#include <string>
 #include "manufacturing/pocket/PocketMachiningJobService.h"
 
 #include <algorithm>
@@ -13,9 +17,6 @@
 #include <unordered_set>
 #include <utility>
 
-#include <QCryptographicHash>
-#include <QDateTime>
-#include <QUuid>
 
 #include "manufacturing/job/MachiningJobStorage.h"
 #include "toolpath/pocket/geometry/PocketRegionBuilder.h"
@@ -27,10 +28,7 @@ namespace {
 
 std::string sha256(const std::string& value)
 {
-    return QCryptographicHash::hash(
-               QByteArray::fromStdString(value),
-               QCryptographicHash::Sha256)
-        .toHex().toStdString();
+    return oap::sha256Hex(value);
 }
 
 // 把装夹面名称(如 +Z)转为小写字母与 pos/neg 前缀的稳定 token,用于 Setup ID。
@@ -75,7 +73,7 @@ std::string parametersFingerprint(
     snapshot.pocketParameters = params;
     return sha256(
         MachiningJobStorage::serializeDefinition(snapshot)
-            .toStdString());
+            );
 }
 
 void appendPointFingerprint(std::ostringstream& value,
@@ -249,7 +247,7 @@ std::string operationFingerprint(
     value << operation.setupId << '|'
           << (setup != definition.setups.end()
                   ? MachiningJobStorage::setupInputFingerprint(
-                        definition.part, *setup).toStdString()
+                        definition.part, *setup)
                   : std::string{}) << '|'
           << operation.toolControllerId << '|'
           << (controller != definition.toolControllers.end()
@@ -320,7 +318,7 @@ SetupDefinition makeSetup(
     if (result.confirmation.confirmed) {
         result.confirmation.confirmedInputFingerprint =
             MachiningJobStorage::setupInputFingerprint(part, result)
-                .toStdString();
+                ;
     }
     return result;
 }
@@ -432,8 +430,7 @@ bool PocketMachiningJobService::capture(
     if (firstNew == 0)
         candidate.pocketParameters = *request.parameters;
     candidate.modifiedAt =
-        QDateTime::currentDateTimeUtc()
-            .toString(Qt::ISODateWithMs).toStdString();
+        oap::utcTimestamp();
 
 
     // 新槽腔工序的全局序列从已有孔工序最大序列之后开始,保持全局顺序唯一。
@@ -474,7 +471,7 @@ bool PocketMachiningJobService::capture(
         const toolpath::ToolpathToolContext operationTool = generated.tool;
         const std::string toolHash =
             toolFingerprint(operationTool);
-        const auto uniqueId = request.append ? QUuid::createUuid().toString(QUuid::WithoutBraces).toStdString() : std::string{};
+        const auto uniqueId = request.append ? oap::randomUuid() : std::string{};
         const std::string controllerId = request.append ? "tool-controller-pocket-" + uniqueId :
             "tool-controller-pocket-" +
             toolHash.substr(0, 12) + (request.toolLibraryId && request.toolLibraryId->empty() ? "-direct" : "");
@@ -617,7 +614,7 @@ bool PocketMachiningJobService::capture(
     job.setPocketResult(
         std::move(batch),
         MachiningJobStorage::pocketExecutionFingerprint(
-            job.definition()).toStdString());
+            job.definition()));
     return true;
 }
 
@@ -818,12 +815,11 @@ PocketMachiningJobService::regenerate(
         toolpath::PocketToolpathValidator().validate(
             result.operations, result.effectiveParams);
     job.definition().modifiedAt =
-        QDateTime::currentDateTimeUtc()
-            .toString(Qt::ISODateWithMs).toStdString();
+        oap::utcTimestamp();
     job.setPocketResult(
         result,
         MachiningJobStorage::pocketExecutionFingerprint(
-            job.definition()).toStdString());
+            job.definition()));
     return result;
 }
 

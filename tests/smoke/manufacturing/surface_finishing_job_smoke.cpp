@@ -1,3 +1,5 @@
+#include "support/Json.h"
+#include <string>
 #include "manufacturing/finishing/SurfaceFinishingMachiningJobService.h"
 #include "manufacturing/job/MachiningJobStorage.h"
 #include "manufacturing/job/MachiningJobApplicationService.h"
@@ -7,9 +9,6 @@
 #include <XCAFApp_Application.hxx>
 #include <XCAFDoc_DocumentTool.hxx>
 #include <XCAFDoc_ShapeTool.hxx>
-#include <QJsonDocument>
-#include <QJsonObject>
-#include <QJsonArray>
 #include <iostream>
 #include <stdexcept>
 
@@ -96,11 +95,11 @@ int main()
             "capture accepted a mismatched tool or mutated the job on failure");
         tool.diameter -= 1;
 
-        const QByteArray saved = MachiningJobStorage::serializeDefinition(job.definition());
-        require(!saved.contains("\"moves\"") && !saved.contains("\"primitives\""), "runtime geometry leaked into persistence");
-        QString loadError;
+        const std::string saved = MachiningJobStorage::serializeDefinition(job.definition());
+        require(saved.find("\"moves\"") == std::string::npos && saved.find("\"primitives\"") == std::string::npos, "runtime geometry leaked into persistence");
+        std::string loadError;
         MachiningJob restored;
-        require(MachiningJobStorage::deserializeDefinition(saved, restored.definition(), &loadError), loadError.toStdString());
+        require(MachiningJobStorage::deserializeDefinition(saved, restored.definition(), &loadError), loadError);
         require(restored.definition().schemaVersion == manufacturing::kMachiningJobSchemaVersion && !restored.hasFinishingResult(), "load must rebuild runtime");
         const auto rebuilt = service.regenerate(restored, indexer);
         require(!rebuilt.cancelled && rebuilt.validation.ok() && restored.currentFinishingResult(), rebuilt.validation.summary());
@@ -126,24 +125,24 @@ int main()
         require(!disabled.definition().finishingOperations.front().enabled && !disabled.hasFinishingResult(),
             "editing a disabled operation unexpectedly enabled or published it");
 
-        auto root = QJsonDocument::fromJson(saved).object();
+        auto root = oap::JsonDocument::fromJson(saved).object();
         auto jsonJob = root.value("job").toObject();
         auto operations = jsonJob.value("surface_finishing_operations").toArray();
         auto operation = operations[0].toObject();
         auto jsonParameters = operation.value("parameters").toObject();
         jsonParameters.insert("max_samples", -1);
         operation.insert("parameters", jsonParameters);
-        operations[0] = operation;
+        operations.replace(0, operation);
         jsonJob.insert("surface_finishing_operations", operations);
         root.insert("job", jsonJob);
         MachiningJobDefinition rejected;
-        require(!MachiningJobStorage::deserializeDefinition(QJsonDocument(root).toJson(), rejected, &loadError),
+        require(!MachiningJobStorage::deserializeDefinition(oap::JsonDocument(root).toJson(), rejected, &loadError),
             "negative persisted budget was accepted");
-        root = QJsonDocument::fromJson(saved).object();
+        root = oap::JsonDocument::fromJson(saved).object();
         jsonJob = root.value("job").toObject();
-        jsonJob.insert("surface_operations", QJsonArray{QJsonObject{{"legacy", true}}});
+        jsonJob.insert("surface_operations", oap::JsonArray{oap::JsonObject{{"legacy", true}}});
         root.insert("job", jsonJob);
-        require(!MachiningJobStorage::deserializeDefinition(QJsonDocument(root).toJson(), rejected, &loadError),
+        require(!MachiningJobStorage::deserializeDefinition(oap::JsonDocument(root).toJson(), rejected, &loadError),
             "legacy surface was silently migrated");
         XCAFApp_Application::GetApplication()->Close(document);
         std::cout << "Finishing Job capture, persistence, regeneration, invalidation and cancellation passed.\n";

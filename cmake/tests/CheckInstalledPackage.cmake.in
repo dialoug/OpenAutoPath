@@ -36,7 +36,7 @@ set(configure_args
     "-DCMAKE_CXX_COMPILER=@CMAKE_CXX_COMPILER@"
     "-DOAP_SDK_INCLUDE_DIR=${sdk_include}"
     "-DOpenAutoPath_DIR=${stage}/@CMAKE_INSTALL_LIBDIR@/cmake/OpenAutoPath"
-    "-DQt6_DIR=@Qt6_DIR@" "-DOAP_OCCT_PROVIDER=@OAP_OCCT_PROVIDER@")
+    "-DOAP_OCCT_PROVIDER=@OAP_OCCT_PROVIDER@")
 if("@OAP_OCCT_PROVIDER@" STREQUAL "WINDOWS_SDK")
     list(APPEND configure_args "-DOAP_OCCT_ROOT=@OAP_OCCT_ROOT@")
 else()

@@ -1,17 +1,14 @@
 // 刀库 JSON 持久化边界：负责版本/字段校验、兼容导入和安全覆盖写入。
+#include "support/Files.h"
+#include "support/Utf8Path.h"
+#include <regex>
+#include "support/Json.h"
+#include "support/Text.h"
+#include <format>
+#include <vector>
+#include <string>
 #include "tooling/library/ToolLibraryStorage.h"
 
-#include <QCoreApplication>
-#include <QDir>
-#include <QFile>
-#include <QFileInfo>
-#include <QJsonArray>
-#include <QJsonDocument>
-#include <QJsonObject>
-#include <QJsonParseError>
-#include <QRegularExpression>
-#include <QSaveFile>
-#include <QStandardPaths>
 
 #include <cmath>
 
@@ -24,146 +21,121 @@ constexpr int kLibrarySchemaVersion = 1;
 constexpr int kCatalogSchemaVersion = 3;
 constexpr int kOldestSupportedCatalogVersion = 1;
 // 单文件大小上限 16 MiB，防止读取超大文件。
-constexpr qint64 kMaxToolLibraryBytes = 16ll * 1024ll * 1024ll;
+constexpr std::int64_t kMaxToolLibraryBytes = 16ll * 1024ll * 1024ll;
 
 // 旧标识仅用于显式导入兼容；写入始终使用 OAP 标识。
-bool isLibrarySchema(const QString& schema)
+bool isLibrarySchema(const std::string& schema)
 {
-    return schema == QStringLiteral("oap-tool-library") ||
-           schema == QStringLiteral("faceface-tool-library");
+    return schema == std::string("oap-tool-library") ||
+           schema == std::string("faceface-tool-library");
 }
 
 // 受大小限制地读取整个文件；超限或读取出错时报错并返回 false。
-bool readLimitedJson(QFile& file, QByteArray& data, QString* error)
+bool isContainedFile(const std::string& rootPath, const std::string& candidatePath)
 {
-    const qint64 size = file.size();
-    if (size < 0 || size > kMaxToolLibraryBytes) {
-        if (error) {
-            *error = QCoreApplication::translate("OpenAutoPath", "刀库文件过大（上限 %1 MiB）")
-                         .arg(kMaxToolLibraryBytes / (1024 * 1024));
-        }
-        return false;
-    }
-    data = file.read(kMaxToolLibraryBytes + 1);
-    if (data.size() > kMaxToolLibraryBytes) {
-        if (error) *error = QCoreApplication::translate("OpenAutoPath", "刀库文件超过允许大小");
-        return false;
-    }
-    if (file.error() != QFileDevice::NoError) {
-        if (error) *error = QCoreApplication::translate("OpenAutoPath", "读取刀库失败：%1").arg(file.errorString());
-        return false;
-    }
-    return true;
-}
-
-// 路径安全校验：candidate 必须是 root 目录内的真实文件，拒绝 ../ 逃逸。
-bool isContainedFile(const QString& rootPath, const QString& candidatePath)
-{
-    const QString root = QFileInfo(rootPath).canonicalFilePath();
-    const QFileInfo candidateInfo(candidatePath);
-    const QString candidate = candidateInfo.canonicalFilePath();
-    if (root.isEmpty() || candidate.isEmpty() || !candidateInfo.isFile())
-        return false;
-    const QString relative = QDir(root).relativeFilePath(candidate);
-    return !QDir::isAbsolutePath(relative) && relative != QStringLiteral("..") &&
-           !relative.startsWith(QStringLiteral("../")) &&
-           !relative.startsWith(QStringLiteral("..\\"));
+    std::error_code error;
+    const auto root = std::filesystem::canonical(oap::utf8Path(rootPath), error);
+    if (error) return false;
+    const auto candidate = std::filesystem::canonical(oap::utf8Path(candidatePath), error);
+    if (error || !std::filesystem::is_regular_file(candidate, error)) return false;
+    const auto relative = candidate.lexically_relative(root);
+    return !relative.empty() && !relative.is_absolute() && *relative.begin() != "..";
 }
 
 // ToolGeometry ↔ JSON 的字段映射，字段名即持久化格式的一部分，勿随意改名。
-QJsonObject geometryToJson(const ToolGeometry& geometry)
+oap::JsonObject geometryToJson(const ToolGeometry& geometry)
 {
     return {
-        {QStringLiteral("diameter"), geometry.diameter},
-        {QStringLiteral("cutting_edge_length"), geometry.cuttingEdgeLength},
-        {QStringLiteral("overall_length"), geometry.overallLength},
-        {QStringLiteral("corner_radius"), geometry.cornerRadius},
-        {QStringLiteral("tip_angle"), geometry.tipAngle},
-        {QStringLiteral("tip_compensation"), geometry.tipCompensation},
-        {QStringLiteral("shank_diameter"), geometry.shankDiameter},
-        {QStringLiteral("holder_diameter"), geometry.holderDiameter},
-        {QStringLiteral("holder_length"), geometry.holderLength},
-        {QStringLiteral("spindle_envelope_diameter"),
+        {std::string("diameter"), geometry.diameter},
+        {std::string("cutting_edge_length"), geometry.cuttingEdgeLength},
+        {std::string("overall_length"), geometry.overallLength},
+        {std::string("corner_radius"), geometry.cornerRadius},
+        {std::string("tip_angle"), geometry.tipAngle},
+        {std::string("tip_compensation"), geometry.tipCompensation},
+        {std::string("shank_diameter"), geometry.shankDiameter},
+        {std::string("holder_diameter"), geometry.holderDiameter},
+        {std::string("holder_length"), geometry.holderLength},
+        {std::string("spindle_envelope_diameter"),
          geometry.spindleEnvelopeDiameter},
-        {QStringLiteral("spindle_envelope_length"),
+        {std::string("spindle_envelope_length"),
          geometry.spindleEnvelopeLength},
     };
 }
 
 // 反序列化几何：缺失字段按 0（未知）处理，语义与领域模型约定一致。
-ToolGeometry geometryFromJson(const QJsonObject& object)
+ToolGeometry geometryFromJson(const oap::JsonObject& object)
 {
     ToolGeometry geometry;
-    geometry.diameter = object.value(QStringLiteral("diameter")).toDouble();
+    geometry.diameter = object.value(std::string("diameter")).toDouble();
     geometry.cuttingEdgeLength =
-        object.value(QStringLiteral("cutting_edge_length")).toDouble();
-    geometry.overallLength = object.value(QStringLiteral("overall_length")).toDouble();
-    geometry.cornerRadius = object.value(QStringLiteral("corner_radius")).toDouble();
-    geometry.tipAngle = object.value(QStringLiteral("tip_angle")).toDouble();
+        object.value(std::string("cutting_edge_length")).toDouble();
+    geometry.overallLength = object.value(std::string("overall_length")).toDouble();
+    geometry.cornerRadius = object.value(std::string("corner_radius")).toDouble();
+    geometry.tipAngle = object.value(std::string("tip_angle")).toDouble();
     geometry.tipCompensation =
-        object.value(QStringLiteral("tip_compensation")).toDouble();
+        object.value(std::string("tip_compensation")).toDouble();
     geometry.shankDiameter =
-        object.value(QStringLiteral("shank_diameter")).toDouble();
+        object.value(std::string("shank_diameter")).toDouble();
     geometry.holderDiameter =
-        object.value(QStringLiteral("holder_diameter")).toDouble();
+        object.value(std::string("holder_diameter")).toDouble();
     geometry.holderLength =
-        object.value(QStringLiteral("holder_length")).toDouble();
+        object.value(std::string("holder_length")).toDouble();
     geometry.spindleEnvelopeDiameter = object.value(
-        QStringLiteral("spindle_envelope_diameter")).toDouble();
+        std::string("spindle_envelope_diameter")).toDouble();
     geometry.spindleEnvelopeLength = object.value(
-        QStringLiteral("spindle_envelope_length")).toDouble();
+        std::string("spindle_envelope_length")).toDouble();
     return geometry;
 }
 
 // 切削参数 → JSON 的字段映射（含钻循环字符串 ID）。
-QJsonObject cuttingToJson(const CuttingParameters& cutting)
+oap::JsonObject cuttingToJson(const CuttingParameters& cutting)
 {
     return {
-        {QStringLiteral("spindle_speed"), cutting.spindleSpeed},
-        {QStringLiteral("horizontal_feed"), cutting.horizontalFeed},
-        {QStringLiteral("vertical_feed"), cutting.verticalFeed},
-        {QStringLiteral("horizontal_rapid"), cutting.horizontalRapid},
-        {QStringLiteral("vertical_rapid"), cutting.verticalRapid},
-        {QStringLiteral("peck_depth"), cutting.peckDepth},
-        {QStringLiteral("drill_cycle"), drillCycleId(cutting.drillCycle)},
+        {std::string("spindle_speed"), cutting.spindleSpeed},
+        {std::string("horizontal_feed"), cutting.horizontalFeed},
+        {std::string("vertical_feed"), cutting.verticalFeed},
+        {std::string("horizontal_rapid"), cutting.horizontalRapid},
+        {std::string("vertical_rapid"), cutting.verticalRapid},
+        {std::string("peck_depth"), cutting.peckDepth},
+        {std::string("drill_cycle"), drillCycleId(cutting.drillCycle)},
     };
 }
 
-QJsonObject toolToJson(const ToolBit& tool)
+oap::JsonObject toolToJson(const ToolBit& tool)
 {
-    QJsonObject attributes;
+    oap::JsonObject attributes;
     for (auto it = tool.attributes.cbegin(); it != tool.attributes.cend(); ++it)
-        attributes.insert(it.key(), it.value());
+        attributes.insert(it->first, it->second);
     return {
-        {QStringLiteral("id"), tool.id},
-        {QStringLiteral("name"), tool.name},
-        {QStringLiteral("type"), toolTypeId(tool.type)},
-        {QStringLiteral("geometry"), geometryToJson(tool.geometry)},
-        {QStringLiteral("note"), tool.note},
-        {QStringLiteral("through_coolant"), tool.throughCoolant},
-        {QStringLiteral("attributes"), attributes},
+        {std::string("id"), tool.id},
+        {std::string("name"), tool.name},
+        {std::string("type"), toolTypeId(tool.type)},
+        {std::string("geometry"), geometryToJson(tool.geometry)},
+        {std::string("note"), tool.note},
+        {std::string("through_coolant"), tool.throughCoolant},
+        {std::string("attributes"), attributes},
     };
 }
 
-bool toolFromJson(const QJsonObject& item, ToolBit& tool, QString* error)
+bool toolFromJson(const oap::JsonObject& item, ToolBit& tool, std::string* error)
 {
     ToolBit parsed;
-    parsed.id = item.value(QStringLiteral("id")).toString();
-    parsed.name = item.value(QStringLiteral("name")).toString();
-    parsed.type = toolTypeFromId(item.value(QStringLiteral("type")).toString());
+    parsed.id = item.value(std::string("id")).toString();
+    parsed.name = item.value(std::string("name")).toString();
+    parsed.type = toolTypeFromId(item.value(std::string("type")).toString());
     parsed.geometry = geometryFromJson(
-        item.value(QStringLiteral("geometry")).toObject());
-    parsed.note = item.value(QStringLiteral("note")).toString();
+        item.value(std::string("geometry")).toObject());
+    parsed.note = item.value(std::string("note")).toString();
     parsed.throughCoolant =
-        item.value(QStringLiteral("through_coolant")).toBool();
-    const QJsonObject attributes =
-        item.value(QStringLiteral("attributes")).toObject();
+        item.value(std::string("through_coolant")).toBool();
+    const oap::JsonObject attributes =
+        item.value(std::string("attributes")).toObject();
     for (auto it = attributes.begin(); it != attributes.end(); ++it)
-        parsed.attributes.insert(it.key(), it.value().toVariant().toString());
+        parsed.attributes.insert_or_assign(it.key(), it.value().scalarText());
 
-    ToolLibrary validator(QStringLiteral("asset-validator"),
-                          QStringLiteral("asset-validator"));
-    QString validationError;
+    ToolLibrary validator(std::string("asset-validator"),
+                          std::string("asset-validator"));
+    std::string validationError;
     if (!validator.upsertTool(parsed, &validationError) ||
         !validator.isValid(&validationError)) {
         if (error)
@@ -175,77 +147,77 @@ bool toolFromJson(const QJsonObject& item, ToolBit& tool, QString* error)
 }
 
 // 反序列化切削参数：缺失字段按 0（沿用默认）处理。
-CuttingParameters cuttingFromJson(const QJsonObject& object)
+CuttingParameters cuttingFromJson(const oap::JsonObject& object)
 {
     CuttingParameters cutting;
-    cutting.spindleSpeed = object.value(QStringLiteral("spindle_speed")).toDouble();
-    cutting.horizontalFeed = object.value(QStringLiteral("horizontal_feed")).toDouble();
-    cutting.verticalFeed = object.value(QStringLiteral("vertical_feed")).toDouble();
-    cutting.horizontalRapid = object.value(QStringLiteral("horizontal_rapid")).toDouble();
-    cutting.verticalRapid = object.value(QStringLiteral("vertical_rapid")).toDouble();
-    cutting.peckDepth = object.value(QStringLiteral("peck_depth")).toDouble();
+    cutting.spindleSpeed = object.value(std::string("spindle_speed")).toDouble();
+    cutting.horizontalFeed = object.value(std::string("horizontal_feed")).toDouble();
+    cutting.verticalFeed = object.value(std::string("vertical_feed")).toDouble();
+    cutting.horizontalRapid = object.value(std::string("horizontal_rapid")).toDouble();
+    cutting.verticalRapid = object.value(std::string("vertical_rapid")).toDouble();
+    cutting.peckDepth = object.value(std::string("peck_depth")).toDouble();
     cutting.drillCycle =
-        drillCycleFromId(object.value(QStringLiteral("drill_cycle")).toString());
+        drillCycleFromId(object.value(std::string("drill_cycle")).toString());
     return cutting;
 }
 
-QJsonObject libraryToJson(const ToolLibrary& library)
+oap::JsonObject libraryToJson(const ToolLibrary& library)
 {
     // 刀具定义与刀位控制器分开存储；控制器只通过稳定 tool_id 引用刀具。
-    QJsonObject libraryAttributes;
+    oap::JsonObject libraryAttributes;
     for (auto it = library.attributes().cbegin(); it != library.attributes().cend(); ++it)
-        libraryAttributes.insert(it.key(), it.value());
+        libraryAttributes.insert(it->first, it->second);
 
-    QJsonArray tools;
-    for (const ToolBit& tool : library.tools())
+    oap::JsonArray tools;
+    for (const auto& [key, tool] : library.tools())
         tools.append(toolToJson(tool));
 
-    QJsonArray controllers;
+    oap::JsonArray controllers;
     // Wire keys stay unchanged for backward compatibility with existing v1
     // .oaptl files and catalog.json. In the domain these are library defaults,
     // not Job ToolController instances.
-    for (const LibraryToolSlot& slot : library.toolSlots()) {
-        controllers.append(QJsonObject{
-            {QStringLiteral("tool_number"), slot.toolNumber},
-            {QStringLiteral("tool_id"), slot.toolId},
-            {QStringLiteral("coolant"), coolantModeId(slot.coolantDefault)},
-            {QStringLiteral("cutting"), cuttingToJson(slot.cuttingDefaults)},
+    for (const auto& [key, slot] : library.toolSlots()) {
+        controllers.append(oap::JsonObject{
+            {std::string("tool_number"), slot.toolNumber},
+            {std::string("tool_id"), slot.toolId},
+            {std::string("coolant"), coolantModeId(slot.coolantDefault)},
+            {std::string("cutting"), cuttingToJson(slot.cuttingDefaults)},
         });
     }
 
     return {
-        {QStringLiteral("id"), library.id()},
-        {QStringLiteral("name"), library.name()},
-        {QStringLiteral("machine"), library.machine()},
-        {QStringLiteral("description"), library.description()},
-        {QStringLiteral("attributes"), libraryAttributes},
-        {QStringLiteral("tools"), tools},
-        {QStringLiteral("controllers"), controllers},
+        {std::string("id"), library.id()},
+        {std::string("name"), library.name()},
+        {std::string("machine"), library.machine()},
+        {std::string("description"), library.description()},
+        {std::string("attributes"), libraryAttributes},
+        {std::string("tools"), tools},
+        {std::string("controllers"), controllers},
     };
 }
 
 // 反序列化单刀库：临时对象全量解析 + 领域校验，成功才替换输出参数。
-bool libraryFromJson(const QJsonObject& object, ToolLibrary& library, QString* error)
+bool libraryFromJson(const oap::JsonObject& object, ToolLibrary& library, std::string* error)
 {
     // 先在临时对象中完整解析并走领域校验，失败时不污染调用方已有刀库。
-    ToolLibrary parsed(object.value(QStringLiteral("id")).toString(),
-                       object.value(QStringLiteral("name")).toString(),
-                       object.value(QStringLiteral("machine")).toString());
-    parsed.setDescription(object.value(QStringLiteral("description")).toString());
-    const QJsonObject libraryAttributes =
-        object.value(QStringLiteral("attributes")).toObject();
+    ToolLibrary parsed(object.value(std::string("id")).toString(),
+                       object.value(std::string("name")).toString(),
+                       object.value(std::string("machine")).toString());
+    parsed.setDescription(object.value(std::string("description")).toString());
+    const oap::JsonObject libraryAttributes =
+        object.value(std::string("attributes")).toObject();
     for (auto it = libraryAttributes.begin(); it != libraryAttributes.end(); ++it)
-        parsed.setAttribute(it.key(), it.value().toVariant().toString());
+        parsed.setAttribute(it.key(), it.value().scalarText());
 
-    const QJsonValue toolsValue = object.value(QStringLiteral("tools"));
+    const oap::JsonValue toolsValue = object.value(std::string("tools"));
     if (!toolsValue.isArray()) {
-        if (error) *error = QCoreApplication::translate("OpenAutoPath", "刀库缺少 tools 数组");
+        if (error) *error = std::string("刀库缺少 tools 数组");
         return false;
     }
-    for (const QJsonValue& value : toolsValue.toArray()) {
+    for (const oap::JsonValue& value : toolsValue.toArray()) {
         if (!value.isObject()) continue;
         ToolBit tool;
-        QString itemError;
+        std::string itemError;
         if (!toolFromJson(value.toObject(), tool, &itemError)) {
             if (error) *error = itemError;
             return false;
@@ -256,29 +228,29 @@ bool libraryFromJson(const QJsonObject& object, ToolLibrary& library, QString* e
         }
     }
 
-    const QJsonValue controllersValue = object.value(QStringLiteral("controllers"));
+    const oap::JsonValue controllersValue = object.value(std::string("controllers"));
     if (!controllersValue.isArray()) {
-        if (error) *error = QCoreApplication::translate("OpenAutoPath", "刀库缺少 controllers 数组");
+        if (error) *error = std::string("刀库缺少 controllers 数组");
         return false;
     }
-    for (const QJsonValue& value : controllersValue.toArray()) {
+    for (const oap::JsonValue& value : controllersValue.toArray()) {
         if (!value.isObject()) continue;
-        const QJsonObject item = value.toObject();
+        const oap::JsonObject item = value.toObject();
         LibraryToolSlot slot;
-        slot.toolNumber = item.value(QStringLiteral("tool_number")).toInt();
-        slot.toolId = item.value(QStringLiteral("tool_id")).toString();
+        slot.toolNumber = item.value(std::string("tool_number")).toInt();
+        slot.toolId = item.value(std::string("tool_id")).toString();
         slot.coolantDefault = coolantModeFromId(
-            item.value(QStringLiteral("coolant")).toString());
+            item.value(std::string("coolant")).toString());
         slot.cuttingDefaults = cuttingFromJson(
-            item.value(QStringLiteral("cutting")).toObject());
-        QString itemError;
+            item.value(std::string("cutting")).toObject());
+        std::string itemError;
         if (!parsed.assignToolToSlot(std::move(slot), &itemError)) {
             if (error) *error = itemError;
             return false;
         }
     }
 
-    QString validationError;
+    std::string validationError;
     if (!parsed.isValid(&validationError)) {
         if (error) *error = validationError;
         return false;
@@ -287,185 +259,173 @@ bool libraryFromJson(const QJsonObject& object, ToolLibrary& library, QString* e
     return true;
 }
 
-QJsonObject libraryReferenceToJson(const ToolLibrary& library)
+oap::JsonObject libraryReferenceToJson(const ToolLibrary& library)
 {
-    QJsonObject object = libraryToJson(library);
-    object.remove(QStringLiteral("tools"));
-    QJsonArray references;
-    for (const ToolBit& tool : library.tools())
+    oap::JsonObject object = libraryToJson(library);
+    object.remove(std::string("tools"));
+    oap::JsonArray references;
+    for (const auto& [key, tool] : library.tools())
         references.append(tool.id);
-    object.insert(QStringLiteral("tool_refs"), references);
+    object.insert(std::string("tool_refs"), references);
     return object;
 }
 
-bool libraryFromReferencesJson(const QJsonObject& object,
+bool libraryFromReferencesJson(const oap::JsonObject& object,
                                const ToolAssetCatalog& assets,
                                ToolLibrary& library,
-                               QString* error)
+                               std::string* error)
 {
-    const QJsonValue referencesValue = object.value(QStringLiteral("tool_refs"));
+    const oap::JsonValue referencesValue = object.value(std::string("tool_refs"));
     if (!referencesValue.isArray()) {
         if (error)
-            *error = QCoreApplication::translate("OpenAutoPath", "刀库缺少 tool_refs 数组");
+            *error = std::string("刀库缺少 tool_refs 数组");
         return false;
     }
-    QJsonArray tools;
-    for (const QJsonValue& value : referencesValue.toArray()) {
-        const QString assetId = value.toString();
+    oap::JsonArray tools;
+    for (const oap::JsonValue& value : referencesValue.toArray()) {
+        const std::string assetId = value.toString();
         const ToolBit* asset = assets.assetById(assetId);
         if (!asset) {
             if (error) {
-                *error = QCoreApplication::translate("OpenAutoPath", "刀库引用了不存在的全局刀具资产：%1")
-                             .arg(assetId);
+                *error = std::format("刀库引用了不存在的全局刀具资产：{0}", assetId);
             }
             return false;
         }
         tools.append(toolToJson(*asset));
     }
-    QJsonObject materialized = object;
-    materialized.insert(QStringLiteral("tools"), tools);
+    oap::JsonObject materialized = object;
+    materialized.insert(std::string("tools"), tools);
     return libraryFromJson(materialized, library, error);
 }
 
 // 解析 JSON 并确认顶层为对象；失败时报解析错误与偏移。
-bool parseDocument(const QByteArray& data, QJsonDocument& document, QString* error)
+bool parseDocument(const std::string& data, oap::JsonDocument& document, std::string* error)
 {
-    QJsonParseError parseError;
-    document = QJsonDocument::fromJson(data, &parseError);
-    if (parseError.error != QJsonParseError::NoError || !document.isObject()) {
+    oap::JsonParseError parseError;
+    document = oap::JsonDocument::fromJson(data, &parseError);
+    if (parseError || !document.isObject()) {
         if (error) {
-            *error = QCoreApplication::translate("OpenAutoPath", "JSON 解析失败：%1（偏移 %2）")
-                         .arg(parseError.errorString()).arg(parseError.offset);
+            *error = std::format("JSON 解析失败：{0}（偏移 {1}）", parseError.message, parseError.offset);
         }
         return false;
     }
     return true;
 }
 
-bool writeAtomically(const QString& filePath, const QByteArray& data, QString* error)
+bool writeAtomically(const std::string& filePath, const std::string& data, std::string* error)
 {
-    // QSaveFile 通过临时文件提交，写入失败时保留原有刀库文件。
-    const QFileInfo info(filePath);
-    if (!QDir().mkpath(info.absolutePath())) {
-        if (error) *error = QCoreApplication::translate("OpenAutoPath", "无法创建目录：%1").arg(info.absolutePath());
+    const auto parent = oap::utf8Path(filePath).parent_path();
+    std::error_code failure;
+    if (!parent.empty()) std::filesystem::create_directories(parent, failure);
+    if (failure) {
+        if (error) *error = failure.message();
         return false;
     }
-    QSaveFile file(filePath);
-    if (!file.open(QIODevice::WriteOnly)) {
-        if (error) *error = QCoreApplication::translate("OpenAutoPath", "无法写入文件：%1").arg(file.errorString());
-        return false;
-    }
-    if (file.write(data) != data.size() || !file.commit()) {
-        if (error) *error = QCoreApplication::translate("OpenAutoPath", "保存刀库失败：%1").arg(file.errorString());
-        return false;
-    }
-    return true;
+    return oap::writeFileAtomically(filePath, data, error);
 }
 
-double freeCadQuantity(const QJsonObject& parameters, const QString& key)
+double freeCadQuantity(const oap::JsonObject& parameters, const std::string& key)
 {
     // FreeCAD 数量字段可能是数值，也可能是带单位字符串；本层只读取前导数值。
-    const QJsonValue value = parameters.value(key);
+    const oap::JsonValue value = parameters.value(key);
     if (value.isDouble()) return value.toDouble();
-    const QString text = value.toString().trimmed();
-    static const QRegularExpression number(
-        QStringLiteral(R"(^\s*([-+]?(?:\d+(?:\.\d*)?|\.\d+)(?:[eE][-+]?\d+)?))"));
-    const QRegularExpressionMatch match = number.match(text);
-    return match.hasMatch() ? match.captured(1).toDouble() : 0.0;
+    const std::string text = oap::trim(value.toString());
+    static const std::regex number(R"(^([-+]?(?:\d+(?:\.\d*)?|\.\d+)(?:[eE][-+]?\d+)?))");
+    std::smatch match;
+    if (!std::regex_search(text, match, number)) return 0.0;
+    try {
+        return std::stod(match[1].str());
+    } catch (const std::out_of_range&) {
+        return 0.0;
+    }
 }
 
 // 按 FreeCAD 的 shape-type + shape 关键字推断刀具类型；无法识别回退 Unknown。
-ToolType freeCadToolType(const QString& shapeType, const QString& shape)
+ToolType freeCadToolType(const std::string& shapeType, const std::string& shape)
 {
-    const QString key = (shapeType + QLatin1Char(' ') + shape).toLower();
-    if (key.contains(QStringLiteral("drill"))) return ToolType::Drill;
-    if (key.contains(QStringLiteral("ball"))) return ToolType::BallEndMill;
-    if (key.contains(QStringLiteral("bull")) || key.contains(QStringLiteral("radius")))
+    const std::string key = oap::lowerAscii(shapeType + ' ' + shape);
+    if ((key.find("drill") != std::string::npos)) return ToolType::Drill;
+    if ((key.find("ball") != std::string::npos)) return ToolType::BallEndMill;
+    if ((key.find("bull") != std::string::npos) || (key.find("radius") != std::string::npos))
         return ToolType::BullNose;
-    if (key.contains(QStringLiteral("chamfer"))) return ToolType::ChamferMill;
-    if (key.contains(QStringLiteral("boring"))) return ToolType::BoringBar;
-    if (key.contains(QStringLiteral("ream"))) return ToolType::Reamer;
-    if (key.contains(QStringLiteral("tap"))) return ToolType::Tap;
-    if (key.contains(QStringLiteral("probe"))) return ToolType::Probe;
-    if (key.contains(QStringLiteral("endmill")) || key.contains(QStringLiteral("end_mill")))
+    if ((key.find("chamfer") != std::string::npos)) return ToolType::ChamferMill;
+    if ((key.find("boring") != std::string::npos)) return ToolType::BoringBar;
+    if ((key.find("ream") != std::string::npos)) return ToolType::Reamer;
+    if ((key.find("tap") != std::string::npos)) return ToolType::Tap;
+    if ((key.find("probe") != std::string::npos)) return ToolType::Probe;
+    if ((key.find("endmill") != std::string::npos) || (key.find("end_mill") != std::string::npos))
         return ToolType::EndMill;
     return ToolType::Unknown;
 }
 
 // 解析 FreeCAD 的 .fctb（Bit/*.fctb）刀具文件；id 取文件主名。
-bool loadFreeCadToolBit(const QString& filePath, ToolBit& tool, QString* error)
+bool loadFreeCadToolBit(const std::string& filePath, ToolBit& tool, std::string* error)
 {
-    QFile file(filePath);
-    if (!file.open(QIODevice::ReadOnly)) {
-        if (error) *error = QCoreApplication::translate("OpenAutoPath", "无法读取 FreeCAD 刀具 %1：%2")
-                                .arg(filePath, file.errorString());
-        return false;
-    }
-    QByteArray data;
-    if (!readLimitedJson(file, data, error)) return false;
-    QJsonDocument document;
+    std::string data;
+    if (!oap::readFile(filePath, data, error, kMaxToolLibraryBytes)) return false;
+    oap::JsonDocument document;
     if (!parseDocument(data, document, error)) return false;
-    const QJsonObject object = document.object();
-    const QFileInfo info(filePath);
-    tool.id = info.completeBaseName();
-    tool.name = object.value(QStringLiteral("name")).toString(tool.id);
-    const QString shape = object.value(QStringLiteral("shape")).toString();
-    const QString shapeType = object.value(QStringLiteral("shape-type")).toString();
+    const oap::JsonObject object = document.object();
+    tool.id = oap::pathUtf8(oap::utf8Path(filePath).stem());
+    tool.name = object.value(std::string("name")).toString(tool.id);
+    const std::string shape = object.value(std::string("shape")).toString();
+    const std::string shapeType = object.value(std::string("shape-type")).toString();
     tool.type = freeCadToolType(shapeType, shape);
-    const QJsonObject parameters = object.value(QStringLiteral("parameter")).toObject();
-    tool.geometry.diameter = freeCadQuantity(parameters, QStringLiteral("Diameter"));
-    tool.geometry.overallLength = freeCadQuantity(parameters, QStringLiteral("Length"));
+    const oap::JsonObject parameters = object.value(std::string("parameter")).toObject();
+    tool.geometry.diameter = freeCadQuantity(parameters, std::string("Diameter"));
+    tool.geometry.overallLength = freeCadQuantity(parameters, std::string("Length"));
     tool.geometry.cuttingEdgeLength =
-        freeCadQuantity(parameters, QStringLiteral("CuttingEdgeHeight"));
-    tool.geometry.cornerRadius = freeCadQuantity(parameters, QStringLiteral("CornerRadius"));
-    tool.geometry.tipAngle = freeCadQuantity(parameters, QStringLiteral("TipAngle"));
+        freeCadQuantity(parameters, std::string("CuttingEdgeHeight"));
+    tool.geometry.cornerRadius = freeCadQuantity(parameters, std::string("CornerRadius"));
+    tool.geometry.tipAngle = freeCadQuantity(parameters, std::string("TipAngle"));
     if (tool.geometry.tipAngle <= 0.0) {
         tool.geometry.tipAngle = freeCadQuantity(
-            parameters, QStringLiteral("CuttingEdgeAngle"));
+            parameters, std::string("CuttingEdgeAngle"));
     }
     tool.geometry.shankDiameter =
-        freeCadQuantity(parameters, QStringLiteral("ShankDiameter"));
-    const QJsonObject attributes = object.value(QStringLiteral("attribute")).toObject();
+        freeCadQuantity(parameters, std::string("ShankDiameter"));
+    const oap::JsonObject attributes = object.value(std::string("attribute")).toObject();
     for (auto it = attributes.begin(); it != attributes.end(); ++it)
-        tool.attributes.insert(it.key(), it.value().toVariant().toString());
+        tool.attributes.insert_or_assign(it.key(), it.value().scalarText());
     const int fluteCount = static_cast<int>(std::lround(
-        freeCadQuantity(parameters, QStringLiteral("Flutes"))));
+        freeCadQuantity(parameters, std::string("Flutes"))));
     if (fluteCount > 0)
-        tool.attributes.insert(QStringLiteral("flutes"),
-                               QString::number(fluteCount));
-    tool.attributes.insert(QStringLiteral("freecad_shape"), shape);
+        tool.attributes.insert_or_assign(std::string("flutes"),
+                               std::to_string(fluteCount));
+    tool.attributes.insert_or_assign(std::string("freecad_shape"), shape);
     return true;
 }
 
 // 解析 FreeCAD 的 .fctl 刀库：逐条装载 ToolBit 依赖并建立刀号控制器。
-bool loadFreeCadLibrary(const QString& filePath,
-                        const QJsonObject& object,
+bool loadFreeCadLibrary(const std::string& filePath,
+                        const oap::JsonObject& object,
                         ToolLibrary& library,
-                        QString* error)
+                        std::string* error)
 {
     // .fctl 只保存刀号和 ToolBit 路径，需同时兼容库旁路径与 FreeCAD ../Bit 布局。
-    const QFileInfo libraryFile(filePath);
-    ToolLibrary parsed(libraryFile.completeBaseName(),
-                       object.value(QStringLiteral("label")).toString(
-                           libraryFile.completeBaseName()));
-    parsed.setDescription(QCoreApplication::translate("OpenAutoPath", "从 FreeCAD .fctl 导入"));
-    const QJsonArray entries = object.value(QStringLiteral("tools")).toArray();
-    for (const QJsonValue& value : entries) {
-        const QJsonObject entry = value.toObject();
-        const int number = entry.value(QStringLiteral("nr")).toInt();
-        const QString relative = entry.value(QStringLiteral("path")).toString();
-        const QString fileName = QFileInfo(relative).fileName();
-        const QString libraryRoot = libraryFile.dir().absolutePath();
-        const QString bitRoot =
-            QDir(libraryFile.dir().filePath(QStringLiteral("../Bit"))).absolutePath();
-        const QStringList roots{libraryRoot, bitRoot};
-        const QStringList candidates{
-            QDir(libraryRoot).filePath(relative),
-            QDir(bitRoot).filePath(fileName),
+    const auto libraryFile = oap::utf8Path(filePath);
+    const auto libraryName = oap::pathUtf8(libraryFile.stem());
+    ToolLibrary parsed(libraryName,
+                       object.value(std::string("label")).toString(
+                           libraryName));
+    parsed.setDescription(std::string("从 FreeCAD .fctl 导入"));
+    const oap::JsonArray entries = object.value(std::string("tools")).toArray();
+    for (const oap::JsonValue& value : entries) {
+        const oap::JsonObject entry = value.toObject();
+        const int number = entry.value(std::string("nr")).toInt();
+        const std::string relative = entry.value(std::string("path")).toString();
+        const std::string fileName = oap::pathUtf8(oap::utf8Path(relative).filename());
+        const std::string libraryRoot = oap::pathUtf8(std::filesystem::absolute(libraryFile).parent_path());
+        const std::string bitRoot =
+            oap::pathUtf8(oap::utf8Path(libraryRoot).parent_path() / "Bit");
+        const std::vector<std::string> roots{libraryRoot, bitRoot};
+        const std::vector<std::string> candidates{
+            oap::pathUtf8(oap::utf8Path(libraryRoot) / oap::utf8Path(relative)),
+            oap::pathUtf8(oap::utf8Path(bitRoot) / oap::utf8Path(fileName)),
         };
-        QString bitPath;
-        for (qsizetype index = 0; index < candidates.size(); ++index) {
-            const QString& candidate = candidates[index];
+        std::string bitPath;
+        for (std::size_t index = 0; index < candidates.size(); ++index) {
+            const std::string& candidate = candidates[index];
             if (isContainedFile(roots[index], candidate)) {
                 bitPath = candidate;
                 break;
@@ -473,16 +433,16 @@ bool loadFreeCadLibrary(const QString& filePath,
         }
 
         ToolBit tool;
-        QString bitError;
-        if (bitPath.isEmpty() || !loadFreeCadToolBit(bitPath, tool, &bitError)) {
-            tool.id = QFileInfo(fileName).completeBaseName();
-            tool.name = QCoreApplication::translate("OpenAutoPath", "缺失刀具：%1").arg(fileName);
+        std::string bitError;
+        if (bitPath.empty() || !loadFreeCadToolBit(bitPath, tool, &bitError)) {
+            tool.id = oap::pathUtf8(oap::utf8Path(fileName).stem());
+            tool.name = std::format("缺失刀具：{0}", fileName);
             tool.type = ToolType::Unknown;
-            tool.note = bitPath.isEmpty()
-                ? QCoreApplication::translate("OpenAutoPath", "未找到 FreeCAD 刀具依赖")
+            tool.note = bitPath.empty()
+                ? std::string("未找到 FreeCAD 刀具依赖")
                 : bitError;
         }
-        QString itemError;
+        std::string itemError;
         if (!parsed.upsertTool(tool, &itemError)) {
             if (error) *error = itemError;
             return false;
@@ -502,44 +462,43 @@ bool loadFreeCadLibrary(const QString& filePath,
 } // namespace
 
 // 单刀库序列化：根对象带 schema 标识与版本号，供 deserializeLibrary 识别。
-QByteArray ToolLibraryStorage::serializeLibrary(const ToolLibrary& library)
+std::string ToolLibraryStorage::serializeLibrary(const ToolLibrary& library)
 {
-    const QJsonObject root{
-        {QStringLiteral("schema"), QStringLiteral("oap-tool-library")},
-        {QStringLiteral("version"), kLibrarySchemaVersion},
-        {QStringLiteral("library"), libraryToJson(library)},
+    const oap::JsonObject root{
+        {std::string("schema"), std::string("oap-tool-library")},
+        {std::string("version"), kLibrarySchemaVersion},
+        {std::string("library"), libraryToJson(library)},
     };
-    return QJsonDocument(root).toJson(QJsonDocument::Indented);
+    return oap::JsonDocument(root).toJson(oap::JsonDocument::Indented);
 }
 
 // 单刀库反序列化：校验 schema 与版本，再走领域校验；失败不污染 library。
-bool ToolLibraryStorage::deserializeLibrary(const QByteArray& data,
+bool ToolLibraryStorage::deserializeLibrary(const std::string& data,
                                             ToolLibrary& library,
-                                            QString* error)
+                                            std::string* error)
 {
-    QJsonDocument document;
+    oap::JsonDocument document;
     if (!parseDocument(data, document, error)) return false;
-    const QJsonObject root = document.object();
-    if (!isLibrarySchema(root.value(QStringLiteral("schema")).toString())) {
-        if (error) *error = QCoreApplication::translate("OpenAutoPath", "不是 OpenAutoPath 刀库文件");
+    const oap::JsonObject root = document.object();
+    if (!isLibrarySchema(root.value(std::string("schema")).toString())) {
+        if (error) *error = std::string("不是 OpenAutoPath 刀库文件");
         return false;
     }
-    if (root.value(QStringLiteral("version")).toInt() !=
+    if (root.value(std::string("version")).toInt() !=
         kLibrarySchemaVersion) {
-        if (error) *error = QCoreApplication::translate("OpenAutoPath", "不支持的刀库版本：%1")
-                                .arg(root.value(QStringLiteral("version")).toInt());
+        if (error) *error = std::format("不支持的刀库版本：{0}", root.value(std::string("version")).toInt());
         return false;
     }
-    return libraryFromJson(root.value(QStringLiteral("library")).toObject(),
+    return libraryFromJson(root.value(std::string("library")).toObject(),
                            library, error);
 }
 
 // 保存单刀库：先校验，再原子写盘；不合法时不落盘。
-bool ToolLibraryStorage::saveLibrary(const QString& filePath,
+bool ToolLibraryStorage::saveLibrary(const std::string& filePath,
                                      const ToolLibrary& library,
-                                     QString* error)
+                                     std::string* error)
 {
-    QString validationError;
+    std::string validationError;
     if (!library.isValid(&validationError)) {
         if (error) *error = validationError;
         return false;
@@ -548,62 +507,56 @@ bool ToolLibraryStorage::saveLibrary(const QString& filePath,
 }
 
 // 加载单刀库或 FreeCAD .fctl：按根字段自动判别格式。
-bool ToolLibraryStorage::loadLibrary(const QString& filePath,
+bool ToolLibraryStorage::loadLibrary(const std::string& filePath,
                                      ToolLibrary& library,
-                                     QString* error)
+                                     std::string* error)
 {
-    QFile file(filePath);
-    if (!file.open(QIODevice::ReadOnly)) {
-        if (error) *error = QCoreApplication::translate("OpenAutoPath", "无法读取刀库：%1").arg(file.errorString());
-        return false;
-    }
-    QByteArray data;
-    if (!readLimitedJson(file, data, error)) return false;
-    QJsonDocument document;
+    std::string data;
+    if (!oap::readFile(filePath, data, error, kMaxToolLibraryBytes)) return false;
+    oap::JsonDocument document;
     if (!parseDocument(data, document, error)) return false;
-    const QJsonObject root = document.object();
+    const oap::JsonObject root = document.object();
     // 通过根字段自动区分本项目格式和 FreeCAD .fctl，调用方无需预先指定来源。
-    if (isLibrarySchema(root.value(QStringLiteral("schema")).toString())) {
+    if (isLibrarySchema(root.value(std::string("schema")).toString())) {
         return deserializeLibrary(data, library, error);
     }
-    if (root.value(QStringLiteral("tools")).isArray())
+    if (root.value(std::string("tools")).isArray())
         return loadFreeCadLibrary(filePath, root, library, error);
-    if (error) *error = QCoreApplication::translate("OpenAutoPath", "未知刀库格式");
+    if (error) *error = std::string("未知刀库格式");
     return false;
 }
 
 // 保存整个刀库目录：逐个校验后合并为 catalog.json 原子写入。
-bool ToolLibraryStorage::saveCatalog(const QString& filePath,
+bool ToolLibraryStorage::saveCatalog(const std::string& filePath,
                                      const ToolAssetCatalog& catalog,
-                                     QString* error)
+                                     std::string* error)
 {
-    QString validationError;
+    std::string validationError;
     if (!catalog.isValid(&validationError)) {
         if (error)
-            *error = QCoreApplication::translate("OpenAutoPath", "刀具资产目录无效：\n%1")
-                         .arg(validationError);
+            *error = std::format("刀具资产目录无效：\n{0}", validationError);
         return false;
     }
 
-    QJsonArray assets;
-    for (const ToolBit& tool : catalog.assets())
+    oap::JsonArray assets;
+    for (const auto& [key, tool] : catalog.assets())
         assets.append(toolToJson(tool));
-    QJsonArray libraries;
+    oap::JsonArray libraries;
     for (const ToolLibrary& library : catalog.libraries())
         libraries.append(libraryReferenceToJson(library));
-    const QJsonObject root{
-        {QStringLiteral("schema"), QStringLiteral("oap-tool-library-catalog")},
-        {QStringLiteral("version"), kCatalogSchemaVersion},
-        {QStringLiteral("tool_assets"), assets},
-        {QStringLiteral("libraries"), libraries},
+    const oap::JsonObject root{
+        {std::string("schema"), std::string("oap-tool-library-catalog")},
+        {std::string("version"), kCatalogSchemaVersion},
+        {std::string("tool_assets"), assets},
+        {std::string("libraries"), libraries},
     };
     return writeAtomically(filePath,
-                           QJsonDocument(root).toJson(QJsonDocument::Indented), error);
+                           oap::JsonDocument(root).toJson(oap::JsonDocument::Indented), error);
 }
 
-bool ToolLibraryStorage::saveCatalog(const QString& filePath,
-                                     const QVector<ToolLibrary>& libraries,
-                                     QString* error)
+bool ToolLibraryStorage::saveCatalog(const std::string& filePath,
+                                     const std::vector<ToolLibrary>& libraries,
+                                     std::string* error)
 {
     ToolAssetCatalog catalog;
     if (!ToolAssetCatalog::fromLibraries(libraries, catalog, error))
@@ -612,45 +565,40 @@ bool ToolLibraryStorage::saveCatalog(const QString& filePath,
 }
 
 // 加载刀库目录；旧版本仅迁移存储结构，保留用户提供的参数。
-bool ToolLibraryStorage::loadCatalog(const QString& filePath,
+bool ToolLibraryStorage::loadCatalog(const std::string& filePath,
                                      ToolAssetCatalog& catalog,
-                                     QString* error,
+                                     std::string* error,
                                      bool* requiresCatalogRewrite)
 {
     if (requiresCatalogRewrite)
         *requiresCatalogRewrite = false;
-    QFile file(filePath);
-    if (!file.open(QIODevice::ReadOnly)) {
-        if (error) *error = QCoreApplication::translate("OpenAutoPath", "无法读取刀库目录：%1").arg(file.errorString());
-        return false;
-    }
-    QByteArray data;
-    if (!readLimitedJson(file, data, error)) return false;
-    QJsonDocument document;
+    std::string data;
+    if (!oap::readFile(filePath, data, error, kMaxToolLibraryBytes)) return false;
+    oap::JsonDocument document;
     if (!parseDocument(data, document, error)) return false;
-    const QJsonObject root = document.object();
+    const oap::JsonObject root = document.object();
     const int version =
-        root.value(QStringLiteral("version")).toInt();
-    const QString schema = root.value(QStringLiteral("schema")).toString();
-    if ((schema != QStringLiteral("oap-tool-library-catalog") &&
-         schema != QStringLiteral("faceface-tool-library-catalog")) ||
+        root.value(std::string("version")).toInt();
+    const std::string schema = root.value(std::string("schema")).toString();
+    if ((schema != std::string("oap-tool-library-catalog") &&
+         schema != std::string("faceface-tool-library-catalog")) ||
         version < kOldestSupportedCatalogVersion ||
         version > kCatalogSchemaVersion) {
-        if (error) *error = QCoreApplication::translate("OpenAutoPath", "刀库目录格式或版本不受支持");
+        if (error) *error = std::string("刀库目录格式或版本不受支持");
         return false;
     }
 
     ToolAssetCatalog parsed;
     bool identifiersMigrated = false;
     const bool usesGlobalAssets =
-        root.value(QStringLiteral("tool_assets")).isArray();
+        root.value(std::string("tool_assets")).isArray();
     if (usesGlobalAssets) {
-        for (const QJsonValue& value :
-             root.value(QStringLiteral("tool_assets")).toArray()) {
+        for (const oap::JsonValue& value :
+             root.value(std::string("tool_assets")).toArray()) {
             if (!value.isObject())
                 continue;
             ToolBit tool;
-            QString itemError;
+            std::string itemError;
             if (!toolFromJson(value.toObject(), tool, &itemError)) {
                 if (error)
                     *error = itemError;
@@ -658,7 +606,7 @@ bool ToolLibraryStorage::loadCatalog(const QString& filePath,
             }
             if (parsed.assetById(tool.id)) {
                 if (error)
-                    *error = QCoreApplication::translate("OpenAutoPath", "全局刀具资产 ID 重复：%1").arg(tool.id);
+                    *error = std::format("全局刀具资产 ID 重复：{0}", tool.id);
                 return false;
             }
             if (!parsed.upsertAsset(std::move(tool), &itemError)) {
@@ -667,10 +615,10 @@ bool ToolLibraryStorage::loadCatalog(const QString& filePath,
                 return false;
             }
         }
-        for (const QJsonValue& value :
-             root.value(QStringLiteral("libraries")).toArray()) {
+        for (const oap::JsonValue& value :
+             root.value(std::string("libraries")).toArray()) {
             ToolLibrary library;
-            QString itemError;
+            std::string itemError;
             if (!libraryFromReferencesJson(value.toObject(), parsed,
                                            library, &itemError) ||
                 !parsed.addLibrary(std::move(library), &itemError)) {
@@ -680,11 +628,11 @@ bool ToolLibraryStorage::loadCatalog(const QString& filePath,
             }
         }
     } else {
-        QVector<ToolLibrary> legacyLibraries;
-        for (const QJsonValue& value :
-             root.value(QStringLiteral("libraries")).toArray()) {
+        std::vector<ToolLibrary> legacyLibraries;
+        for (const oap::JsonValue& value :
+             root.value(std::string("libraries")).toArray()) {
             ToolLibrary library;
-            QString itemError;
+            std::string itemError;
             if (!libraryFromJson(value.toObject(), library, &itemError)) {
                 if (error)
                     *error = itemError;
@@ -701,14 +649,14 @@ bool ToolLibraryStorage::loadCatalog(const QString& filePath,
     catalog = std::move(parsed);
     if (requiresCatalogRewrite)
         *requiresCatalogRewrite =
-            schema != QStringLiteral("oap-tool-library-catalog") || !usesGlobalAssets ||
+            schema != std::string("oap-tool-library-catalog") || !usesGlobalAssets ||
             version < kCatalogSchemaVersion || identifiersMigrated;
     return true;
 }
 
-bool ToolLibraryStorage::loadCatalog(const QString& filePath,
-                                     QVector<ToolLibrary>& libraries,
-                                     QString* error)
+bool ToolLibraryStorage::loadCatalog(const std::string& filePath,
+                                     std::vector<ToolLibrary>& libraries,
+                                     std::string* error)
 {
     ToolAssetCatalog catalog;
     if (!loadCatalog(filePath, catalog, error)) {
@@ -716,15 +664,6 @@ bool ToolLibraryStorage::loadCatalog(const QString& filePath,
     }
     libraries = catalog.libraries();
     return true;
-}
-
-// 默认目录路径：AppConfigLocation/tool-libraries/catalog.json，兜底为程序目录 config。
-QString ToolLibraryStorage::defaultCatalogPath()
-{
-    QString base = QStandardPaths::writableLocation(QStandardPaths::AppConfigLocation);
-    if (base.isEmpty())
-        base = QDir(QCoreApplication::applicationDirPath()).filePath(QStringLiteral("config"));
-    return QDir(base).filePath(QStringLiteral("tool-libraries/catalog.json"));
 }
 
 } // namespace oap::tooling

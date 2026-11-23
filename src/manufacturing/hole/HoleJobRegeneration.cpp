@@ -1,9 +1,11 @@
 // Regenerate hole Job operations and publish validated runtime results.
+#include "support/Identity.h"
+#include <vector>
+#include <string>
 #include "manufacturing/hole/HoleMachiningJobService.h"
 #include <algorithm>
 #include <set>
 #include <utility>
-#include <QDateTime>
 #include "manufacturing/hole/HoleJobRebuildReview.h"
 #include "manufacturing/job/MachiningJobStorage.h"
 #include "toolpath/hole/HoleToolpathValidator.h"
@@ -267,10 +269,9 @@ toolpath::HoleToolpathBatch HoleMachiningJobService::regenerate(
                 result.effectiveParams, rapidContext, result.machining);
     }
     definition.modifiedAt =
-        QDateTime::currentDateTimeUtc().toString(Qt::ISODateWithMs)
-            .toStdString();
+        oap::utcTimestamp();
     const std::string fingerprint = MachiningJobStorage::
-        holeExecutionFingerprint(definition).toStdString();
+        holeExecutionFingerprint(definition);
     candidate.setHoleResult(result, fingerprint);
     if (!result.cancelled) {
         // 重建成功：恢复保存的 IPW 前缀；失败则保持原 Job 不动。

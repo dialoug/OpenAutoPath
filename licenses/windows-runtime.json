@@ -1,75 +1,7 @@
 {
   "schemaVersion": 1,
-  "scope": "Windows x64 runtime shipped by the pinned Qt/OCCT SDK configuration. Unknown or changed libraries require review.",
+  "scope": "Pinned Windows x64 native worker SDK dependencies and source archives.",
   "components": [
-    {
-      "id": "qtbase",
-      "version": "6.11.1",
-      "license": "LGPL-3.0-only; bundled components retain their own terms",
-      "notice": "runtime/Qt-6.11.1-NOTICES.txt",
-      "files": [
-        {
-          "path": "bin/generic/qtuiotouchplugin.dll",
-          "sha256": "0a517e732bd6a12889e0708d6c464db1c07cfad9bb80831815d85505378d54ba"
-        },
-        {
-          "path": "bin/imageformats/qgif.dll",
-          "sha256": "1ac71f48e08ee0aa405d55041f8340d56ed827fb94260bceda46ac0a50dfb7a5"
-        },
-        {
-          "path": "bin/imageformats/qico.dll",
-          "sha256": "0eb08bc9d8f6c1ab05f3a837629eb10e41eb6aa72240d23e291056b801894794"
-        },
-        {
-          "path": "bin/imageformats/qjpeg.dll",
-          "sha256": "bc3815c58443a01f43417ecac74bbf182c245d433ea82af0b3dc669c2cb064ab"
-        },
-        {
-          "path": "bin/networkinformation/qnetworklistmanager.dll",
-          "sha256": "8de339b75f82efac6381ca01e3dd3482c500a9115c49b53fbccafe0d933eef64"
-        },
-        {
-          "path": "bin/platforms/qwindows.dll",
-          "sha256": "dd126e2a47f7f3d4a855981e9d4012076058b1440f6900b9a07aa950e4e4f20a"
-        },
-        {
-          "path": "bin/Qt6Core.dll",
-          "sha256": "fae4778a42e93adc82b831c879c886a05147e9cc26760808d21116be5547259b"
-        },
-        {
-          "path": "bin/Qt6Gui.dll",
-          "sha256": "8fceee959a670372aaa5763287c2ef7924cd9ecdbe2c29cf4b6c12a63079c503"
-        },
-        {
-          "path": "bin/Qt6Network.dll",
-          "sha256": "0232076731e386b6cc353bdf743d5fb17e95a3493c2d02afac984db87ed47b96"
-        },
-        {
-          "path": "bin/Qt6OpenGL.dll",
-          "sha256": "487f5dc733294df5553008195e5f659be2cd45d034bd30755705589d8892149b"
-        },
-        {
-          "path": "bin/Qt6OpenGLWidgets.dll",
-          "sha256": "1b116f24e60b03a2fef39b04210f0a2e8d163452b786a008e52f11bb4164f769"
-        },
-        {
-          "path": "bin/Qt6Widgets.dll",
-          "sha256": "4d603bff620ae0830d15c25a787f9f10ed3f972d998f1f17c9c4f83937280399"
-        },
-        {
-          "path": "bin/styles/qmodernwindowsstyle.dll",
-          "sha256": "093e3ac68dfdac52a2667a2f7ba00b336392f9d6bde08430494ef54dbd120541"
-        },
-        {
-          "path": "bin/tls/qcertonlybackend.dll",
-          "sha256": "c1fa08ef8f0ea33370ad8e1239d9147262b08d002edab4bc4e9812827381dbba"
-        },
-        {
-          "path": "bin/tls/qschannelbackend.dll",
-          "sha256": "b263e588f2a93955a3e42b2c0d893d203cbe5a0ac42d1af5840ddd3b9a16b183"
-        }
-      ]
-    },
     {
       "id": "occt",
       "version": "7.9.3",
@@ -400,22 +332,8 @@
       }
     },
     {
-      "id": "dxc",
-      "version": "1.9.2602.17 (21d28f727)",
-      "license": "NCSA/MIT and Microsoft DirectX Shader Compiler terms",
-      "notice": "runtime/DirectXShaderCompiler/LICENSE-MS.txt",
-      "files": [
-        {
-          "path": "bin/dxcompiler.dll"
-        },
-        {
-          "path": "bin/dxil.dll"
-        }
-      ]
-    },
-    {
       "id": "msvc",
-      "version": "Microsoft Visual C++ redistributable selected by windeployqt / MSVC",
+      "version": "Microsoft Visual C++ redistributable that matches MSVC",
       "license": "Microsoft redistributable terms",
       "notice": "runtime/Microsoft-RUNTIME.txt",
       "files": [
@@ -429,12 +347,6 @@
     }
   ],
   "sources": [
-    {
-      "component": "qtbase",
-      "file": "qtbase-6.11.1.tar.xz",
-      "url": "https://download.qt.io/archive/qt/6.11/6.11.1/submodules/qtbase-everywhere-src-6.11.1.tar.xz",
-      "sha256": "d9594a31228aa23ad6b531719a29b45f0f3989fe6c136d45767ea179f233c1ac"
-    },
     {
       "component": "occt",
       "file": "OCCT-V7_9_3.tar.gz",

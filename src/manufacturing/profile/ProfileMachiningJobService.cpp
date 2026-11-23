@@ -1,6 +1,10 @@
 // ProfileMachiningJobService 实现（oap_manufacturing）。
 // 持久化外轮廓 root outer-wire 稳定引用，并在重新打开零件后重建区域与
 // 派生刀路，见 ProfileMachiningJobService.h。
+#include "analysis/ContentHash.h"
+#include "support/Identity.h"
+#include <vector>
+#include <string>
 #include "manufacturing/profile/ProfileMachiningJobService.h"
 
 #include <algorithm>
@@ -10,8 +14,6 @@
 #include <unordered_set>
 #include <utility>
 
-#include <QCryptographicHash>
-#include <QDateTime>
 
 #include "manufacturing/job/MachiningJobStorage.h"
 #include "toolpath/profile/geometry/ProfileRegionBuilder.h"
@@ -22,10 +24,7 @@ namespace {
 
 std::string sha256(const std::string& value)
 {
-    return QCryptographicHash::hash(
-               QByteArray::fromStdString(value),
-               QCryptographicHash::Sha256)
-        .toHex().toStdString();
+    return oap::sha256Hex(value);
 }
 
 std::string setupFaceToken(MoldSetupFace face)
@@ -99,7 +98,7 @@ std::string parametersFingerprint(const toolpath::ToolpathParams& params)
     MachiningJobDefinition snapshot;
     snapshot.profileParameters = params;
     return sha256(
-        MachiningJobStorage::serializeDefinition(snapshot).toStdString());
+        MachiningJobStorage::serializeDefinition(snapshot));
 }
 
 std::string operationFingerprint(
@@ -124,7 +123,7 @@ std::string operationFingerprint(
     std::ostringstream value;
     value << operation.setupId << '|'
           << (setup ? MachiningJobStorage::setupInputFingerprint(
-                          definition.part, *setup).toStdString()
+                          definition.part, *setup)
                     : std::string{}) << '|'
           << operation.toolControllerId << '|'
           << (controller
@@ -191,7 +190,7 @@ SetupDefinition makeSetup(
     if (result.confirmation.confirmed) {
         result.confirmation.confirmedInputFingerprint =
             MachiningJobStorage::setupInputFingerprint(part, result)
-                .toStdString();
+                ;
     }
     return result;
 }
@@ -237,8 +236,7 @@ bool ProfileMachiningJobService::capture(
     candidate.profileOperations.clear();
     candidate.schemaVersion = kMachiningJobSchemaVersion;
     candidate.profileParameters = *request.parameters;
-    candidate.modifiedAt = QDateTime::currentDateTimeUtc()
-        .toString(Qt::ISODateWithMs).toStdString();
+    candidate.modifiedAt = oap::utcTimestamp();
 
     int nextSequence = 0;
     for (const auto& operation : candidate.holeOperations)
@@ -358,7 +356,7 @@ bool ProfileMachiningJobService::capture(
     job.setProfileResult(
         std::move(batch),
         MachiningJobStorage::profileExecutionFingerprint(
-            job.definition()).toStdString());
+            job.definition()));
     return true;
 }
 
@@ -487,12 +485,11 @@ toolpath::ProfileToolpathBatch ProfileMachiningJobService::regenerate(
 
     if (!result.operations.empty())
         result.algorithmId = result.operations.front().algorithmId;
-    job.definition().modifiedAt = QDateTime::currentDateTimeUtc()
-        .toString(Qt::ISODateWithMs).toStdString();
+    job.definition().modifiedAt = oap::utcTimestamp();
     job.setProfileResult(
         result,
         MachiningJobStorage::profileExecutionFingerprint(
-            job.definition()).toStdString());
+            job.definition()));
     return result;
 }
 

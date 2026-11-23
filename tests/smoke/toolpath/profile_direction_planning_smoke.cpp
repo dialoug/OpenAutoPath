@@ -130,8 +130,8 @@ void checkStep(const char* path, const char* libraryPath)
     std::stable_sort(regions.begin(),regions.end(),[](const auto& a,const auto& b){return a.openDir.Z()>b.openDir.Z();});
     oap::tooling::ToolLibrary library;
     ToolpathParams params;
-    QString libraryError;
-    if(libraryPath)require(oap::tooling::ToolLibraryStorage::loadLibrary(QString::fromUtf8(libraryPath),library,&libraryError),"test tool library load failed");
+    std::string libraryError;
+    if(libraryPath)require(oap::tooling::ToolLibraryStorage::loadLibrary(libraryPath,library,&libraryError),"test tool library load failed");
     ProfileDirectionPlanningOptions options;
     options.hasCandidateTool=[&](const auto& r){return libraryPath ? oap::tooling::ProfileAutomaticToolpath::hasCandidateTool(library,r,params) : r.depth<=110;};
     const auto plan=ProfileDirectionPlanner().plan(regions,options);

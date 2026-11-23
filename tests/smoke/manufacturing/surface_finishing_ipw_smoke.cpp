@@ -56,7 +56,7 @@ m::SetupDefinition setup(const m::PartDefinition& part, int index, const gp_Ax3&
     value.valid = true;
     value.confirmation.confirmed = true;
     value.confirmation.confirmedInputFingerprint =
-        m::MachiningJobStorage::setupInputFingerprint(part, value).toStdString();
+        m::MachiningJobStorage::setupInputFingerprint(part, value);
     return value;
 }
 
@@ -81,7 +81,7 @@ void installFinishing(m::MachiningJob& job, const TopoDS_Shape& target)
         batch.operations.push_back(std::move(operation));
     }
     job.setFinishingResult(std::move(batch),
-        m::MachiningJobStorage::finishingExecutionFingerprint(job.definition()).toStdString());
+        m::MachiningJobStorage::finishingExecutionFingerprint(job.definition()));
 }
 
 m::MachiningJob fixture(const TopoDS_Shape& target)
@@ -146,7 +146,7 @@ m::MachiningJob fixture(const TopoDS_Shape& target)
     roughRuntime.clearing.primitives.push_back(t::makeLinearPrimitive(move));
     roughBatch.operations.push_back(std::move(roughRuntime));
     job.setPocketResult(std::move(roughBatch),
-        m::MachiningJobStorage::pocketExecutionFingerprint(def).toStdString());
+        m::MachiningJobStorage::pocketExecutionFingerprint(def));
     installFinishing(job, target);
     const auto errors = job.validationErrors();
     require(errors.empty(), errors.empty() ? "" : errors.front());
@@ -278,7 +278,7 @@ void verifyStockRoughingAndFinishing()
     t::SurfaceFinishingBatch batch;
     batch.effectiveParams = operation.result.toolpathParams();
     batch.operations.push_back(std::move(operation));
-    job.setFinishingResult(std::move(batch), m::MachiningJobStorage::finishingExecutionFingerprint(def).toStdString());
+    job.setFinishingResult(std::move(batch), m::MachiningJobStorage::finishingExecutionFingerprint(def));
     require(job.validationErrors().empty(), "layered formal Job is invalid");
     const auto assembled = m::MachiningProgramAssembler{}.assemble(job);
     require(assembled.ok() && assembled.program.operations.size() == 1 &&

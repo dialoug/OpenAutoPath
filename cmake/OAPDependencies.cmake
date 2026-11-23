@@ -3,42 +3,26 @@
 # 直接从根 CMakeLists.txt 配置时优先使用环境变量；未设置环境变量则回退到
 # 当前仓库的标准 Windows 开发目录布局。所有路径仍是缓存变量，可用 -D 覆盖。
 
-set(oap_qt_root_default "$ENV{OAP_QT_ROOT}")
-if(NOT oap_qt_root_default AND WIN32)
-    set(oap_qt_root_default "C:/Qt/6.11.1/msvc2022_64")
-endif()
-set(OAP_QT_ROOT "${oap_qt_root_default}" CACHE PATH
-    "Qt installation prefix containing lib/cmake/Qt6")
-if(OAP_QT_ROOT)
-    list(PREPEND CMAKE_PREFIX_PATH "${OAP_QT_ROOT}")
-endif()
-set(oap_qt_components Core)
-if(OAP_BUILD_GUI)
-    list(APPEND oap_qt_components Widgets Gui OpenGL OpenGLWidgets ShaderTools GuiPrivate)
-endif()
-find_package(Qt6 6.11 REQUIRED COMPONENTS ${oap_qt_components})
 find_package(Threads REQUIRED)
+include(FetchContent)
 
-# Native Vulkan compute/indirect draw interop needs headers only. Device entry
-# points come from Qt's Vulkan instance, so no separate loader library is linked.
-if(OAP_BUILD_GUI)
-    find_path(OAP_VULKAN_HEADERS_DIR vulkan/vulkan.h HINTS "$ENV{VULKAN_SDK}/Include")
-    if(NOT OAP_VULKAN_HEADERS_DIR)
-        include(FetchContent)
-        cmake_policy(PUSH)
-        if(POLICY CMP0135)
-            cmake_policy(SET CMP0135 NEW)
-        endif()
-        FetchContent_Declare(oap_vulkan_headers
-            URL https://codeload.github.com/KhronosGroup/Vulkan-Headers/zip/refs/tags/v1.3.290
-            URL_HASH SHA256=918a8bb31b8312fd649fd1d1826443da870f33f3187c16c4528aa94927409bab
-            # Only populate headers; do not add the dependency's install/test targets.
-            SOURCE_SUBDIR include)
-        FetchContent_MakeAvailable(oap_vulkan_headers)
-        cmake_policy(POP)
-        set(OAP_VULKAN_HEADERS_DIR "${oap_vulkan_headers_SOURCE_DIR}/include")
-    endif()
+set(OAP_JSON_ROOT "$ENV{OAP_JSON_ROOT}" CACHE PATH "Optional nlohmann/json 3.12.0 source directory")
+if(NOT OAP_JSON_ROOT AND EXISTS "${PROJECT_SOURCE_DIR}/external/nlohmann/include/nlohmann/json.hpp")
+    set(OAP_JSON_ROOT "${PROJECT_SOURCE_DIR}/external/nlohmann")
 endif()
+if(NOT OAP_JSON_ROOT)
+    if(POLICY CMP0135)
+        cmake_policy(SET CMP0135 NEW)
+    endif()
+    FetchContent_Declare(oap_json
+        URL https://github.com/nlohmann/json/releases/download/v3.12.0/include.zip
+        URL_HASH SHA256=b8cb0ef2dd7f57f18933997c9934bb1fa962594f701cd5a8d3c2c80541559372
+        SOURCE_SUBDIR _oap_headers_only)
+    FetchContent_MakeAvailable(oap_json)
+    set(OAP_JSON_ROOT "${oap_json_SOURCE_DIR}")
+endif()
+find_path(OAP_JSON_INCLUDE_DIR nlohmann/json.hpp
+    PATHS "${OAP_JSON_ROOT}/include" "${OAP_JSON_ROOT}" NO_DEFAULT_PATH REQUIRED)
 
 include("${CMAKE_CURRENT_LIST_DIR}/dependencies/OAPOCCT.cmake")
 if(OAP_OCCT_PROVIDER STREQUAL "WINDOWS_SDK")
@@ -114,7 +98,6 @@ if(WIN32)
     include("${CMAKE_CURRENT_LIST_DIR}/platforms/OAPWindowsDependencies.cmake")
 endif()
 
-unset(oap_qt_root_default)
 unset(oap_occt_root_default)
 unset(oap_clipper2_root_default)
 unset(oap_thirdparty_root_default)

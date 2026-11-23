@@ -7,4 +7,3 @@ dependencies:
   - cxx-compiler
   - git
   - occt=7.9.3=novtk*
-  - qt6-main=6.11.1

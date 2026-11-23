@@ -1,3 +1,9 @@
+#include "support/Files.h"
+#include <bit>
+#include "support/Json.h"
+#include <vector>
+#include <string>
+#include <cstdint>
 #include "Simulation.h"
 #include "toolpath/pocket/simulation/IpwQuality.h"
 #include "toolpath/pocket/simulation/PocketZMapComparison.h"
@@ -5,13 +11,9 @@
 #include "toolpath/core/simulation/FixedAxisToolpathView.h"
 #include <algorithm>
 #include "manufacturing/ipw/HoleMultiDexelUpdater.h"
-#include <QDataStream>
 #include <map>
 #include <array>
 #include "toolpath/core/PocketToolBinding.h"
-#include <QJsonArray>
-#include <QJsonDocument>
-#include <QSaveFile>
 #include <stdexcept>
 
 namespace oap::worker
@@ -120,11 +122,11 @@ Stock moveFrame(const MachiningJob &job, const ipw::IpwNode &node, std::size_t c
     return stock;
 }
 
-QJsonArray meshJson(const Handle(Poly_Triangulation) & mesh, const QString &id)
+oap::JsonArray meshJson(const Handle(Poly_Triangulation) & mesh, const std::string &id)
 {
     if (mesh.IsNull())
         return {};
-    QJsonArray positions, indices;
+    oap::JsonArray positions, indices;
     for (int i = 1; i <= mesh->NbNodes(); ++i)
     {
         const auto p = mesh->Node(i);
@@ -139,18 +141,17 @@ QJsonArray meshJson(const Handle(Poly_Triangulation) & mesh, const QString &id)
             indices.append(tri.Value(k) - 1);
     }
 
-    return {QJsonObject{{"id", id}, {"positions", positions}, {"indices", indices}}};
+    return {oap::JsonObject{{"id", id}, {"positions", positions}, {"indices", indices}}};
 }
 
-void writeMeshData(const QString &name, const QJsonDocument &document)
+void writeMeshData(const std::string &name, const oap::JsonDocument &document)
 {
-    QSaveFile file(name);
-    const auto bytes = document.toJson(QJsonDocument::Compact);
-    if (!file.open(QIODevice::WriteOnly) || file.write(bytes) != bytes.size() || !file.commit())
+    const auto bytes = document.toJson(oap::JsonDocument::Compact);
+    if (!oap::writeFileAtomically(name, bytes))
         throw std::runtime_error("无法保存余料网格");
 }
 
-QJsonObject compareStock(const MachiningJob &job, Stock stock, const TopoDS_Shape &target,
+oap::JsonObject compareStock(const MachiningJob &job, Stock stock, const TopoDS_Shape &target,
                          const toolpath::DexelDisplayMeshOptions &opts)
 {
     const auto &session = job.ipwSession();
@@ -173,8 +174,8 @@ QJsonObject compareStock(const MachiningJob &job, Stock stock, const TopoDS_Shap
         throw std::runtime_error(audit.diagnostics.empty() ? "余料与成品比较失败"
                                                            : audit.diagnostics.front().message);
     const auto display = audit.heightFieldDisplaySource;
-    QJsonObject meshes;
-    const auto saveView = [&](const QString &key, toolpath::PocketZMapDifferenceView view, double volume) {
+    oap::JsonObject meshes;
+    const auto saveView = [&](const std::string &key, toolpath::PocketZMapDifferenceView view, double volume) {
         if (volume <= 0 || !display)
             return;
         Handle(Poly_Triangulation) mesh;
@@ -186,15 +187,15 @@ QJsonObject compareStock(const MachiningJob &job, Stock stock, const TopoDS_Shap
     saveView("allowance", View::RemainingAllowance, audit.remainingAllowanceVolume);
     saveView("overcut", View::Overcut, audit.overcutVolume);
     saveView("missing", View::InitialMissing, audit.initialMissingVolume);
-    writeMeshData("differences.json", QJsonDocument(meshes));
-    QJsonArray attribution;
+    writeMeshData("differences.json", oap::JsonDocument(meshes));
+    oap::JsonArray attribution;
     if (audit.overcutVolume > std::max(1e-8, 1e-9 * audit.targetVolume))
     {
         const auto attributed = comparison.attributeOvercut(data, target, {}, nullptr, display);
         if (!attributed.complete)
             throw std::runtime_error("工序过切归因失败");
         for (const auto &op : attributed.operations)
-            attribution.append(QJsonObject{{"operation", QString::fromStdString(op.operationId)},
+            attribution.append(oap::JsonObject{{"operation", op.operationId},
                                            {"sequence", op.sequenceIndex},
                                            {"volume", op.volume},
                                            {"certain", op.certainVolume},
@@ -210,7 +211,7 @@ QJsonObject compareStock(const MachiningJob &job, Stock stock, const TopoDS_Shap
 }
 } // namespace
 
-QJsonObject replayResult(const MachiningJob &job, bool selectedOnly, int quality)
+oap::JsonObject replayResult(const MachiningJob &job, bool selectedOnly, int quality)
 {
     const auto &nodes = job.ipwSession().nodes();
     if (nodes.empty())
@@ -222,8 +223,8 @@ QJsonObject replayResult(const MachiningJob &job, bool selectedOnly, int quality
         std::vector<Cut> cuts;
     };
     std::vector<Operation> operations;
-    QJsonArray path, spans, frames, tools;
-    const auto point = [](const gp_Pnt &p) { return QJsonArray{p.X(), p.Y(), p.Z()}; };
+    oap::JsonArray path, spans, frames, tools;
+    const auto point = [](const gp_Pnt &p) { return oap::JsonArray{p.X(), p.Y(), p.Z()}; };
     for (const auto &node : nodes) {
         if (selectedOnly && &node != &nodes.back())
             continue;
@@ -233,30 +234,32 @@ QJsonObject replayResult(const MachiningJob &job, bool selectedOnly, int quality
         auto cuts = operationCuts(job, node, families.at(kind));
         for (const auto &cut : cuts) {
             for (const auto &move : cut.path.moves)
-                path.append(QJsonArray{point(move.from), point(move.to)});
+                path.append(oap::JsonArray{point(move.from), point(move.to)});
             toolpath::DexelToolProfile profile;
-            QJsonArray outline;
+            oap::JsonArray outline;
             if (toolpath::buildDexelToolProfile(cut.profile, {}, profile)) {
                 for (const auto &band : profile.bands) {
-                    outline.append(QJsonArray{band.radius, band.lower});
-                    outline.append(QJsonArray{band.radius, band.upper});
+                    outline.append(oap::JsonArray{band.radius, band.lower});
+                    outline.append(oap::JsonArray{band.radius, band.upper});
                 }
             }
             const auto &axis = cut.path.outwardToolAxis;
-            tools.append(QJsonObject{{"end", path.size()}, {"axis", QJsonArray{axis.X(), axis.Y(), axis.Z()}},
+            tools.append(oap::JsonObject{{"end", path.size()}, {"axis", oap::JsonArray{axis.X(), axis.Y(), axis.Z()}},
                                      {"outline", outline}});
         }
-        spans.append(QJsonObject{{"id", QString::fromStdString(node.operation.id)}, {"end", path.size()}});
+        spans.append(oap::JsonObject{{"id", node.operation.id}, {"end", path.size()}});
         operations.push_back({node, std::move(cuts)});
     }
-    writeMeshData("path.json", QJsonDocument(path));
-    QSaveFile file("replay.bin");
-    if (!file.open(QIODevice::WriteOnly))
-        throw std::runtime_error("无法写入余料回放");
-    QDataStream out(&file);
-    out.setByteOrder(QDataStream::LittleEndian);
-    out.setFloatingPointPrecision(QDataStream::SinglePrecision);
-    auto saveFrame = [&](const Stock &stock, qsizetype move) {
+    writeMeshData("path.json", oap::JsonDocument(path));
+    oap::AtomicFile file("replay.bin");
+    if (!file.stream()) throw std::runtime_error("无法写入余料回放");
+    auto writeWord = [&](std::uint32_t word) {
+        const std::array bytes{
+            static_cast<char>(word), static_cast<char>(word >> 8),
+            static_cast<char>(word >> 16), static_cast<char>(word >> 24)};
+        file.stream().write(bytes.data(), bytes.size());
+    };
+    auto saveFrame = [&](const Stock &stock, std::size_t move) {
         const auto opts = toolpath::ipwDisplayQualityProfile(quality, stock->resolution()).meshOptions;
         toolpath::DexelDisplayMeshMetrics metrics;
         Handle(Poly_Triangulation) mesh;
@@ -265,28 +268,28 @@ QJsonObject replayResult(const MachiningJob &job, bool selectedOnly, int quality
             throw std::runtime_error("余料回放网格: " + error);
         // The native surface duplicates the vertices of every triangle. Index
         // identical transmitted positions, keeping the original facets and winding.
-        std::map<std::array<float, 3>, quint32> vertices;
-        std::vector<quint32> indices(mesh->NbNodes() + 1);
+        std::map<std::array<float, 3>, std::uint32_t> vertices;
+        std::vector<std::uint32_t> indices(mesh->NbNodes() + 1);
         for (int i = 1; i <= mesh->NbNodes(); ++i) {
             const auto p = mesh->Node(i);
             const std::array<float, 3> xyz{float(p.X()), float(p.Y()), float(p.Z())};
-            const auto [it, inserted] = vertices.try_emplace(xyz, static_cast<quint32>(vertices.size()));
+            const auto [it, inserted] = vertices.try_emplace(xyz, static_cast<std::uint32_t>(vertices.size()));
             if (inserted)
-                out << xyz[0] << xyz[1] << xyz[2];
+                for (const float coordinate : xyz) writeWord(std::bit_cast<std::uint32_t>(coordinate));
             indices[i] = it->second;
         }
         const auto triangles = mesh->NbTriangles();
         for (int i = 1; i <= triangles; ++i) {
             const auto &t = mesh->Triangle(i);
-            out << indices[t.Value(1)] << indices[t.Value(2)] << indices[t.Value(3)];
+            for (int corner = 1; corner <= 3; ++corner) writeWord(indices[t.Value(corner)]);
         }
-        frames.append(QJsonObject{{"move", move}, {"vertices", static_cast<qint64>(vertices.size())}, {"triangles", triangles},
+        frames.append(oap::JsonObject{{"move", move}, {"vertices", static_cast<std::int64_t>(vertices.size())}, {"triangles", triangles},
                                   {"volume", stock->volume()}, {"materialSpacing", stock->resolution()},
                                   {"displaySpacing", stock->resolution() * metrics.planarDecimationStride}});
     };
     // At most 33 display meshes per replay, independent of program length.
     const auto stride = (path.size() + 31) / 32;
-    qsizetype cursor = 0;
+    std::size_t cursor = 0;
     saveFrame(checkpoint(job, operations.front().node.parentStateKey), cursor);
     for (const auto &[node, cuts] : operations) {
         auto stock = checkpoint(job, node.parentStateKey);
@@ -304,29 +307,29 @@ QJsonObject replayResult(const MachiningJob &job, bool selectedOnly, int quality
             }
         }
     }
-    if (out.status() != QDataStream::Ok || !file.commit())
+    if (!file.commit())
         throw std::runtime_error("无法保存余料回放");
     return {{"frames", frames}, {"operations", spans}, {"tools", tools}, {"moves", path.size()},
             {"quality", quality}, {"selectedOnly", selectedOnly}};
 }
 
-QJsonObject stockResult(const MachiningJob &job, const ipw::IpwExecutionResult &simulation,
-                        const QJsonObject &request, const TopoDS_Shape &target)
+oap::JsonObject stockResult(const MachiningJob &job, const ipw::IpwExecutionResult &simulation,
+                        const oap::JsonObject &request, const TopoDS_Shape &target)
 {
     const auto &nodes = job.ipwSession().nodes();
     auto stock = simulation.finalCheckpoint->dexelStock;
-    QJsonObject result;
+    oap::JsonObject result;
     int completeOperations = static_cast<int>(nodes.size());
     if (request.contains("completedMoves"))
     {
         const int completed = request["completedMoves"].toInt(-1);
         if (completed < 0 || nodes.empty() ||
-            nodes.back().operation.id != request["operation"].toString().toStdString())
+            nodes.back().operation.id != request["operation"].toString())
             throw std::runtime_error("无效的移动仿真请求");
         std::size_t total = 0;
         stock = moveFrame(job, nodes.back(), completed, total);
         result.insert("completedMoves", completed);
-        result.insert("totalMoves", static_cast<qint64>(total));
+        result.insert("totalMoves", static_cast<std::int64_t>(total));
         if (completed < total)
             --completeOperations;
     }
@@ -337,7 +340,7 @@ QJsonObject stockResult(const MachiningJob &job, const ipw::IpwExecutionResult &
     toolpath::DexelDisplayMeshMetrics metrics;
     if (!stock->buildDisplayMesh(mesh, &metrics, &error, {}, opts) || mesh.IsNull())
         throw std::runtime_error("IPW mesh: " + error);
-    writeMeshData("stock.json", QJsonDocument(meshJson(mesh, "IPW")));
+    writeMeshData("stock.json", oap::JsonDocument(meshJson(mesh, "IPW")));
     result.insert("comparison", compareStock(job, stock, target, opts));
     result.insert("volume", stock->volume());
     result.insert("quality", quality);

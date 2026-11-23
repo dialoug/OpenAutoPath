@@ -1,4 +1,6 @@
 // 加工 Job 工序管理事务实现，见 MachiningOperationService.h。
+#include <vector>
+#include <string>
 #include "manufacturing/job/MachiningOperationService.h"
 
 #include <algorithm>
@@ -13,8 +15,6 @@
 #include <unordered_set>
 #include <utility>
 
-#include <QCryptographicHash>
-#include <QDateTime>
 
 #include "manufacturing/job/MachiningJobStorage.h"
 

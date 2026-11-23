@@ -1,5 +1,8 @@
 // IpwSession 的实现:内容寻址的 stateKey 链、最长前缀复用与节点状态机。
 // 属于 oap_manufacturing::ipw 模块,配合 IpwCheckpointStore 使用。
+#include "analysis/ContentHash.h"
+#include <vector>
+#include <string>
 #include "manufacturing/ipw/IpwSession.h"
 
 #include <algorithm>
@@ -7,34 +10,21 @@
 #include <unordered_set>
 #include <utility>
 
-#include <QByteArray>
-#include <QCryptographicHash>
 
 namespace oap::manufacturing::ipw {
 namespace {
 
-void addFingerprintPart(
-    QCryptographicHash& hash,
-    std::string_view value)
+// Length-prefix each field so adjacent components cannot alias.
+std::string stableStateKey(const std::vector<std::string_view>& parts)
 {
-    const QByteArray bytes(
-        value.data(),
-        static_cast<qsizetype>(value.size()));
-    hash.addData(QByteArray::number(bytes.size()));
-    hash.addData(QByteArrayLiteral(":"));
-    hash.addData(bytes);
-    hash.addData(QByteArrayLiteral(";"));
-}
-
-// 以长度前缀方式把多个部件拼入 SHA-256,得到确定性的内容寻址键
-// (长度前缀避免部件边界歧义)。
-std::string stableStateKey(
-    const std::vector<std::string_view>& parts)
-{
-    QCryptographicHash hash(QCryptographicHash::Sha256);
-    for (const std::string_view part : parts)
-        addFingerprintPart(hash, part);
-    return hash.result().toHex().toStdString();
+    std::string bytes;
+    for (const auto part : parts) {
+        bytes += std::to_string(part.size());
+        bytes += ':';
+        bytes += part;
+        bytes += ';';
+    }
+    return oap::sha256Hex(bytes);
 }
 
 // 根节点键:由初始毛坯指纹与引擎指纹决定;任一变化即生成新根键,使旧前缀失效。

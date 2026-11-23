@@ -1,42 +1,38 @@
+#include "support/Files.h"
+#include "support/Json.h"
+#include <string>
 #include "NcReview.h"
 #include "toolpath/program/validation/GCodeReview.h"
-#include <QFile>
-#include <QJsonDocument>
-#include <QSaveFile>
 #include <stdexcept>
 
 namespace oap::worker {
-QJsonObject reviewNc(const std::string &text, const QString &filename, const QString &setup,
-                     const QString &tool, const QJsonArray &operations, QJsonArray warnings)
+oap::JsonObject reviewNc(const std::string &text, const std::string &filename, const std::string &setup,
+                     const std::string &tool, const oap::JsonArray &operations, oap::JsonArray warnings)
 {
     const auto report = toolpath::GCodeReview().review(text);
-    QJsonArray errors;
+    oap::JsonArray errors;
     for (const auto &issue : report.issues) {
         auto &rows = issue.severity == toolpath::GCodeReviewSeverity::Error ? errors : warnings;
-        rows.append(QJsonObject{{"code", QString::fromStdString(issue.code)}, {"line", issue.line},
-                                {"message", QString::fromStdString(issue.message)}});
+        rows.append(oap::JsonObject{{"code", issue.code}, {"line", issue.line},
+                                {"message", issue.message}});
     }
     return {{"filename", filename}, {"setup", setup}, {"tool", tool}, {"operations", operations},
-            {"lines", report.lineCount}, {"warnings", warnings}, {"errors", errors}, {"text", QString::fromStdString(text)}};
+            {"lines", report.lineCount}, {"warnings", warnings}, {"errors", errors}, {"text", text}};
 }
 
-void writeNcReport(const QJsonArray &programs)
+void writeNcReport(const oap::JsonArray &programs)
 {
-    QSaveFile file("programs.json");
-    const auto bytes = QJsonDocument(programs).toJson(QJsonDocument::Compact);
-    if (!file.open(QIODevice::WriteOnly) || file.write(bytes) != bytes.size() || !file.commit())
+    const auto bytes = oap::JsonDocument(programs).toJson(oap::JsonDocument::Compact);
+    if (!oap::writeFileAtomically("programs.json", bytes))
         throw std::runtime_error("无法保存 NC 审查结果");
 }
 
-int reviewSingleNc(const QString &setup, const QString &tool, const QJsonArray &operations, QJsonArray warnings)
+int reviewSingleNc(const std::string &setup, const std::string &tool, const oap::JsonArray &operations, oap::JsonArray warnings)
 {
-    QFile file("reference.nc");
-    if (!file.open(QIODevice::ReadOnly))
+    std::string text;
+    if (!oap::readFile("reference.nc", text))
         throw std::runtime_error("无法读取工序参考 NC");
-    const auto text = file.readAll();
-    if (file.error() != QFileDevice::NoError)
-        throw std::runtime_error("读取工序参考 NC 失败");
-    const auto program = reviewNc(text.toStdString(), "reference.nc", setup, tool, operations, warnings);
+    const auto program = reviewNc(text, "reference.nc", setup, tool, operations, warnings);
     writeNcReport({program});
     return static_cast<int>(program["errors"].toArray().size());
 }

@@ -33,26 +33,9 @@
       }
     },
     {
-      "name": "windows-vs2022",
-      "inherits": "windows-base",
-      "generator": "Visual Studio 17 2022",
-      "cacheVariables": {
-        "OAP_BUILD_GUI": true,
-        "OAP_DEPLOY_RUNTIME": true
-      }
-    },
-    {
-      "name": "windows-vs2026",
-      "inherits": "windows-vs2022",
-      "generator": "Visual Studio 18 2026"
-    },
-    {
       "name": "windows-core",
-      "inherits": "windows-vs2022",
-      "cacheVariables": {
-        "OAP_BUILD_GUI": false,
-        "OAP_DEPLOY_RUNTIME": false
-      }
+      "inherits": "windows-base",
+      "generator": "Visual Studio 17 2022"
     },
     {
       "name": "windows-core-vs2026",
@@ -67,9 +50,7 @@
       "cacheVariables": {
         "CMAKE_BUILD_TYPE": "RelWithDebInfo",
         "CMAKE_EXPORT_COMPILE_COMMANDS": true,
-        "OAP_OCCT_PROVIDER": "PACKAGE",
-        "OAP_BUILD_GUI": false,
-        "OAP_DEPLOY_RUNTIME": false
+        "OAP_OCCT_PROVIDER": "PACKAGE"
       }
     },
     {
@@ -92,18 +73,6 @@
     }
   ],
   "buildPresets": [
-    {
-      "name": "windows-vs2022",
-      "configurePreset": "windows-vs2022",
-      "configuration": "RelWithDebInfo",
-      "jobs": 4
-    },
-    {
-      "name": "windows-vs2026",
-      "configurePreset": "windows-vs2026",
-      "configuration": "RelWithDebInfo",
-      "jobs": 4
-    },
     {
       "name": "windows-core",
       "configurePreset": "windows-core",
@@ -131,38 +100,6 @@
   ],
   "testPresets": [
     {
-      "name": "windows-vs2022",
-      "configurePreset": "windows-vs2022",
-      "configuration": "RelWithDebInfo",
-      "output": {
-        "outputOnFailure": true
-      },
-      "filter": {
-        "include": {
-          "label": "fast"
-        }
-      },
-      "execution": {
-        "noTestsAction": "error"
-      }
-    },
-    {
-      "name": "windows-vs2026",
-      "configurePreset": "windows-vs2026",
-      "configuration": "RelWithDebInfo",
-      "output": {
-        "outputOnFailure": true
-      },
-      "filter": {
-        "include": {
-          "label": "fast"
-        }
-      },
-      "execution": {
-        "noTestsAction": "error"
-      }
-    },
-    {
       "name": "windows-core",
       "configurePreset": "windows-core",
       "configuration": "Release",
@@ -224,24 +161,6 @@
       },
       "execution": {
         "noTestsAction": "error"
-      }
-    },
-    {
-      "name": "windows-vs2022-packaging",
-      "inherits": "windows-vs2022",
-      "filter": {
-        "include": {
-          "label": "packaging"
-        }
-      }
-    },
-    {
-      "name": "windows-vs2026-packaging",
-      "inherits": "windows-vs2026",
-      "filter": {
-        "include": {
-          "label": "packaging"
-        }
       }
     },
     {

@@ -12,7 +12,7 @@ manual tool controllers are rejected before installation; automatic library-back
 projects migrate without discarding operations. The module is a
 UI-independent application/domain module; dialogs, progress presentation and
 scene updates belong to the focused `oap_app_workflow_*` targets or
-`OpenAutoPathApp`.
+`oap-worker`.
 
 The repository-wide dependency rules are defined in
 [`ARCHITECTURE.md`](../../ARCHITECTURE.md). The component map and boundary contracts below describe the current Job and IPW responsibilities.
@@ -48,7 +48,7 @@ The repository-wide dependency rules are defined in
 
 - [Toolpath modules](../toolpath/README.md) describe generation, validation and the program boundary.
 - [Surface finishing](../toolpath/finishing/README.md) describes engraving parameters and integration.
-- [Application workflows](../app/workflows/README.md) describe desktop transactions and project coordination.
+- [Web server workflows](../../server/README.md) describe project versions and CAM tasks.
 
 ## Boundary contract
 
@@ -60,7 +60,7 @@ types.
 
 The module must not:
 
-- include desktop widgets, `MainWindow`, `OcctView` or presentation objects;
+- depend on presentation objects;
 - store widget state in the persistent Job definition;
 - persist generated OCCT toolpaths, display meshes or IPW cache objects as Job
   source data;
@@ -76,10 +76,10 @@ The deterministic fast suite exercises Job validation and storage projections,
 project-level neutral-program assembly/partitioning and IPW publication gates, hole batch identity,
 Hole/Pocket/Profile/SurfaceFinishing IPW behavior, project regeneration and DTO mapping.
 After configuring dependencies as described in [BUILDING.md](../../BUILDING.md),
-run the fast suite from the repository root (use `windows-vs2026` for VS 2026).
+run the fast suite from the repository root (use `windows-core-vs2026` for VS 2026).
 For full regression, use the unfiltered commands in the build guide:
 
 ```powershell
-cmake --build --preset windows-vs2022
-ctest --preset windows-vs2022 --parallel 1
+cmake --build --preset windows-core
+ctest --preset windows-core --parallel 1
 ```

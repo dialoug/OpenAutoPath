@@ -136,7 +136,7 @@ SetupSynchronizationReport MachiningJobApplicationService::captureSetups(
 
         const std::string inputFingerprint =
             MachiningJobStorage::setupInputFingerprint(
-                definition.part, setup).toStdString();
+                definition.part, setup);
         if (setup.confirmation.confirmed &&
             setup.confirmation.confirmedInputFingerprint ==
                 inputFingerprint) {
@@ -175,7 +175,7 @@ MachiningJobApplicationService::rebindLoadedSetups(
         applyFrame(rebound, *frame);
         const std::string expected =
             MachiningJobStorage::setupInputFingerprint(
-                definition.part, rebound).toStdString();
+                definition.part, rebound);
         if (setup.confirmation.confirmed &&
             setup.confirmation.confirmedInputFingerprint == expected) {
             ++report.retainedConfirmationCount;
@@ -297,21 +297,21 @@ bool MachiningJobApplicationService::synchronizeForSave(
         job.setHoleResult(
             std::move(*holeResult),
             MachiningJobStorage::holeExecutionFingerprint(
-                definition).toStdString());
+                definition));
     }
     if (pocketResult) {
         job.setPocketResult(
             std::move(*pocketResult),
             MachiningJobStorage::pocketExecutionFingerprint(
-                definition).toStdString());
+                definition));
     }
     if (profileResult) {
         job.setProfileResult(
             std::move(*profileResult),
             MachiningJobStorage::profileExecutionFingerprint(
-                definition).toStdString());
+                definition));
     }
-    const std::string currentFingerprint = MachiningJobStorage::finishingExecutionFingerprint(definition).toStdString();
+    const std::string currentFingerprint = MachiningJobStorage::finishingExecutionFingerprint(definition);
     if (finishingResult && currentFingerprint == finishingFingerprint)
         job.setFinishingResult(std::move(*finishingResult), currentFingerprint);
     else

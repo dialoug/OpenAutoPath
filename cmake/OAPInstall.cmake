@@ -12,7 +12,7 @@ if(OAP_INSTALL_DEVELOPMENT)
         "oap_toolpath_algorithms|ToolpathAlgorithms" "oap_toolpath_workflow|ToolpathWorkflow"
         "oap_toollibrary|ToolLibrary" "oap_toolpath_adapter|ToolpathAdapter"
         "oap_manufacturing|Manufacturing")
-    set(oap_install_targets oap_opencamlib)
+    set(oap_install_targets oap_opencamlib oap_support)
     set_target_properties(oap_opencamlib PROPERTIES EXPORT_NAME OpenCAMLib)
     foreach(entry IN LISTS oap_core_exports)
         string(REPLACE "|" ";" entry "${entry}")
@@ -49,52 +49,32 @@ if(OAP_INSTALL_DEVELOPMENT)
         DESTINATION "${oap_package_dir}" COMPONENT Development)
 endif()
 
-if(OAP_BUILD_GUI)
-    # Include the source and license of the embedded Qt translation resource.
-    install(DIRECTORY "${PROJECT_SOURCE_DIR}/resources/i18n/qt/"
-        DESTINATION ${CMAKE_INSTALL_DATADIR}/licenses/OpenAutoPath/qttranslations
-        COMPONENT Runtime)
-    install(TARGETS OpenAutoPath RUNTIME DESTINATION . COMPONENT Runtime)
-    install(TARGETS OpenAutoPathApp oap_opencamlib
-        RUNTIME DESTINATION bin COMPONENT Runtime)
-    if(OAP_DEPLOY_RUNTIME)
-        # Install from the populated runtime directory, not the whole build tree.
-        # This preserves Qt plugin subdirectories and the VC runtime installer.
-        install(DIRECTORY "$<TARGET_FILE_DIR:OpenAutoPathApp>/"
-            DESTINATION bin COMPONENT Runtime
-            FILES_MATCHING PATTERN "*.dll" PATTERN "vc_redist*.exe")
-    endif()
-endif()
-
-set(oap_license_components Runtime Development)
-if(OAP_BUILD_WORKER)
-    list(APPEND oap_license_components ServerWorker)
-    install(TARGETS oap-worker RUNTIME_DEPENDENCY_SET oap_worker_runtime
+install(TARGETS oap-worker RUNTIME_DEPENDENCY_SET oap_worker_runtime
+    RUNTIME DESTINATION bin COMPONENT ServerWorker)
+install(TARGETS oap_opencamlib
+    RUNTIME DESTINATION bin COMPONENT ServerWorker
+    LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR} COMPONENT ServerWorker)
+if(WIN32)
+    set(worker_dll_dirs "${OAP_OCCT_RUNTIME_DIR}")
+    foreach(dll IN LISTS OAP_THIRDPARTY_DLLS OAP_VCOMP_RUNTIME_DLL)
+        get_filename_component(dll_dir "${dll}" DIRECTORY)
+        list(APPEND worker_dll_dirs "${dll_dir}")
+    endforeach()
+    list(REMOVE_DUPLICATES worker_dll_dirs)
+    install(RUNTIME_DEPENDENCY_SET oap_worker_runtime
+        DIRECTORIES ${worker_dll_dirs}
+        PRE_EXCLUDE_REGEXES "^(api|ext)-ms-"
+        POST_EXCLUDE_REGEXES "[/\\\\][Ss]ystem32[/\\\\]"
         RUNTIME DESTINATION bin COMPONENT ServerWorker)
-    install(TARGETS oap_opencamlib
-        RUNTIME DESTINATION bin COMPONENT ServerWorker
-        LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR} COMPONENT ServerWorker
-        ARCHIVE DESTINATION ${CMAKE_INSTALL_LIBDIR} COMPONENT Development)
-    if(WIN32)
-        set(worker_dll_dirs "${OAP_QT_BIN_DIR}" "${OAP_OCCT_RUNTIME_DIR}")
-        foreach(dll IN LISTS OAP_THIRDPARTY_DLLS OAP_VCOMP_RUNTIME_DLL)
-            get_filename_component(dll_dir "${dll}" DIRECTORY)
-            list(APPEND worker_dll_dirs "${dll_dir}")
-        endforeach()
-        install(RUNTIME_DEPENDENCY_SET oap_worker_runtime
-            DIRECTORIES ${worker_dll_dirs}
-            PRE_EXCLUDE_REGEXES "^(api|ext)-ms-"
-            POST_EXCLUDE_REGEXES "[/\\\\][Ss]ystem32[/\\\\]"
-            RUNTIME DESTINATION bin COMPONENT ServerWorker)
-        install(DIRECTORY "${PROJECT_SOURCE_DIR}/licenses/runtime/"
-            DESTINATION ${CMAKE_INSTALL_DATADIR}/licenses/OpenAutoPath/runtime
-            COMPONENT ServerWorker)
-    endif()
+    install(DIRECTORY "${PROJECT_SOURCE_DIR}/licenses/runtime/"
+        DESTINATION ${CMAKE_INSTALL_DATADIR}/licenses/OpenAutoPath/runtime
+        COMPONENT ServerWorker)
 endif()
 
-foreach(component IN LISTS oap_license_components)
+foreach(component Development ServerWorker)
     install(FILES "${PROJECT_SOURCE_DIR}/LICENSE"
         "${PROJECT_SOURCE_DIR}/THIRD_PARTY_NOTICES.md"
+        "${PROJECT_SOURCE_DIR}/licenses/nlohmann-json-MIT.txt"
         "${PROJECT_SOURCE_DIR}/licenses/AnalysisSitus-BSD-3-Clause.txt"
         DESTINATION ${CMAKE_INSTALL_DATADIR}/licenses/OpenAutoPath
         COMPONENT ${component})
@@ -112,23 +92,4 @@ foreach(component IN LISTS oap_license_components)
             RENAME Clipper2-LICENSE.txt COMPONENT ${component})
     endif()
 endforeach()
-if(WIN32 AND OAP_BUILD_GUI)
-    if(EXISTS "${OAP_OCCT_ROOT}/build-record.json")
-        install(FILES "${OAP_OCCT_ROOT}/build-record.json"
-            DESTINATION ${CMAKE_INSTALL_DATADIR}/licenses/OpenAutoPath/build-evidence
-            RENAME occt-build-record.json COMPONENT Runtime)
-    endif()
-    if(EXISTS "${OAP_FREEIMAGE_ROOT}/build-record.json")
-        install(FILES "${OAP_FREEIMAGE_ROOT}/build-record.json"
-            DESTINATION ${CMAKE_INSTALL_DATADIR}/licenses/OpenAutoPath/build-evidence
-            RENAME FreeImage-build-record.json COMPONENT Runtime)
-    endif()
-    install(DIRECTORY "${PROJECT_SOURCE_DIR}/licenses/runtime/"
-        DESTINATION ${CMAKE_INSTALL_DATADIR}/licenses/OpenAutoPath/runtime
-        COMPONENT Runtime)
-    install(FILES "${PROJECT_SOURCE_DIR}/licenses/windows-runtime.json"
-        "${PROJECT_SOURCE_DIR}/licenses/DEPENDENCY_SOURCES.md"
-        DESTINATION ${CMAKE_INSTALL_DATADIR}/licenses/OpenAutoPath
-        COMPONENT Runtime)
-endif()
 install(FILES BUILDING.md DESTINATION ${CMAKE_INSTALL_DATADIR}/doc/OpenAutoPath)

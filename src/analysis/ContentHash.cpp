@@ -151,8 +151,7 @@ bool sha256FileHex(const std::string& path, std::string& outHex)
     std::ifstream in(utf8Path(path), std::ios::binary);
     if (!in) return false;
     Sha256 hash;
-    // Windows GUI 线程的默认栈通常只有 1 MiB，块缓冲保持在 64 KiB，避免
-    // 仅为计算指纹就在栈上触发 guard page/stack overflow。
+    // Limit stack usage while hashing large model files.
     std::array<unsigned char, 64u * 1024u> bytes{};
     while (in) {
         in.read(reinterpret_cast<char*>(bytes.data()),

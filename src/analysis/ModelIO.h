@@ -1,4 +1,4 @@
-// ModelIO — oap::Model 的紧凑二进制序列化(缓存用,UI 无关、不依赖 Qt)。
+// ModelIO — oap::Model 的紧凑二进制序列化(缓存用,UI 无关)。
 // 格式自带魔数 + 版本号;版本不符则 readModel 返回 false,使旧缓存自动失效。
 // 仅序列化模型拓扑(units/faces/edges/wires),不含 TopoDS 几何
 // (几何由 BinXCAF 的 .xbf 单独缓存)。读回后由 StepIndexer::restoreMaps 重建

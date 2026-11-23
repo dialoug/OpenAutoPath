@@ -10,11 +10,10 @@
 // 持久化由 ToolLibraryStorage 负责：.oaptl 自包含 JSON 与目录 catalog.json。
 #pragma once
 
-#include <QMap>
-#include <QString>
-#include <QStringList>
-#include <QVector>
 
+#include <map>
+#include <vector>
+#include <string>
 #include <utility>
 
 namespace oap::tooling {
@@ -52,17 +51,17 @@ enum class DrillCycle {
 };
 
 // 枚举与稳定字符串 ID 的双向转换；ID 用于 JSON 持久化，显示名用于界面。
-QString toolTypeId(ToolType type);
-QString toolTypeDisplayName(ToolType type);
-ToolType toolTypeFromId(const QString& id);
+std::string toolTypeId(ToolType type);
+std::string toolTypeDisplayName(ToolType type);
+ToolType toolTypeFromId(const std::string& id);
 
 // 刀型参数规则：描述编辑器与校验器应如何解释通用 ToolGeometry 字段。
 // 刀柄/夹头和主轴包络始终属于装配参数，不随刀型隐藏。
 struct ToolTypeParameterSchema {
-    QString diameterLabel;
-    QString cuttingEdgeLengthLabel;
-    QString fluteCountLabel;
-    QString tipAngleLabel;
+    std::string diameterLabel;
+    std::string cuttingEdgeLengthLabel;
+    std::string fluteCountLabel;
+    std::string tipAngleLabel;
     bool diameterRequired = true;
     bool cuttingEdgeLengthVisible = true;
     bool fluteCountVisible = true;
@@ -77,13 +76,13 @@ struct ToolTypeParameterSchema {
 
 ToolTypeParameterSchema toolTypeParameterSchema(ToolType type);
 
-QString coolantModeId(CoolantMode mode);
-QString coolantModeDisplayName(CoolantMode mode);
-CoolantMode coolantModeFromId(const QString& id);
+std::string coolantModeId(CoolantMode mode);
+std::string coolantModeDisplayName(CoolantMode mode);
+CoolantMode coolantModeFromId(const std::string& id);
 
-QString drillCycleId(DrillCycle cycle);
-QString drillCycleDisplayName(DrillCycle cycle);
-DrillCycle drillCycleFromId(const QString& id);
+std::string drillCycleId(DrillCycle cycle);
+std::string drillCycleDisplayName(DrillCycle cycle);
+DrillCycle drillCycleFromId(const std::string& id);
 
 // 刀具几何参数（单位见各成员行内注释）；0 约定为“未知/未填写”，持久化原样保存。
 struct ToolGeometry {
@@ -103,19 +102,19 @@ struct ToolGeometry {
 
 ToolGeometry normalizedToolGeometry(ToolType type,
                                     ToolGeometry geometry) noexcept;
-QStringList toolGeometryValidationErrors(ToolType type,
+std::vector<std::string> toolGeometryValidationErrors(ToolType type,
                                          const ToolGeometry& geometry);
 
 // 一把可复用刀具的完整定义；进入 ToolAssetCatalog 后 id 全局唯一，attributes
 // 保存牙规、材料、来源及旧目录迁移信息等开放属性。
 struct ToolBit {
-    QString id;                     // 在刀库内稳定且唯一。
-    QString name;
+    std::string id;                     // 在刀库内稳定且唯一。
+    std::string name;
     ToolType type = ToolType::Unknown;
     ToolGeometry geometry;
-    QString note;
+    std::string note;
     bool throughCoolant = false;
-    QMap<QString, QString> attributes; // 牙规、材料、来源等开放属性。
+    std::map<std::string, std::string> attributes; // 牙规、材料、来源等开放属性。
 };
 
 // 切削参数；0 表示“沿用当前/机床默认”，以便导入时区分未知与用户维护值。
@@ -133,7 +132,7 @@ struct CuttingParameters {
 // 默认切削/冷却值。它不是 Job ToolController，不能被工序直接引用。
 struct LibraryToolSlot {
     int toolNumber = 0;
-    QString toolId;
+    std::string toolId;
     CuttingParameters cuttingDefaults;
     CoolantMode coolantDefault = CoolantMode::Off;
 };
@@ -153,62 +152,62 @@ struct AssignedTool {
 class ToolLibrary {
 public:
     ToolLibrary() = default;
-    ToolLibrary(QString id, QString name, QString machine = {});
+    ToolLibrary(std::string id, std::string name, std::string machine = {});
 
     // 只读访问器：返回内部成员引用，调用方不应持有超过刀库生命周期的引用。
-    const QString& id() const noexcept { return m_id; }
-    const QString& name() const noexcept { return m_name; }
-    const QString& machine() const noexcept { return m_machine; }
-    const QString& description() const noexcept { return m_description; }
-    const QMap<QString, QString>& attributes() const noexcept { return m_attributes; }
+    const std::string& id() const noexcept { return m_id; }
+    const std::string& name() const noexcept { return m_name; }
+    const std::string& machine() const noexcept { return m_machine; }
+    const std::string& description() const noexcept { return m_description; }
+    const std::map<std::string, std::string>& attributes() const noexcept { return m_attributes; }
 
-    void setId(QString id) { m_id = std::move(id); }
-    void setName(QString name) { m_name = std::move(name); }
-    void setMachine(QString machine) { m_machine = std::move(machine); }
-    void setDescription(QString description) { m_description = std::move(description); }
-    void setAttribute(QString key, QString value)
+    void setId(std::string id) { m_id = std::move(id); }
+    void setName(std::string name) { m_name = std::move(name); }
+    void setMachine(std::string machine) { m_machine = std::move(machine); }
+    void setDescription(std::string description) { m_description = std::move(description); }
+    void setAttribute(std::string key, std::string value)
     {
-        m_attributes.insert(std::move(key), std::move(value));
+        m_attributes.insert_or_assign(std::move(key), std::move(value));
     }
 
-    const QMap<QString, ToolBit>& tools() const noexcept { return m_tools; }
-    const QMap<int, LibraryToolSlot>& toolSlots() const noexcept { return m_slots; }
+    const std::map<std::string, ToolBit>& tools() const noexcept { return m_tools; }
+    const std::map<int, LibraryToolSlot>& toolSlots() const noexcept { return m_slots; }
 
     // 查询接口：未命中返回 nullptr；返回指针指向内部容器元素，任何修改操作后失效。
-    const ToolBit* toolById(const QString& id) const;
-    ToolBit* toolById(const QString& id);
+    const ToolBit* toolById(const std::string& id) const;
+    ToolBit* toolById(const std::string& id);
     const ToolBit* toolByNumber(int toolNumber) const;
     const LibraryToolSlot* slotByNumber(int toolNumber) const;
-    const LibraryToolSlot* slotForTool(const QString& toolId) const;
-    int toolNumberFor(const QString& toolId) const;
-    QVector<AssignedTool> assignedTools() const;
+    const LibraryToolSlot* slotForTool(const std::string& toolId) const;
+    int toolNumberFor(const std::string& toolId) const;
+    std::vector<AssignedTool> assignedTools() const;
 
     // 新增或替换刀具定义。替换时保留已有刀位映射。
-    bool upsertTool(ToolBit tool, QString* error = nullptr);
+    bool upsertTool(ToolBit tool, std::string* error = nullptr);
     // 删除刀具定义，并顺带解除其已占用的刀位。
-    bool removeTool(const QString& toolId, QString* error = nullptr);
+    bool removeTool(const std::string& toolId, std::string* error = nullptr);
 
     // 分配刀号时，若目标刀号已占用，会把原刀具移动到末尾的新刀号；
     // 该行为与 FreeCAD Library::assign_new_bit_no 一致。
-    bool assignToolToSlot(LibraryToolSlot slot, QString* error = nullptr);
+    bool assignToolToSlot(LibraryToolSlot slot, std::string* error = nullptr);
     // 解除刀具占用的刀位（仅删除控制器，保留刀具定义）；返回是否真的解除了分配。
-    bool unassignToolSlot(const QString& toolId);
+    bool unassignToolSlot(const std::string& toolId);
     // 返回当前最大 T 号 + 1；无任何刀位时返回 1（与 FreeCAD 分配行为一致）。
     int nextAvailableToolNumber() const;
 
     // 收集全部结构/几何/刀位一致性错误；空列表表示刀库有效。isValid 返回其合并文本。
-    QStringList validationErrors() const;
-    bool isValid(QString* error = nullptr) const;
+    std::vector<std::string> validationErrors() const;
+    bool isValid(std::string* error = nullptr) const;
 
 private:
     // 刀具定义与刀位控制器分开存放；控制器只通过 toolId 引用刀具。
-    QString m_id;
-    QString m_name;
-    QString m_machine;
-    QString m_description;
-    QMap<QString, QString> m_attributes;
-    QMap<QString, ToolBit> m_tools;
-    QMap<int, LibraryToolSlot> m_slots;
+    std::string m_id;
+    std::string m_name;
+    std::string m_machine;
+    std::string m_description;
+    std::map<std::string, std::string> m_attributes;
+    std::map<std::string, ToolBit> m_tools;
+    std::map<int, LibraryToolSlot> m_slots;
 };
 
 } // namespace oap::tooling

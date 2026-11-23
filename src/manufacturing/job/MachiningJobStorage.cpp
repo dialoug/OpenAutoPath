@@ -1,9 +1,15 @@
 
 // MachiningJobStorage 的实现（oap_manufacturing 持久化层）：MachiningJobDefinition
 // 的 JSON 编解码、.oapjob 文件读写、旧 schema 迁移以及定义/执行/来源指纹计算。
-// 全部为无状态逻辑，错误通过 QString* error 返回；不涉及刀路生成与 UI。
+// 全部为无状态逻辑，错误通过 std::string* error 返回；不涉及刀路生成与 UI。
+#include "support/Files.h"
+#include "analysis/ContentHash.h"
+#include "support/Json.h"
+#include <format>
+#include <vector>
+#include <string>
+#include <set>
 #include "manufacturing/job/MachiningJobStorage.h"
-#include <QCoreApplication>
 #include "manufacturing/job/detail/SurfaceFinishingJson.h"
 
 
@@ -12,518 +18,510 @@
 #include <limits>
 #include <utility>
 
-#include <QCryptographicHash>
-#include <QFile>
-#include <QJsonArray>
-#include <QJsonDocument>
-#include <QJsonObject>
-#include <QSet>
-#include <QJsonParseError>
-#include <QSaveFile>
 
 namespace oap::manufacturing {
 namespace {
 
 // ---- 以下为定义的 JSON 编解码辅助函数，字段名即文件格式的一部分，不得改名。 ----
 
-constexpr qint64 kMaxJobBytes = 32ll * 1024ll * 1024ll;
+constexpr std::int64_t kMaxJobBytes = 32ll * 1024ll * 1024ll;
 constexpr auto kFormatId = "oap-machining-job";
 
-QString fromUtf8(const std::string& value)
+std::string fromUtf8(const std::string& value)
 {
-    return QString::fromUtf8(value.data(), static_cast<qsizetype>(value.size()));
+    return std::string(value.data(), static_cast<std::size_t>(value.size()));
 }
 
-std::string toUtf8(const QJsonValue& value)
+std::string toUtf8(const oap::JsonValue& value)
 {
-    return value.toString().toUtf8().toStdString();
+    return value.toString();
 }
 
-QJsonObject vectorToJson(const JobVector3& value)
+oap::JsonObject vectorToJson(const JobVector3& value)
 {
-    return {{QStringLiteral("x"), value.x},
-            {QStringLiteral("y"), value.y},
-            {QStringLiteral("z"), value.z}};
+    return {{std::string("x"), value.x},
+            {std::string("y"), value.y},
+            {std::string("z"), value.z}};
 }
 
-JobVector3 vectorFromJson(const QJsonValue& value)
+JobVector3 vectorFromJson(const oap::JsonValue& value)
 {
-    const QJsonObject object = value.toObject();
-    return {object.value(QStringLiteral("x")).toDouble(),
-            object.value(QStringLiteral("y")).toDouble(),
-            object.value(QStringLiteral("z")).toDouble()};
+    const oap::JsonObject object = value.toObject();
+    return {object.value(std::string("x")).toDouble(),
+            object.value(std::string("y")).toDouble(),
+            object.value(std::string("z")).toDouble()};
 }
 
-QJsonArray stringsToJson(const std::vector<std::string>& values)
+oap::JsonArray stringsToJson(const std::vector<std::string>& values)
 {
-    QJsonArray result;
+    oap::JsonArray result;
     for (const std::string& value : values)
         result.append(fromUtf8(value));
     return result;
 }
 
-std::vector<std::string> stringsFromJson(const QJsonValue& value)
+std::vector<std::string> stringsFromJson(const oap::JsonValue& value)
 {
     std::vector<std::string> result;
-    const QJsonArray array = value.toArray();
+    const oap::JsonArray array = value.toArray();
     result.reserve(static_cast<std::size_t>(array.size()));
-    for (const QJsonValue& item : array)
+    for (const oap::JsonValue& item : array)
         result.push_back(toUtf8(item));
     return result;
 }
 
-QJsonObject toolDefToJson(const toolpath::ToolDef& value)
+oap::JsonObject toolDefToJson(const toolpath::ToolDef& value)
 {
     return {
-        {QStringLiteral("diameter"), value.diameter},
-        {QStringLiteral("corner_radius"), value.cornerRadius},
-        {QStringLiteral("horizontal_feed"), value.horizFeed},
-        {QStringLiteral("vertical_feed"), value.vertFeed},
-        {QStringLiteral("horizontal_rapid"), value.horizRapid},
-        {QStringLiteral("vertical_rapid"), value.vertRapid},
-        {QStringLiteral("spindle_speed"), value.spindleSpeed},
-        {QStringLiteral("cutting_edge_length"), value.cuttingEdgeLength},
-        {QStringLiteral("overall_length"), value.overallLength},
-        {QStringLiteral("shank_diameter"), value.shankDiameter},
-        {QStringLiteral("holder_diameter"), value.holderDiameter},
-        {QStringLiteral("holder_length"), value.holderLength},
-        {QStringLiteral("spindle_envelope_diameter"),
+        {std::string("diameter"), value.diameter},
+        {std::string("corner_radius"), value.cornerRadius},
+        {std::string("horizontal_feed"), value.horizFeed},
+        {std::string("vertical_feed"), value.vertFeed},
+        {std::string("horizontal_rapid"), value.horizRapid},
+        {std::string("vertical_rapid"), value.vertRapid},
+        {std::string("spindle_speed"), value.spindleSpeed},
+        {std::string("cutting_edge_length"), value.cuttingEdgeLength},
+        {std::string("overall_length"), value.overallLength},
+        {std::string("shank_diameter"), value.shankDiameter},
+        {std::string("holder_diameter"), value.holderDiameter},
+        {std::string("holder_length"), value.holderLength},
+        {std::string("spindle_envelope_diameter"),
          value.spindleEnvelopeDiameter},
-        {QStringLiteral("spindle_envelope_length"),
+        {std::string("spindle_envelope_length"),
          value.spindleEnvelopeLength},
-        {QStringLiteral("tip_compensation"), value.tipCompensation},
+        {std::string("tip_compensation"), value.tipCompensation},
     };
 }
 
-toolpath::ToolDef toolDefFromJson(const QJsonValue& value)
+toolpath::ToolDef toolDefFromJson(const oap::JsonValue& value)
 {
-    const QJsonObject object = value.toObject();
+    const oap::JsonObject object = value.toObject();
     toolpath::ToolDef result;
-    result.diameter = object.value(QStringLiteral("diameter")).toDouble(result.diameter);
-    result.cornerRadius = object.value(QStringLiteral("corner_radius")).toDouble();
-    result.horizFeed = object.value(QStringLiteral("horizontal_feed")).toDouble(result.horizFeed);
-    result.vertFeed = object.value(QStringLiteral("vertical_feed")).toDouble(result.vertFeed);
-    result.horizRapid = object.value(QStringLiteral("horizontal_rapid")).toDouble(result.horizRapid);
-    result.vertRapid = object.value(QStringLiteral("vertical_rapid")).toDouble(result.vertRapid);
-    result.spindleSpeed = object.value(QStringLiteral("spindle_speed")).toDouble(result.spindleSpeed);
-    result.cuttingEdgeLength = object.value(QStringLiteral("cutting_edge_length")).toDouble();
-    result.overallLength = object.value(QStringLiteral("overall_length")).toDouble();
-    result.shankDiameter = object.value(QStringLiteral("shank_diameter")).toDouble();
-    result.holderDiameter = object.value(QStringLiteral("holder_diameter")).toDouble();
-    result.holderLength = object.value(QStringLiteral("holder_length")).toDouble();
+    result.diameter = object.value(std::string("diameter")).toDouble(result.diameter);
+    result.cornerRadius = object.value(std::string("corner_radius")).toDouble();
+    result.horizFeed = object.value(std::string("horizontal_feed")).toDouble(result.horizFeed);
+    result.vertFeed = object.value(std::string("vertical_feed")).toDouble(result.vertFeed);
+    result.horizRapid = object.value(std::string("horizontal_rapid")).toDouble(result.horizRapid);
+    result.vertRapid = object.value(std::string("vertical_rapid")).toDouble(result.vertRapid);
+    result.spindleSpeed = object.value(std::string("spindle_speed")).toDouble(result.spindleSpeed);
+    result.cuttingEdgeLength = object.value(std::string("cutting_edge_length")).toDouble();
+    result.overallLength = object.value(std::string("overall_length")).toDouble();
+    result.shankDiameter = object.value(std::string("shank_diameter")).toDouble();
+    result.holderDiameter = object.value(std::string("holder_diameter")).toDouble();
+    result.holderLength = object.value(std::string("holder_length")).toDouble();
     result.spindleEnvelopeDiameter = object.value(
-        QStringLiteral("spindle_envelope_diameter")).toDouble();
+        std::string("spindle_envelope_diameter")).toDouble();
     result.spindleEnvelopeLength = object.value(
-        QStringLiteral("spindle_envelope_length")).toDouble();
-    result.tipCompensation = object.value(QStringLiteral("tip_compensation")).toDouble();
+        std::string("spindle_envelope_length")).toDouble();
+    result.tipCompensation = object.value(std::string("tip_compensation")).toDouble();
     return result;
 }
 
-QJsonObject depthToJson(const toolpath::DepthParams& value)
+oap::JsonObject depthToJson(const toolpath::DepthParams& value)
 {
     return {
-        {QStringLiteral("clearance_height"), value.clearanceHeight},
-        {QStringLiteral("safe_height"), value.safeHeight},
-        {QStringLiteral("use_feature_depth"), value.useFeatureDepth},
-        {QStringLiteral("start_depth"), value.startDepth},
-        {QStringLiteral("final_depth"), value.finalDepth},
-        {QStringLiteral("step_down"), value.stepDown},
-        {QStringLiteral("finish_depth"), value.finishDepth},
+        {std::string("clearance_height"), value.clearanceHeight},
+        {std::string("safe_height"), value.safeHeight},
+        {std::string("use_feature_depth"), value.useFeatureDepth},
+        {std::string("start_depth"), value.startDepth},
+        {std::string("final_depth"), value.finalDepth},
+        {std::string("step_down"), value.stepDown},
+        {std::string("finish_depth"), value.finishDepth},
     };
 }
 
-toolpath::DepthParams depthFromJson(const QJsonValue& value)
+toolpath::DepthParams depthFromJson(const oap::JsonValue& value)
 {
-    const QJsonObject object = value.toObject();
+    const oap::JsonObject object = value.toObject();
     toolpath::DepthParams result;
-    result.clearanceHeight = object.value(QStringLiteral("clearance_height")).toDouble(result.clearanceHeight);
-    result.safeHeight = object.value(QStringLiteral("safe_height")).toDouble(result.safeHeight);
-    result.useFeatureDepth = object.value(QStringLiteral("use_feature_depth")).toBool(result.useFeatureDepth);
-    result.startDepth = object.value(QStringLiteral("start_depth")).toDouble(result.startDepth);
-    result.finalDepth = object.value(QStringLiteral("final_depth")).toDouble(result.finalDepth);
-    result.stepDown = object.value(QStringLiteral("step_down")).toDouble(result.stepDown);
-    result.finishDepth = object.value(QStringLiteral("finish_depth")).toDouble(result.finishDepth);
+    result.clearanceHeight = object.value(std::string("clearance_height")).toDouble(result.clearanceHeight);
+    result.safeHeight = object.value(std::string("safe_height")).toDouble(result.safeHeight);
+    result.useFeatureDepth = object.value(std::string("use_feature_depth")).toBool(result.useFeatureDepth);
+    result.startDepth = object.value(std::string("start_depth")).toDouble(result.startDepth);
+    result.finalDepth = object.value(std::string("final_depth")).toDouble(result.finalDepth);
+    result.stepDown = object.value(std::string("step_down")).toDouble(result.stepDown);
+    result.finishDepth = object.value(std::string("finish_depth")).toDouble(result.finishDepth);
     return result;
 }
 
-QJsonObject clearingToJson(const toolpath::ClearingParams& value)
+oap::JsonObject clearingToJson(const toolpath::ClearingParams& value)
 {
     const toolpath::AdaptiveClearingParams& adaptive = value.adaptive;
     return {
-        {QStringLiteral("pattern"), static_cast<int>(value.pattern)},
-        {QStringLiteral("expansion_direction"),
+        {std::string("pattern"), static_cast<int>(value.pattern)},
+        {std::string("expansion_direction"),
          static_cast<int>(toolpath::effectivePocketClearingDirection(
              value.pattern, value.expansionDirection))},
-        {QStringLiteral("cut_mode"), static_cast<int>(value.cutMode)},
-        {QStringLiteral("entry_mode"), static_cast<int>(value.entryMode)},
-        {QStringLiteral("ramp_start_reference"),
+        {std::string("cut_mode"), static_cast<int>(value.cutMode)},
+        {std::string("entry_mode"), static_cast<int>(value.entryMode)},
+        {std::string("ramp_start_reference"),
          static_cast<int>(value.rampStartReference)},
-        {QStringLiteral("ramp_angle_deg"), value.rampAngleDeg},
-        {QStringLiteral("maximum_ramp_length"), value.maximumRampLength},
-        {QStringLiteral("helix_diameter"), value.helixDiameter},
-        {QStringLiteral("zigzag_ramp_width"), value.zigzagRampWidth},
-        {QStringLiteral("ramp_feed"), value.rampFeed},
-        {QStringLiteral("step_over_percent"), value.stepOverPercent},
-        {QStringLiteral("extra_offset"), value.extraOffset},
-        {QStringLiteral("precision"), value.precision},
-        {QStringLiteral("arc_tolerance"), value.arcTolerance},
-        {QStringLiteral("zigzag_angle"), value.zigzagAngle},
-        {QStringLiteral("perimeter_pass"), value.perimeterPass},
-        {QStringLiteral("adaptive"), QJsonObject{
-             {QStringLiteral("target_engagement"), adaptive.targetEngagement},
-             {QStringLiteral("target_angle_deg"), adaptive.targetEngagementAngleDeg},
-             {QStringLiteral("maximum_angle_deg"), adaptive.maximumEngagementAngleDeg},
-             {QStringLiteral("angle_samples"), adaptive.engagementAngleSamples},
-             {QStringLiteral("minimum_turn_radius_factor"), adaptive.minimumTurnRadiusFactor},
-             {QStringLiteral("remaining_tolerance"), adaptive.remainingTolerance},
-             {QStringLiteral("material_cell_size"), adaptive.materialCellSize},
-             {QStringLiteral("maximum_passes"), adaptive.maximumAdaptivePasses},
-             {QStringLiteral("lookahead_depth"), adaptive.lookaheadDepth},
-             {QStringLiteral("beam_width"), adaptive.beamWidth}}},
+        {std::string("ramp_angle_deg"), value.rampAngleDeg},
+        {std::string("maximum_ramp_length"), value.maximumRampLength},
+        {std::string("helix_diameter"), value.helixDiameter},
+        {std::string("zigzag_ramp_width"), value.zigzagRampWidth},
+        {std::string("ramp_feed"), value.rampFeed},
+        {std::string("step_over_percent"), value.stepOverPercent},
+        {std::string("extra_offset"), value.extraOffset},
+        {std::string("precision"), value.precision},
+        {std::string("arc_tolerance"), value.arcTolerance},
+        {std::string("zigzag_angle"), value.zigzagAngle},
+        {std::string("perimeter_pass"), value.perimeterPass},
+        {std::string("adaptive"), oap::JsonObject{
+             {std::string("target_engagement"), adaptive.targetEngagement},
+             {std::string("target_angle_deg"), adaptive.targetEngagementAngleDeg},
+             {std::string("maximum_angle_deg"), adaptive.maximumEngagementAngleDeg},
+             {std::string("angle_samples"), adaptive.engagementAngleSamples},
+             {std::string("minimum_turn_radius_factor"), adaptive.minimumTurnRadiusFactor},
+             {std::string("remaining_tolerance"), adaptive.remainingTolerance},
+             {std::string("material_cell_size"), adaptive.materialCellSize},
+             {std::string("maximum_passes"), adaptive.maximumAdaptivePasses},
+             {std::string("lookahead_depth"), adaptive.lookaheadDepth},
+             {std::string("beam_width"), adaptive.beamWidth}}},
     };
 }
 
-toolpath::ClearingParams clearingFromJson(const QJsonValue& value)
+toolpath::ClearingParams clearingFromJson(const oap::JsonValue& value)
 {
-    const QJsonObject object = value.toObject();
+    const oap::JsonObject object = value.toObject();
     toolpath::ClearingParams result;
     result.pattern = static_cast<toolpath::ClearingPattern>(
-        object.value(QStringLiteral("pattern")).toInt(static_cast<int>(result.pattern)));
+        object.value(std::string("pattern")).toInt(static_cast<int>(result.pattern)));
     result.expansionDirection =
         static_cast<toolpath::PocketClearingDirection>(
-            object.value(QStringLiteral("expansion_direction")).toInt(
+            object.value(std::string("expansion_direction")).toInt(
                 static_cast<int>(result.expansionDirection)));
     result.expansionDirection =
         toolpath::effectivePocketClearingDirection(
             result.pattern, result.expansionDirection);
     result.cutMode = static_cast<toolpath::CutMode>(
-        object.value(QStringLiteral("cut_mode")).toInt(static_cast<int>(result.cutMode)));
+        object.value(std::string("cut_mode")).toInt(static_cast<int>(result.cutMode)));
     result.entryMode = static_cast<toolpath::PocketEntryMode>(
-        object.value(QStringLiteral("entry_mode")).toInt(
+        object.value(std::string("entry_mode")).toInt(
             static_cast<int>(result.entryMode)));
     result.rampStartReference =
         static_cast<toolpath::PocketRampStartReference>(
-            object.value(QStringLiteral("ramp_start_reference")).toInt(
+            object.value(std::string("ramp_start_reference")).toInt(
                 static_cast<int>(result.rampStartReference)));
     result.rampAngleDeg =
-        object.value(QStringLiteral("ramp_angle_deg")).toDouble(
+        object.value(std::string("ramp_angle_deg")).toDouble(
             result.rampAngleDeg);
     result.maximumRampLength =
-        object.value(QStringLiteral("maximum_ramp_length")).toDouble(
+        object.value(std::string("maximum_ramp_length")).toDouble(
             result.maximumRampLength);
     result.helixDiameter =
-        object.value(QStringLiteral("helix_diameter")).toDouble(
+        object.value(std::string("helix_diameter")).toDouble(
             result.helixDiameter);
     result.zigzagRampWidth =
-        object.value(QStringLiteral("zigzag_ramp_width")).toDouble(
+        object.value(std::string("zigzag_ramp_width")).toDouble(
             result.zigzagRampWidth);
     result.rampFeed =
-        object.value(QStringLiteral("ramp_feed")).toDouble(
+        object.value(std::string("ramp_feed")).toDouble(
             result.rampFeed);
-    result.stepOverPercent = object.value(QStringLiteral("step_over_percent")).toDouble(result.stepOverPercent);
-    result.extraOffset = object.value(QStringLiteral("extra_offset")).toDouble(result.extraOffset);
-    result.precision = object.value(QStringLiteral("precision")).toInt(result.precision);
-    result.arcTolerance = object.value(QStringLiteral("arc_tolerance")).toDouble(result.arcTolerance);
-    result.zigzagAngle = object.value(QStringLiteral("zigzag_angle")).toDouble(result.zigzagAngle);
-    result.perimeterPass = object.value(QStringLiteral("perimeter_pass")).toBool(result.perimeterPass);
-    const QJsonObject adaptive =
-        object.value(QStringLiteral("adaptive")).toObject();
+    result.stepOverPercent = object.value(std::string("step_over_percent")).toDouble(result.stepOverPercent);
+    result.extraOffset = object.value(std::string("extra_offset")).toDouble(result.extraOffset);
+    result.precision = object.value(std::string("precision")).toInt(result.precision);
+    result.arcTolerance = object.value(std::string("arc_tolerance")).toDouble(result.arcTolerance);
+    result.zigzagAngle = object.value(std::string("zigzag_angle")).toDouble(result.zigzagAngle);
+    result.perimeterPass = object.value(std::string("perimeter_pass")).toBool(result.perimeterPass);
+    const oap::JsonObject adaptive =
+        object.value(std::string("adaptive")).toObject();
     result.adaptive.targetEngagement = adaptive.value(
-        QStringLiteral("target_engagement")).toDouble(
+        std::string("target_engagement")).toDouble(
             result.adaptive.targetEngagement);
     result.adaptive.targetEngagementAngleDeg = adaptive.value(
-        QStringLiteral("target_angle_deg")).toDouble(
+        std::string("target_angle_deg")).toDouble(
             result.adaptive.targetEngagementAngleDeg);
     result.adaptive.maximumEngagementAngleDeg = adaptive.value(
-        QStringLiteral("maximum_angle_deg")).toDouble(
+        std::string("maximum_angle_deg")).toDouble(
             result.adaptive.maximumEngagementAngleDeg);
     result.adaptive.engagementAngleSamples = adaptive.value(
-        QStringLiteral("angle_samples")).toInt(
+        std::string("angle_samples")).toInt(
             result.adaptive.engagementAngleSamples);
     result.adaptive.minimumTurnRadiusFactor = adaptive.value(
-        QStringLiteral("minimum_turn_radius_factor")).toDouble(
+        std::string("minimum_turn_radius_factor")).toDouble(
             result.adaptive.minimumTurnRadiusFactor);
     result.adaptive.remainingTolerance = adaptive.value(
-        QStringLiteral("remaining_tolerance")).toDouble(
+        std::string("remaining_tolerance")).toDouble(
             result.adaptive.remainingTolerance);
     result.adaptive.materialCellSize = adaptive.value(
-        QStringLiteral("material_cell_size")).toDouble(
+        std::string("material_cell_size")).toDouble(
             result.adaptive.materialCellSize);
     result.adaptive.maximumAdaptivePasses = adaptive.value(
-        QStringLiteral("maximum_passes")).toInt(
+        std::string("maximum_passes")).toInt(
             result.adaptive.maximumAdaptivePasses);
     result.adaptive.lookaheadDepth = adaptive.value(
-        QStringLiteral("lookahead_depth")).toInt(
+        std::string("lookahead_depth")).toInt(
             result.adaptive.lookaheadDepth);
     result.adaptive.beamWidth = adaptive.value(
-        QStringLiteral("beam_width")).toInt(
+        std::string("beam_width")).toInt(
             result.adaptive.beamWidth);
     return result;
 }
 
-QJsonObject profileToJson(const toolpath::ProfileParams& value)
+oap::JsonObject profileToJson(const toolpath::ProfileParams& value)
 {
     return {
-        {QStringLiteral("machining_mode"), static_cast<int>(value.machiningMode)},
-        {QStringLiteral("cut_mode"), static_cast<int>(value.cutMode)},
-        {QStringLiteral("side_allowance"), value.sideAllowance},
-        {QStringLiteral("roughing_allowance"), value.roughingAllowance},
-        {QStringLiteral("finish_pass"), value.finishPass},
-        {QStringLiteral("radial_pass_count"), value.radialPassCount},
-        {QStringLiteral("radial_step_over"), value.radialStepOver},
-        {QStringLiteral("lead_in_length"), value.leadInLength},
-        {QStringLiteral("lead_out_length"), value.leadOutLength},
-        {QStringLiteral("precision"), value.precision},
-        {QStringLiteral("arc_tolerance"), value.arcTolerance},
+        {std::string("machining_mode"), static_cast<int>(value.machiningMode)},
+        {std::string("cut_mode"), static_cast<int>(value.cutMode)},
+        {std::string("side_allowance"), value.sideAllowance},
+        {std::string("roughing_allowance"), value.roughingAllowance},
+        {std::string("finish_pass"), value.finishPass},
+        {std::string("radial_pass_count"), value.radialPassCount},
+        {std::string("radial_step_over"), value.radialStepOver},
+        {std::string("lead_in_length"), value.leadInLength},
+        {std::string("lead_out_length"), value.leadOutLength},
+        {std::string("precision"), value.precision},
+        {std::string("arc_tolerance"), value.arcTolerance},
     };
 }
 
-toolpath::ProfileParams profileFromJson(const QJsonValue& value)
+toolpath::ProfileParams profileFromJson(const oap::JsonValue& value)
 {
-    const QJsonObject object = value.toObject();
+    const oap::JsonObject object = value.toObject();
     toolpath::ProfileParams result;
     result.machiningMode = static_cast<toolpath::ProfileMachiningMode>(
-        object.value(QStringLiteral("machining_mode")).toInt(
+        object.value(std::string("machining_mode")).toInt(
             static_cast<int>(result.machiningMode)));
     result.cutMode = static_cast<toolpath::CutMode>(
-        object.value(QStringLiteral("cut_mode")).toInt(
+        object.value(std::string("cut_mode")).toInt(
             static_cast<int>(result.cutMode)));
     result.sideAllowance = object.value(
-        QStringLiteral("side_allowance")).toDouble(result.sideAllowance);
+        std::string("side_allowance")).toDouble(result.sideAllowance);
     result.roughingAllowance = object.value(
-        QStringLiteral("roughing_allowance")).toDouble(
+        std::string("roughing_allowance")).toDouble(
             result.roughingAllowance);
     result.finishPass = object.value(
-        QStringLiteral("finish_pass")).toBool(result.finishPass);
+        std::string("finish_pass")).toBool(result.finishPass);
     result.radialPassCount = object.value(
-        QStringLiteral("radial_pass_count")).toInt(result.radialPassCount);
+        std::string("radial_pass_count")).toInt(result.radialPassCount);
     result.radialStepOver = object.value(
-        QStringLiteral("radial_step_over")).toDouble(result.radialStepOver);
+        std::string("radial_step_over")).toDouble(result.radialStepOver);
     result.leadInLength = object.value(
-        QStringLiteral("lead_in_length")).toDouble(result.leadInLength);
+        std::string("lead_in_length")).toDouble(result.leadInLength);
     result.leadOutLength = object.value(
-        QStringLiteral("lead_out_length")).toDouble(result.leadOutLength);
+        std::string("lead_out_length")).toDouble(result.leadOutLength);
     result.precision = object.value(
-        QStringLiteral("precision")).toInt(result.precision);
+        std::string("precision")).toInt(result.precision);
     result.arcTolerance = object.value(
-        QStringLiteral("arc_tolerance")).toDouble(result.arcTolerance);
+        std::string("arc_tolerance")).toDouble(result.arcTolerance);
     return result;
 }
 
-QJsonObject holeParamsToJson(const toolpath::HoleMachiningParams& value)
+oap::JsonObject holeParamsToJson(const toolpath::HoleMachiningParams& value)
 {
     return {
-        {QStringLiteral("start_corner"), static_cast<int>(value.startCorner)},
-        {QStringLiteral("allowance"), value.allowance},
-        {QStringLiteral("small_hole_diameter_tolerance"), value.smallHoleDiameterTolerance},
-        {QStringLiteral("center_spot_depth"), value.centerSpotDepth},
-        {QStringLiteral("through_hole_breakthrough"), value.throughHoleBreakthrough},
-        {QStringLiteral("medium_hole_ratio"), value.mediumHoleRadiusToolDiameterRatio},
-        {QStringLiteral("drill_cycle_mode"), static_cast<int>(value.drillCycleMode)},
-        {QStringLiteral("drill_retract_mode"), static_cast<int>(value.drillRetractMode)},
-        {QStringLiteral("peck_depth"), value.peckDepth},
-        {QStringLiteral("dwell_seconds"), value.dwellSeconds},
-        {QStringLiteral("drill_tip_angle_deg"), value.drillTipAngleDeg},
-        {QStringLiteral("g81_max_ratio"), value.g81MaxDepthDiameterRatio},
-        {QStringLiteral("g73_max_ratio"), value.g73MaxDepthDiameterRatio},
-        {QStringLiteral("g73_peck_depth"), value.g73PeckDepth},
-        {QStringLiteral("g83_peck_depth"), value.g83PeckDepth},
-        {QStringLiteral("g73_chip_break_retract"), value.g73ChipBreakRetract},
-        {QStringLiteral("g83_reentry_clearance"), value.g83ReentryClearance},
-        {QStringLiteral("collision_envelope_mode"), static_cast<int>(value.collisionEnvelopeMode)},
-        {QStringLiteral("collision_sample_step"), value.collisionEnvelopeSampleStep},
-        {QStringLiteral("helix_pitch"), value.helixPitch},
-        {QStringLiteral("radial_step"), value.radialStep},
-        {QStringLiteral("sample_angle_deg"), value.sampleAngleDeg},
-        {QStringLiteral("helix_chord_tolerance"), value.helixChordTolerance},
-        {QStringLiteral("min_sample_angle_deg"), value.minSampleAngleDeg},
-        {QStringLiteral("max_sample_angle_deg"), value.maxSampleAngleDeg},
-        {QStringLiteral("max_sample_points"), value.maxSamplePoints},
+        {std::string("start_corner"), static_cast<int>(value.startCorner)},
+        {std::string("allowance"), value.allowance},
+        {std::string("small_hole_diameter_tolerance"), value.smallHoleDiameterTolerance},
+        {std::string("center_spot_depth"), value.centerSpotDepth},
+        {std::string("through_hole_breakthrough"), value.throughHoleBreakthrough},
+        {std::string("medium_hole_ratio"), value.mediumHoleRadiusToolDiameterRatio},
+        {std::string("drill_cycle_mode"), static_cast<int>(value.drillCycleMode)},
+        {std::string("drill_retract_mode"), static_cast<int>(value.drillRetractMode)},
+        {std::string("peck_depth"), value.peckDepth},
+        {std::string("dwell_seconds"), value.dwellSeconds},
+        {std::string("drill_tip_angle_deg"), value.drillTipAngleDeg},
+        {std::string("g81_max_ratio"), value.g81MaxDepthDiameterRatio},
+        {std::string("g73_max_ratio"), value.g73MaxDepthDiameterRatio},
+        {std::string("g73_peck_depth"), value.g73PeckDepth},
+        {std::string("g83_peck_depth"), value.g83PeckDepth},
+        {std::string("g73_chip_break_retract"), value.g73ChipBreakRetract},
+        {std::string("g83_reentry_clearance"), value.g83ReentryClearance},
+        {std::string("collision_envelope_mode"), static_cast<int>(value.collisionEnvelopeMode)},
+        {std::string("collision_sample_step"), value.collisionEnvelopeSampleStep},
+        {std::string("helix_pitch"), value.helixPitch},
+        {std::string("radial_step"), value.radialStep},
+        {std::string("sample_angle_deg"), value.sampleAngleDeg},
+        {std::string("helix_chord_tolerance"), value.helixChordTolerance},
+        {std::string("min_sample_angle_deg"), value.minSampleAngleDeg},
+        {std::string("max_sample_angle_deg"), value.maxSampleAngleDeg},
+        {std::string("max_sample_points"), value.maxSamplePoints},
     };
 }
 
-toolpath::HoleMachiningParams holeParamsFromJson(const QJsonValue& value)
+toolpath::HoleMachiningParams holeParamsFromJson(const oap::JsonValue& value)
 {
-    const QJsonObject object = value.toObject();
+    const oap::JsonObject object = value.toObject();
     toolpath::HoleMachiningParams result;
     result.startCorner = static_cast<toolpath::HoleStartCorner>(
-        object.value(QStringLiteral("start_corner")).toInt(static_cast<int>(result.startCorner)));
-    result.allowance = object.value(QStringLiteral("allowance")).toDouble(result.allowance);
-    result.smallHoleDiameterTolerance = object.value(QStringLiteral("small_hole_diameter_tolerance")).toDouble(result.smallHoleDiameterTolerance);
-    result.centerSpotDepth = object.value(QStringLiteral("center_spot_depth")).toDouble(result.centerSpotDepth);
-    result.throughHoleBreakthrough = object.value(QStringLiteral("through_hole_breakthrough")).toDouble(result.throughHoleBreakthrough);
-    result.mediumHoleRadiusToolDiameterRatio = object.value(QStringLiteral("medium_hole_ratio")).toDouble(result.mediumHoleRadiusToolDiameterRatio);
+        object.value(std::string("start_corner")).toInt(static_cast<int>(result.startCorner)));
+    result.allowance = object.value(std::string("allowance")).toDouble(result.allowance);
+    result.smallHoleDiameterTolerance = object.value(std::string("small_hole_diameter_tolerance")).toDouble(result.smallHoleDiameterTolerance);
+    result.centerSpotDepth = object.value(std::string("center_spot_depth")).toDouble(result.centerSpotDepth);
+    result.throughHoleBreakthrough = object.value(std::string("through_hole_breakthrough")).toDouble(result.throughHoleBreakthrough);
+    result.mediumHoleRadiusToolDiameterRatio = object.value(std::string("medium_hole_ratio")).toDouble(result.mediumHoleRadiusToolDiameterRatio);
     result.drillCycleMode = static_cast<toolpath::HoleDrillCycleMode>(
-        object.value(QStringLiteral("drill_cycle_mode")).toInt(static_cast<int>(result.drillCycleMode)));
+        object.value(std::string("drill_cycle_mode")).toInt(static_cast<int>(result.drillCycleMode)));
     result.drillRetractMode = static_cast<toolpath::HoleDrillRetractMode>(
-        object.value(QStringLiteral("drill_retract_mode")).toInt(static_cast<int>(result.drillRetractMode)));
-    result.peckDepth = object.value(QStringLiteral("peck_depth")).toDouble(result.peckDepth);
-    result.dwellSeconds = object.value(QStringLiteral("dwell_seconds")).toDouble(result.dwellSeconds);
-    result.drillTipAngleDeg = object.value(QStringLiteral("drill_tip_angle_deg")).toDouble(result.drillTipAngleDeg);
-    result.g81MaxDepthDiameterRatio = object.value(QStringLiteral("g81_max_ratio")).toDouble(result.g81MaxDepthDiameterRatio);
-    result.g73MaxDepthDiameterRatio = object.value(QStringLiteral("g73_max_ratio")).toDouble(result.g73MaxDepthDiameterRatio);
-    result.g73PeckDepth = object.value(QStringLiteral("g73_peck_depth")).toDouble(result.g73PeckDepth);
-    result.g83PeckDepth = object.value(QStringLiteral("g83_peck_depth")).toDouble(result.g83PeckDepth);
-    result.g73ChipBreakRetract = object.value(QStringLiteral("g73_chip_break_retract")).toDouble(result.g73ChipBreakRetract);
-    result.g83ReentryClearance = object.value(QStringLiteral("g83_reentry_clearance")).toDouble(result.g83ReentryClearance);
+        object.value(std::string("drill_retract_mode")).toInt(static_cast<int>(result.drillRetractMode)));
+    result.peckDepth = object.value(std::string("peck_depth")).toDouble(result.peckDepth);
+    result.dwellSeconds = object.value(std::string("dwell_seconds")).toDouble(result.dwellSeconds);
+    result.drillTipAngleDeg = object.value(std::string("drill_tip_angle_deg")).toDouble(result.drillTipAngleDeg);
+    result.g81MaxDepthDiameterRatio = object.value(std::string("g81_max_ratio")).toDouble(result.g81MaxDepthDiameterRatio);
+    result.g73MaxDepthDiameterRatio = object.value(std::string("g73_max_ratio")).toDouble(result.g73MaxDepthDiameterRatio);
+    result.g73PeckDepth = object.value(std::string("g73_peck_depth")).toDouble(result.g73PeckDepth);
+    result.g83PeckDepth = object.value(std::string("g83_peck_depth")).toDouble(result.g83PeckDepth);
+    result.g73ChipBreakRetract = object.value(std::string("g73_chip_break_retract")).toDouble(result.g73ChipBreakRetract);
+    result.g83ReentryClearance = object.value(std::string("g83_reentry_clearance")).toDouble(result.g83ReentryClearance);
     result.collisionEnvelopeMode = static_cast<toolpath::HoleCollisionEnvelopeMode>(
-        object.value(QStringLiteral("collision_envelope_mode")).toInt(static_cast<int>(result.collisionEnvelopeMode)));
-    result.collisionEnvelopeSampleStep = object.value(QStringLiteral("collision_sample_step")).toDouble(result.collisionEnvelopeSampleStep);
-    result.helixPitch = object.value(QStringLiteral("helix_pitch")).toDouble(result.helixPitch);
-    result.radialStep = object.value(QStringLiteral("radial_step")).toDouble(result.radialStep);
-    result.sampleAngleDeg = object.value(QStringLiteral("sample_angle_deg")).toDouble(result.sampleAngleDeg);
-    result.helixChordTolerance = object.value(QStringLiteral("helix_chord_tolerance")).toDouble(result.helixChordTolerance);
-    result.minSampleAngleDeg = object.value(QStringLiteral("min_sample_angle_deg")).toDouble(result.minSampleAngleDeg);
-    result.maxSampleAngleDeg = object.value(QStringLiteral("max_sample_angle_deg")).toDouble(result.maxSampleAngleDeg);
-    result.maxSamplePoints = object.value(QStringLiteral("max_sample_points")).toInt(result.maxSamplePoints);
+        object.value(std::string("collision_envelope_mode")).toInt(static_cast<int>(result.collisionEnvelopeMode)));
+    result.collisionEnvelopeSampleStep = object.value(std::string("collision_sample_step")).toDouble(result.collisionEnvelopeSampleStep);
+    result.helixPitch = object.value(std::string("helix_pitch")).toDouble(result.helixPitch);
+    result.radialStep = object.value(std::string("radial_step")).toDouble(result.radialStep);
+    result.sampleAngleDeg = object.value(std::string("sample_angle_deg")).toDouble(result.sampleAngleDeg);
+    result.helixChordTolerance = object.value(std::string("helix_chord_tolerance")).toDouble(result.helixChordTolerance);
+    result.minSampleAngleDeg = object.value(std::string("min_sample_angle_deg")).toDouble(result.minSampleAngleDeg);
+    result.maxSampleAngleDeg = object.value(std::string("max_sample_angle_deg")).toDouble(result.maxSampleAngleDeg);
+    result.maxSamplePoints = object.value(std::string("max_sample_points")).toInt(result.maxSamplePoints);
     return result;
 }
 
-QJsonObject parametersToJson(const toolpath::ToolpathParams& value)
+oap::JsonObject parametersToJson(const toolpath::ToolpathParams& value)
 {
-    return {{QStringLiteral("tool"), toolDefToJson(value.tool)},
-            {QStringLiteral("depth"), depthToJson(value.depth)},
-            {QStringLiteral("clearing"), clearingToJson(value.clearing)},
-            {QStringLiteral("profile"), profileToJson(value.profile)},
-            {QStringLiteral("hole"), holeParamsToJson(value.hole)}};
+    return {{std::string("tool"), toolDefToJson(value.tool)},
+            {std::string("depth"), depthToJson(value.depth)},
+            {std::string("clearing"), clearingToJson(value.clearing)},
+            {std::string("profile"), profileToJson(value.profile)},
+            {std::string("hole"), holeParamsToJson(value.hole)}};
 }
 
-toolpath::ToolpathParams parametersFromJson(const QJsonValue& value)
+toolpath::ToolpathParams parametersFromJson(const oap::JsonValue& value)
 {
-    const QJsonObject object = value.toObject();
+    const oap::JsonObject object = value.toObject();
     toolpath::ToolpathParams result;
-    result.tool = toolDefFromJson(object.value(QStringLiteral("tool")));
-    result.depth = depthFromJson(object.value(QStringLiteral("depth")));
-    result.clearing = clearingFromJson(object.value(QStringLiteral("clearing")));
-    result.profile = profileFromJson(object.value(QStringLiteral("profile")));
-    result.hole = holeParamsFromJson(object.value(QStringLiteral("hole")));
+    result.tool = toolDefFromJson(object.value(std::string("tool")));
+    result.depth = depthFromJson(object.value(std::string("depth")));
+    result.clearing = clearingFromJson(object.value(std::string("clearing")));
+    result.profile = profileFromJson(object.value(std::string("profile")));
+    result.hole = holeParamsFromJson(object.value(std::string("hole")));
     return result;
 }
 
-QJsonObject toolContextToJson(const toolpath::ToolpathToolContext& value)
+oap::JsonObject toolContextToJson(const toolpath::ToolpathToolContext& value)
 {
     return {
-        {QStringLiteral("valid"), value.valid},
-        {QStringLiteral("tool_number"), value.toolNumber},
-        {QStringLiteral("tool_id"), fromUtf8(value.toolId)},
-        {QStringLiteral("tool_name"), fromUtf8(value.toolName)},
-        {QStringLiteral("tool_type"), fromUtf8(value.toolType)},
-        {QStringLiteral("diameter"), value.diameter},
-        {QStringLiteral("corner_radius"), value.cornerRadius},
-        {QStringLiteral("spindle_speed"), value.spindleSpeed},
-        {QStringLiteral("horizontal_feed"), value.horizontalFeed},
-        {QStringLiteral("vertical_feed"), value.verticalFeed},
-        {QStringLiteral("horizontal_rapid"), value.horizontalRapid},
-        {QStringLiteral("vertical_rapid"), value.verticalRapid},
-        {QStringLiteral("cutting_edge_length"), value.cuttingEdgeLength},
-        {QStringLiteral("overall_length"), value.overallLength},
-        {QStringLiteral("shank_diameter"), value.shankDiameter},
-        {QStringLiteral("holder_diameter"), value.holderDiameter},
-        {QStringLiteral("holder_length"), value.holderLength},
-        {QStringLiteral("spindle_envelope_diameter"),
+        {std::string("valid"), value.valid},
+        {std::string("tool_number"), value.toolNumber},
+        {std::string("tool_id"), fromUtf8(value.toolId)},
+        {std::string("tool_name"), fromUtf8(value.toolName)},
+        {std::string("tool_type"), fromUtf8(value.toolType)},
+        {std::string("diameter"), value.diameter},
+        {std::string("corner_radius"), value.cornerRadius},
+        {std::string("spindle_speed"), value.spindleSpeed},
+        {std::string("horizontal_feed"), value.horizontalFeed},
+        {std::string("vertical_feed"), value.verticalFeed},
+        {std::string("horizontal_rapid"), value.horizontalRapid},
+        {std::string("vertical_rapid"), value.verticalRapid},
+        {std::string("cutting_edge_length"), value.cuttingEdgeLength},
+        {std::string("overall_length"), value.overallLength},
+        {std::string("shank_diameter"), value.shankDiameter},
+        {std::string("holder_diameter"), value.holderDiameter},
+        {std::string("holder_length"), value.holderLength},
+        {std::string("spindle_envelope_diameter"),
          value.spindleEnvelopeDiameter},
-        {QStringLiteral("spindle_envelope_length"),
+        {std::string("spindle_envelope_length"),
          value.spindleEnvelopeLength},
-        {QStringLiteral("tip_angle"), value.tipAngle},
-        {QStringLiteral("tip_compensation"), value.tipCompensation},
-        {QStringLiteral("peck_depth"), value.peckDepth},
-        {QStringLiteral("drill_cycle"), static_cast<int>(value.drillCycle)},
-        {QStringLiteral("coolant"), static_cast<int>(value.coolant)},
+        {std::string("tip_angle"), value.tipAngle},
+        {std::string("tip_compensation"), value.tipCompensation},
+        {std::string("peck_depth"), value.peckDepth},
+        {std::string("drill_cycle"), static_cast<int>(value.drillCycle)},
+        {std::string("coolant"), static_cast<int>(value.coolant)},
     };
 }
 
-toolpath::ToolpathToolContext toolContextFromJson(const QJsonValue& value)
+toolpath::ToolpathToolContext toolContextFromJson(const oap::JsonValue& value)
 {
-    const QJsonObject object = value.toObject();
+    const oap::JsonObject object = value.toObject();
     toolpath::ToolpathToolContext result;
-    result.valid = object.value(QStringLiteral("valid")).toBool();
-    result.toolNumber = object.value(QStringLiteral("tool_number")).toInt();
-    result.toolId = toUtf8(object.value(QStringLiteral("tool_id")));
-    result.toolName = toUtf8(object.value(QStringLiteral("tool_name")));
-    result.toolType = toUtf8(object.value(QStringLiteral("tool_type")));
-    result.diameter = object.value(QStringLiteral("diameter")).toDouble();
-    result.cornerRadius = object.value(QStringLiteral("corner_radius")).toDouble();
-    result.spindleSpeed = object.value(QStringLiteral("spindle_speed")).toDouble();
-    result.horizontalFeed = object.value(QStringLiteral("horizontal_feed")).toDouble();
-    result.verticalFeed = object.value(QStringLiteral("vertical_feed")).toDouble();
-    result.horizontalRapid = object.value(QStringLiteral("horizontal_rapid")).toDouble();
-    result.verticalRapid = object.value(QStringLiteral("vertical_rapid")).toDouble();
-    result.cuttingEdgeLength = object.value(QStringLiteral("cutting_edge_length")).toDouble();
-    result.overallLength = object.value(QStringLiteral("overall_length")).toDouble();
-    result.shankDiameter = object.value(QStringLiteral("shank_diameter")).toDouble();
-    result.holderDiameter = object.value(QStringLiteral("holder_diameter")).toDouble();
-    result.holderLength = object.value(QStringLiteral("holder_length")).toDouble();
+    result.valid = object.value(std::string("valid")).toBool();
+    result.toolNumber = object.value(std::string("tool_number")).toInt();
+    result.toolId = toUtf8(object.value(std::string("tool_id")));
+    result.toolName = toUtf8(object.value(std::string("tool_name")));
+    result.toolType = toUtf8(object.value(std::string("tool_type")));
+    result.diameter = object.value(std::string("diameter")).toDouble();
+    result.cornerRadius = object.value(std::string("corner_radius")).toDouble();
+    result.spindleSpeed = object.value(std::string("spindle_speed")).toDouble();
+    result.horizontalFeed = object.value(std::string("horizontal_feed")).toDouble();
+    result.verticalFeed = object.value(std::string("vertical_feed")).toDouble();
+    result.horizontalRapid = object.value(std::string("horizontal_rapid")).toDouble();
+    result.verticalRapid = object.value(std::string("vertical_rapid")).toDouble();
+    result.cuttingEdgeLength = object.value(std::string("cutting_edge_length")).toDouble();
+    result.overallLength = object.value(std::string("overall_length")).toDouble();
+    result.shankDiameter = object.value(std::string("shank_diameter")).toDouble();
+    result.holderDiameter = object.value(std::string("holder_diameter")).toDouble();
+    result.holderLength = object.value(std::string("holder_length")).toDouble();
     result.spindleEnvelopeDiameter = object.value(
-        QStringLiteral("spindle_envelope_diameter")).toDouble();
+        std::string("spindle_envelope_diameter")).toDouble();
     result.spindleEnvelopeLength = object.value(
-        QStringLiteral("spindle_envelope_length")).toDouble();
-    result.tipAngle = object.value(QStringLiteral("tip_angle")).toDouble();
-    result.tipCompensation = object.value(QStringLiteral("tip_compensation")).toDouble();
-    result.peckDepth = object.value(QStringLiteral("peck_depth")).toDouble();
+        std::string("spindle_envelope_length")).toDouble();
+    result.tipAngle = object.value(std::string("tip_angle")).toDouble();
+    result.tipCompensation = object.value(std::string("tip_compensation")).toDouble();
+    result.peckDepth = object.value(std::string("peck_depth")).toDouble();
     result.drillCycle = static_cast<toolpath::ToolpathDrillCyclePreference>(
-        object.value(QStringLiteral("drill_cycle")).toInt());
+        object.value(std::string("drill_cycle")).toInt());
     result.coolant = static_cast<toolpath::ToolpathCoolantMode>(
-        object.value(QStringLiteral("coolant")).toInt());
+        object.value(std::string("coolant")).toInt());
     return result;
 }
 
-QJsonObject holeToJson(const toolpath::HoleMachiningInput& value)
+oap::JsonObject holeToJson(const toolpath::HoleMachiningInput& value)
 {
     return {
-        {QStringLiteral("kind"), static_cast<int>(value.kind)},
-        {QStringLiteral("entry"), vectorToJson(toJobVector(value.entry))},
-        {QStringLiteral("bottom"), vectorToJson(toJobVector(value.bottom))},
-        {QStringLiteral("radius"), value.radius},
-        {QStringLiteral("bottom_profile"), static_cast<int>(value.bottomProfile)},
-        {QStringLiteral("entry_resolution"), static_cast<int>(value.entryResolution)},
-        {QStringLiteral("setup_face"), static_cast<int>(value.setupFace)},
-        {QStringLiteral("setup_face_entry_distance"), value.setupFaceEntryDistance},
-        {QStringLiteral("setup_face_other_distance"), value.setupFaceOtherEndpointDistance},
-        {QStringLiteral("setup_face_decision"), static_cast<int>(value.setupFaceDecision)},
-        {QStringLiteral("preserve_entry_side"), value.preserveEntrySide},
-        {QStringLiteral("manual"), value.manuallyConfirmed},
-        {QStringLiteral("source_face_ids"), stringsToJson(value.sourceFaceIds)},
-        {QStringLiteral("stage_wall_face_ids"),
+        {std::string("kind"), static_cast<int>(value.kind)},
+        {std::string("entry"), vectorToJson(toJobVector(value.entry))},
+        {std::string("bottom"), vectorToJson(toJobVector(value.bottom))},
+        {std::string("radius"), value.radius},
+        {std::string("bottom_profile"), static_cast<int>(value.bottomProfile)},
+        {std::string("entry_resolution"), static_cast<int>(value.entryResolution)},
+        {std::string("setup_face"), static_cast<int>(value.setupFace)},
+        {std::string("setup_face_entry_distance"), value.setupFaceEntryDistance},
+        {std::string("setup_face_other_distance"), value.setupFaceOtherEndpointDistance},
+        {std::string("setup_face_decision"), static_cast<int>(value.setupFaceDecision)},
+        {std::string("preserve_entry_side"), value.preserveEntrySide},
+        {std::string("manual"), value.manuallyConfirmed},
+        {std::string("source_face_ids"), stringsToJson(value.sourceFaceIds)},
+        {std::string("stage_wall_face_ids"),
          stringsToJson(value.stageWallFaceIds)},
-        {QStringLiteral("stage_role"), static_cast<int>(value.stageRole)},
-        {QStringLiteral("parent_relation"), static_cast<int>(value.parentRelation)},
-        {QStringLiteral("parent_counterbore_face_id"), fromUtf8(value.parentCounterboreFaceId)},
-        {QStringLiteral("parent_counterbore_floor_face_id"), fromUtf8(value.parentCounterboreFloorFaceId)},
-        {QStringLiteral("parent_counterbore_radius"), value.parentCounterboreRadius},
+        {std::string("stage_role"), static_cast<int>(value.stageRole)},
+        {std::string("parent_relation"), static_cast<int>(value.parentRelation)},
+        {std::string("parent_counterbore_face_id"), fromUtf8(value.parentCounterboreFaceId)},
+        {std::string("parent_counterbore_floor_face_id"), fromUtf8(value.parentCounterboreFloorFaceId)},
+        {std::string("parent_counterbore_radius"), value.parentCounterboreRadius},
     };
 }
 
-toolpath::HoleMachiningInput holeFromJson(const QJsonValue& value)
+toolpath::HoleMachiningInput holeFromJson(const oap::JsonValue& value)
 {
-    const QJsonObject object = value.toObject();
+    const oap::JsonObject object = value.toObject();
     toolpath::HoleMachiningInput result;
-    result.kind = static_cast<FeatureKind>(object.value(QStringLiteral("kind")).toInt());
-    result.entry = toPoint(vectorFromJson(object.value(QStringLiteral("entry"))));
-    result.bottom = toPoint(vectorFromJson(object.value(QStringLiteral("bottom"))));
-    result.radius = object.value(QStringLiteral("radius")).toDouble();
+    result.kind = static_cast<FeatureKind>(object.value(std::string("kind")).toInt());
+    result.entry = toPoint(vectorFromJson(object.value(std::string("entry"))));
+    result.bottom = toPoint(vectorFromJson(object.value(std::string("bottom"))));
+    result.radius = object.value(std::string("radius")).toDouble();
     result.bottomProfile = static_cast<HoleBottomProfile>(
-        object.value(QStringLiteral("bottom_profile")).toInt());
+        object.value(std::string("bottom_profile")).toInt());
     result.entryResolution = static_cast<HoleEntryResolution>(
-        object.value(QStringLiteral("entry_resolution")).toInt());
+        object.value(std::string("entry_resolution")).toInt());
     result.setupFace = static_cast<MoldSetupFace>(
-        object.value(QStringLiteral("setup_face")).toInt());
-    result.setupFaceEntryDistance = object.value(QStringLiteral("setup_face_entry_distance")).toDouble(-1.0);
-    result.setupFaceOtherEndpointDistance = object.value(QStringLiteral("setup_face_other_distance")).toDouble(-1.0);
+        object.value(std::string("setup_face")).toInt());
+    result.setupFaceEntryDistance = object.value(std::string("setup_face_entry_distance")).toDouble(-1.0);
+    result.setupFaceOtherEndpointDistance = object.value(std::string("setup_face_other_distance")).toDouble(-1.0);
     result.setupFaceDecision = static_cast<MoldSetupFaceDecision>(
-        object.value(QStringLiteral("setup_face_decision")).toInt());
-    result.preserveEntrySide = object.value(QStringLiteral("preserve_entry_side")).toBool();
-    result.manuallyConfirmed = object.value(QStringLiteral("manual")).toBool();
-    result.sourceFaceIds = stringsFromJson(object.value(QStringLiteral("source_face_ids")));
+        object.value(std::string("setup_face_decision")).toInt());
+    result.preserveEntrySide = object.value(std::string("preserve_entry_side")).toBool();
+    result.manuallyConfirmed = object.value(std::string("manual")).toBool();
+    result.sourceFaceIds = stringsFromJson(object.value(std::string("source_face_ids")));
     result.stageWallFaceIds = stringsFromJson(
-        object.value(QStringLiteral("stage_wall_face_ids")));
+        object.value(std::string("stage_wall_face_ids")));
     result.stageRole = static_cast<HoleStageRole>(
-        object.value(QStringLiteral("stage_role")).toInt(
+        object.value(std::string("stage_role")).toInt(
             static_cast<int>(HoleStageRole::Standard)));
     result.parentRelation = static_cast<HoleParentRelation>(
-        object.value(QStringLiteral("parent_relation")).toInt());
-    result.parentCounterboreFaceId = toUtf8(object.value(QStringLiteral("parent_counterbore_face_id")));
-    result.parentCounterboreFloorFaceId = toUtf8(object.value(QStringLiteral("parent_counterbore_floor_face_id")));
-    result.parentCounterboreRadius = object.value(QStringLiteral("parent_counterbore_radius")).toDouble();
+        object.value(std::string("parent_relation")).toInt());
+    result.parentCounterboreFaceId = toUtf8(object.value(std::string("parent_counterbore_face_id")));
+    result.parentCounterboreFloorFaceId = toUtf8(object.value(std::string("parent_counterbore_floor_face_id")));
+    result.parentCounterboreRadius = object.value(std::string("parent_counterbore_radius")).toDouble();
     if (result.entryResolution == HoleEntryResolution::Unresolved) {
         result.mappingState =
             toolpath::HoleMachiningMappingState::UnresolvedEntry;
@@ -536,473 +534,473 @@ toolpath::HoleMachiningInput holeFromJson(const QJsonValue& value)
     return result;
 }
 
-QJsonObject definitionToJson(const MachiningJobDefinition& value)
+oap::JsonObject definitionToJson(const MachiningJobDefinition& value)
 {
     // 把可序列化定义整体投影为 JSON；字段名构成文件格式的稳定契约。
-    QJsonArray recognizedHoles;
+    oap::JsonArray recognizedHoles;
     for (const toolpath::HoleMachiningInput& hole : value.recognizedHoles)
         recognizedHoles.append(holeToJson(hole));
-    QJsonArray collisionModels;
+    oap::JsonArray collisionModels;
     for (const CollisionModelReference& model : value.collisionScene.models) {
-        collisionModels.append(QJsonObject{
-            {QStringLiteral("source_path"), fromUtf8(model.sourcePath)},
-            {QStringLiteral("source_fingerprint"),
+        collisionModels.append(oap::JsonObject{
+            {std::string("source_path"), fromUtf8(model.sourcePath)},
+            {std::string("source_fingerprint"),
              fromUtf8(model.sourceFingerprint)},
-            {QStringLiteral("role"), static_cast<int>(model.role)},
-            {QStringLiteral("translation"),
+            {std::string("role"), static_cast<int>(model.role)},
+            {std::string("translation"),
              vectorToJson(model.translation)},
-            {QStringLiteral("rotation_deg"),
+            {std::string("rotation_deg"),
              vectorToJson(model.rotationDeg)},
         });
     }
 
-    QJsonArray setups;
+    oap::JsonArray setups;
     for (const SetupDefinition& setup : value.setups) {
-        setups.append(QJsonObject{
-            {QStringLiteral("id"), fromUtf8(setup.id)},
-            {QStringLiteral("setup_index"), setup.setupIndex},
-            {QStringLiteral("face"), static_cast<int>(setup.face)},
-            {QStringLiteral("work_offset"), static_cast<int>(setup.workOffset)},
-            {QStringLiteral("origin"), vectorToJson(setup.origin)},
-            {QStringLiteral("x_axis"), vectorToJson(setup.xAxis)},
-            {QStringLiteral("y_axis"), vectorToJson(setup.yAxis)},
+        setups.append(oap::JsonObject{
+            {std::string("id"), fromUtf8(setup.id)},
+            {std::string("setup_index"), setup.setupIndex},
+            {std::string("face"), static_cast<int>(setup.face)},
+            {std::string("work_offset"), static_cast<int>(setup.workOffset)},
+            {std::string("origin"), vectorToJson(setup.origin)},
+            {std::string("x_axis"), vectorToJson(setup.xAxis)},
+            {std::string("y_axis"), vectorToJson(setup.yAxis)},
 
-            {QStringLiteral("z_axis"), vectorToJson(setup.zAxis)},
-            {QStringLiteral("valid"), setup.valid},
-            {QStringLiteral("requires_physical_reclamp"), setup.requiresPhysicalReclamp},
-            {QStringLiteral("axis_mapping"), fromUtf8(setup.axisMapping)},
-            {QStringLiteral("operator_instruction"), fromUtf8(setup.operatorInstruction)},
-            {QStringLiteral("confirmation"), QJsonObject{
-                {QStringLiteral("confirmed"), setup.confirmation.confirmed},
-                {QStringLiteral("confirmed_by"), fromUtf8(setup.confirmation.confirmedBy)},
-                {QStringLiteral("confirmed_at"), fromUtf8(setup.confirmation.confirmedAt)},
-                {QStringLiteral("input_fingerprint"), fromUtf8(setup.confirmation.confirmedInputFingerprint)},
+            {std::string("z_axis"), vectorToJson(setup.zAxis)},
+            {std::string("valid"), setup.valid},
+            {std::string("requires_physical_reclamp"), setup.requiresPhysicalReclamp},
+            {std::string("axis_mapping"), fromUtf8(setup.axisMapping)},
+            {std::string("operator_instruction"), fromUtf8(setup.operatorInstruction)},
+            {std::string("confirmation"), oap::JsonObject{
+                {std::string("confirmed"), setup.confirmation.confirmed},
+                {std::string("confirmed_by"), fromUtf8(setup.confirmation.confirmedBy)},
+                {std::string("confirmed_at"), fromUtf8(setup.confirmation.confirmedAt)},
+                {std::string("input_fingerprint"), fromUtf8(setup.confirmation.confirmedInputFingerprint)},
             }},
         });
     }
 
-    QJsonArray controllers;
+    oap::JsonArray controllers;
     for (const JobToolController& controller : value.toolControllers) {
-        controllers.append(QJsonObject{
-            {QStringLiteral("id"), fromUtf8(controller.id)},
-            {QStringLiteral("library_id"), fromUtf8(controller.libraryId)},
-            {QStringLiteral("tool"), toolContextToJson(controller.tool)},
+        controllers.append(oap::JsonObject{
+            {std::string("id"), fromUtf8(controller.id)},
+            {std::string("library_id"), fromUtf8(controller.libraryId)},
+            {std::string("tool"), toolContextToJson(controller.tool)},
         });
     }
 
-    QJsonArray holeOperations;
+    oap::JsonArray holeOperations;
     for (const HoleOperationDefinition& operation : value.holeOperations) {
-        QJsonArray targets;
+        oap::JsonArray targets;
         for (const HoleTargetReference& target : operation.targets) {
-            QJsonArray coveredSourceIndices;
+            oap::JsonArray coveredSourceIndices;
             for (const int sourceIndex : target.coveredSourceHoleIndices)
                 coveredSourceIndices.append(sourceIndex);
-            targets.append(QJsonObject{
-                {QStringLiteral("feature_id"), fromUtf8(target.featureId)},
-                {QStringLiteral("geometry_fingerprint"), fromUtf8(target.geometryFingerprint)},
-                {QStringLiteral("source_hole_index"), target.sourceHoleIndex},
-                {QStringLiteral("covered_source_hole_indices"),
+            targets.append(oap::JsonObject{
+                {std::string("feature_id"), fromUtf8(target.featureId)},
+                {std::string("geometry_fingerprint"), fromUtf8(target.geometryFingerprint)},
+                {std::string("source_hole_index"), target.sourceHoleIndex},
+                {std::string("covered_source_hole_indices"),
                  coveredSourceIndices},
-                {QStringLiteral("physical_hole_index"), target.physicalHoleIndex},
-                {QStringLiteral("strategy"), static_cast<int>(target.strategy)},
-                {QStringLiteral("hole"), holeToJson(target.hole)},
+                {std::string("physical_hole_index"), target.physicalHoleIndex},
+                {std::string("strategy"), static_cast<int>(target.strategy)},
+                {std::string("hole"), holeToJson(target.hole)},
             });
         }
-        holeOperations.append(QJsonObject{
-            {QStringLiteral("id"), fromUtf8(operation.id)},
-            {QStringLiteral("setup_id"), fromUtf8(operation.setupId)},
-            {QStringLiteral("tool_controller_id"), fromUtf8(operation.toolControllerId)},
-            {QStringLiteral("phase"), static_cast<int>(operation.phase)},
-            {QStringLiteral("targets"), targets},
-            {QStringLiteral("enabled"), operation.enabled},
-            {QStringLiteral("sequence"), operation.sequence},
-            {QStringLiteral("state"), static_cast<int>(operation.state)},
-            {QStringLiteral("input_fingerprint"), fromUtf8(operation.inputFingerprint)},
+        holeOperations.append(oap::JsonObject{
+            {std::string("id"), fromUtf8(operation.id)},
+            {std::string("setup_id"), fromUtf8(operation.setupId)},
+            {std::string("tool_controller_id"), fromUtf8(operation.toolControllerId)},
+            {std::string("phase"), static_cast<int>(operation.phase)},
+            {std::string("targets"), targets},
+            {std::string("enabled"), operation.enabled},
+            {std::string("sequence"), operation.sequence},
+            {std::string("state"), static_cast<int>(operation.state)},
+            {std::string("input_fingerprint"), fromUtf8(operation.inputFingerprint)},
         });
     }
 
-    QJsonArray pocketOperations;
+    oap::JsonArray pocketOperations;
     for (const PocketOperationDefinition& operation :
          value.pocketOperations) {
-        QJsonObject entry{
-            {QStringLiteral("id"), fromUtf8(operation.id)},
-            {QStringLiteral("setup_id"), fromUtf8(operation.setupId)},
-            {QStringLiteral("tool_controller_id"),
+        oap::JsonObject entry{
+            {std::string("id"), fromUtf8(operation.id)},
+            {std::string("setup_id"), fromUtf8(operation.setupId)},
+            {std::string("tool_controller_id"),
              fromUtf8(operation.toolControllerId)},
-            {QStringLiteral("rest_previous_tool_diameter"),
+            {std::string("rest_previous_tool_diameter"),
              operation.restMachiningPreviousToolDiameter},
-            {QStringLiteral("algorithm_id"),
+            {std::string("algorithm_id"),
              fromUtf8(operation.algorithmId)},
-            {QStringLiteral("target"), QJsonObject{
-                {QStringLiteral("source_kind"),
+            {std::string("target"), oap::JsonObject{
+                {std::string("source_kind"),
                  static_cast<int>(operation.target.sourceKind)},
-                {QStringLiteral("kind"),
+                {std::string("kind"),
                  static_cast<int>(operation.target.kind)},
-                {QStringLiteral("source_face_ids"),
+                {std::string("source_face_ids"),
                  stringsToJson(operation.target.sourceFaceIds)},
-                {QStringLiteral("floor_face_id"),
+                {std::string("floor_face_id"),
                  fromUtf8(operation.target.floorFaceId)},
-                {QStringLiteral("root_face_id"),
+                {std::string("root_face_id"),
                  fromUtf8(operation.target.rootFaceId)},
-                {QStringLiteral("root_wire_id"),
+                {std::string("root_wire_id"),
                  fromUtf8(operation.target.rootWireId)},
-                {QStringLiteral("allow_open_section_contours"),
+                {std::string("allow_open_section_contours"),
                  operation.target.allowOpenSectionContours},
-                {QStringLiteral("open_boundary_face_count"),
+                {std::string("open_boundary_face_count"),
                  operation.target.openBoundaryFaceCount},
-                {QStringLiteral("geometry_fingerprint"),
+                {std::string("geometry_fingerprint"),
                  fromUtf8(operation.target.geometryFingerprint)},
             }},
-            {QStringLiteral("enabled"), operation.enabled},
-            {QStringLiteral("sequence"), operation.sequence},
-            {QStringLiteral("state"), static_cast<int>(operation.state)},
-            {QStringLiteral("input_fingerprint"),
+            {std::string("enabled"), operation.enabled},
+            {std::string("sequence"), operation.sequence},
+            {std::string("state"), static_cast<int>(operation.state)},
+            {std::string("input_fingerprint"),
              fromUtf8(operation.inputFingerprint)},
         };
         if (operation.parameters)
-            entry.insert(QStringLiteral("parameters"), parametersToJson(*operation.parameters));
+            entry.insert(std::string("parameters"), parametersToJson(*operation.parameters));
         pocketOperations.append(entry);
     }
 
-    QJsonArray profileOperations;
+    oap::JsonArray profileOperations;
     for (const ProfileOperationDefinition& operation :
          value.profileOperations) {
-        profileOperations.append(QJsonObject{
-            {QStringLiteral("id"), fromUtf8(operation.id)},
-            {QStringLiteral("setup_id"), fromUtf8(operation.setupId)},
-            {QStringLiteral("tool_controller_id"),
+        profileOperations.append(oap::JsonObject{
+            {std::string("id"), fromUtf8(operation.id)},
+            {std::string("setup_id"), fromUtf8(operation.setupId)},
+            {std::string("tool_controller_id"),
              fromUtf8(operation.toolControllerId)},
-            {QStringLiteral("algorithm_id"),
+            {std::string("algorithm_id"),
              fromUtf8(operation.algorithmId)},
-            {QStringLiteral("target"), QJsonObject{
-                {QStringLiteral("axis_label"),
+            {std::string("target"), oap::JsonObject{
+                {std::string("axis_label"),
                  fromUtf8(operation.target.axisLabel)},
-                {QStringLiteral("normal_direction"),
+                {std::string("normal_direction"),
                  operation.target.normalDirection},
-                {QStringLiteral("source_face_ids"),
+                {std::string("source_face_ids"),
                  stringsToJson(operation.target.sourceFaceIds)},
-                {QStringLiteral("machining_face_ids"),
+                {std::string("machining_face_ids"),
                  stringsToJson(operation.target.machiningFaceIds)},
-                {QStringLiteral("terminal_face_ids"),
+                {std::string("terminal_face_ids"),
                  stringsToJson(operation.target.terminalFaceIds)},
-                {QStringLiteral("main_outer_face_ids"),
+                {std::string("main_outer_face_ids"),
                  stringsToJson(operation.target.mainOuterFaceIds)},
-                {QStringLiteral("root_face_id"),
+                {std::string("root_face_id"),
                  fromUtf8(operation.target.rootFaceId)},
-                {QStringLiteral("root_wire_id"),
+                {std::string("root_wire_id"),
                  fromUtf8(operation.target.rootWireId)},
-                {QStringLiteral("geometry_fingerprint"),
+                {std::string("geometry_fingerprint"),
                  fromUtf8(operation.target.geometryFingerprint)},
             }},
-            {QStringLiteral("rest_previous_tool_diameter"),
+            {std::string("rest_previous_tool_diameter"),
              operation.restMachiningPreviousToolDiameter},
-            {QStringLiteral("finish_pass"), operation.finishPass},
-            {QStringLiteral("enabled"), operation.enabled},
-            {QStringLiteral("sequence"), operation.sequence},
-            {QStringLiteral("state"), static_cast<int>(operation.state)},
-            {QStringLiteral("input_fingerprint"),
+            {std::string("finish_pass"), operation.finishPass},
+            {std::string("enabled"), operation.enabled},
+            {std::string("sequence"), operation.sequence},
+            {std::string("state"), static_cast<int>(operation.state)},
+            {std::string("input_fingerprint"),
              fromUtf8(operation.inputFingerprint)},
         });
     }
 
     return {
-        {QStringLiteral("schema_version"), kMachiningJobSchemaVersion},
-        {QStringLiteral("id"), fromUtf8(value.id)},
-        {QStringLiteral("name"), fromUtf8(value.name)},
-        {QStringLiteral("created_at"), fromUtf8(value.createdAt)},
-        {QStringLiteral("modified_at"), fromUtf8(value.modifiedAt)},
-        {QStringLiteral("part"), QJsonObject{
-            {QStringLiteral("source_path"), fromUtf8(value.part.sourcePath)},
-            {QStringLiteral("source_fingerprint"), fromUtf8(value.part.sourceFingerprint)},
-            {QStringLiteral("units"), fromUtf8(value.part.units)},
-            {QStringLiteral("recognition_profile_version"), fromUtf8(value.part.recognitionProfileVersion)},
+        {std::string("schema_version"), kMachiningJobSchemaVersion},
+        {std::string("id"), fromUtf8(value.id)},
+        {std::string("name"), fromUtf8(value.name)},
+        {std::string("created_at"), fromUtf8(value.createdAt)},
+        {std::string("modified_at"), fromUtf8(value.modifiedAt)},
+        {std::string("part"), oap::JsonObject{
+            {std::string("source_path"), fromUtf8(value.part.sourcePath)},
+            {std::string("source_fingerprint"), fromUtf8(value.part.sourceFingerprint)},
+            {std::string("units"), fromUtf8(value.part.units)},
+            {std::string("recognition_profile_version"), fromUtf8(value.part.recognitionProfileVersion)},
         }},
-        {QStringLiteral("stock"), QJsonObject{
-            {QStringLiteral("source_kind"), static_cast<int>(value.stock.sourceKind)},
-            {QStringLiteral("source_path"), fromUtf8(value.stock.sourcePath)},
-            {QStringLiteral("source_fingerprint"), fromUtf8(value.stock.sourceFingerprint)},
-            {QStringLiteral("margin_x"), value.stock.marginX},
-            {QStringLiteral("margin_y"), value.stock.marginY},
-            {QStringLiteral("margin_z"), value.stock.marginZ},
+        {std::string("stock"), oap::JsonObject{
+            {std::string("source_kind"), static_cast<int>(value.stock.sourceKind)},
+            {std::string("source_path"), fromUtf8(value.stock.sourcePath)},
+            {std::string("source_fingerprint"), fromUtf8(value.stock.sourceFingerprint)},
+            {std::string("margin_x"), value.stock.marginX},
+            {std::string("margin_y"), value.stock.marginY},
+            {std::string("margin_z"), value.stock.marginZ},
         }},
-        {QStringLiteral("post"), QJsonObject{
-            {QStringLiteral("id"), fromUtf8(value.post.id)},
-            {QStringLiteral("version"), fromUtf8(value.post.version)},
-            {QStringLiteral("program_name"), fromUtf8(value.post.options.programName)},
-            {QStringLiteral("tool_id"), fromUtf8(value.post.options.toolId)},
-            {QStringLiteral("tool_name"), fromUtf8(value.post.options.toolName)},
-            {QStringLiteral("coolant"), value.post.options.coolant},
+        {std::string("post"), oap::JsonObject{
+            {std::string("id"), fromUtf8(value.post.id)},
+            {std::string("version"), fromUtf8(value.post.version)},
+            {std::string("program_name"), fromUtf8(value.post.options.programName)},
+            {std::string("tool_id"), fromUtf8(value.post.options.toolId)},
+            {std::string("tool_name"), fromUtf8(value.post.options.toolName)},
+            {std::string("coolant"), value.post.options.coolant},
         }},
-        {QStringLiteral("collision_scene"), QJsonObject{
-            {QStringLiteral("confirmed"), value.collisionScene.confirmed},
-            {QStringLiteral("models"), collisionModels},
+        {std::string("collision_scene"), oap::JsonObject{
+            {std::string("confirmed"), value.collisionScene.confirmed},
+            {std::string("models"), collisionModels},
         }},
-        {QStringLiteral("active_tool_library_id"), fromUtf8(value.activeToolLibraryId)},
-        {QStringLiteral("algorithm_id"), fromUtf8(value.algorithmId)},
-        {QStringLiteral("hole_parameters"), parametersToJson(value.holeParameters)},
-        {QStringLiteral("pocket_parameters"),
+        {std::string("active_tool_library_id"), fromUtf8(value.activeToolLibraryId)},
+        {std::string("algorithm_id"), fromUtf8(value.algorithmId)},
+        {std::string("hole_parameters"), parametersToJson(value.holeParameters)},
+        {std::string("pocket_parameters"),
          parametersToJson(value.pocketParameters)},
-        {QStringLiteral("profile_parameters"),
+        {std::string("profile_parameters"),
          parametersToJson(value.profileParameters)},
-        {QStringLiteral("recognized_holes"), recognizedHoles},
-        {QStringLiteral("recognized_physical_hole_count"),
+        {std::string("recognized_holes"), recognizedHoles},
+        {std::string("recognized_physical_hole_count"),
          value.recognizedPhysicalHoleCount},
-        {QStringLiteral("setups"), setups},
-        {QStringLiteral("tool_controllers"), controllers},
-        {QStringLiteral("hole_operations"), holeOperations},
-        {QStringLiteral("pocket_operations"), pocketOperations},
-        {QStringLiteral("profile_operations"), profileOperations},
-        {QStringLiteral("surface_finishing_operations"), detail::finishingOperationsToJson(value.finishingOperations)},
+        {std::string("setups"), setups},
+        {std::string("tool_controllers"), controllers},
+        {std::string("hole_operations"), holeOperations},
+        {std::string("pocket_operations"), pocketOperations},
+        {std::string("profile_operations"), profileOperations},
+        {std::string("surface_finishing_operations"), detail::finishingOperationsToJson(value.finishingOperations)},
     };
 }
 
-MachiningJobDefinition definitionFromJson(const QJsonObject& object)
+MachiningJobDefinition definitionFromJson(const oap::JsonObject& object)
 {
     // 反方向还原定义；缺失的可选字段回退到默认值，结构错误由后续校验捕获。
     MachiningJobDefinition result;
-    result.schemaVersion = object.value(QStringLiteral("schema_version")).toInt();
-    result.id = toUtf8(object.value(QStringLiteral("id")));
-    result.finishingOperations = detail::finishingOperationsFromJson(object.value(QStringLiteral("surface_finishing_operations")).toArray());
-    result.name = toUtf8(object.value(QStringLiteral("name")));
-    result.createdAt = toUtf8(object.value(QStringLiteral("created_at")));
-    result.modifiedAt = toUtf8(object.value(QStringLiteral("modified_at")));
+    result.schemaVersion = object.value(std::string("schema_version")).toInt();
+    result.id = toUtf8(object.value(std::string("id")));
+    result.finishingOperations = detail::finishingOperationsFromJson(object.value(std::string("surface_finishing_operations")).toArray());
+    result.name = toUtf8(object.value(std::string("name")));
+    result.createdAt = toUtf8(object.value(std::string("created_at")));
+    result.modifiedAt = toUtf8(object.value(std::string("modified_at")));
 
-    const QJsonObject part = object.value(QStringLiteral("part")).toObject();
-    result.part.sourcePath = toUtf8(part.value(QStringLiteral("source_path")));
-    result.part.sourceFingerprint = toUtf8(part.value(QStringLiteral("source_fingerprint")));
-    result.part.units = toUtf8(part.value(QStringLiteral("units")));
-    result.part.recognitionProfileVersion = toUtf8(part.value(QStringLiteral("recognition_profile_version")));
+    const oap::JsonObject part = object.value(std::string("part")).toObject();
+    result.part.sourcePath = toUtf8(part.value(std::string("source_path")));
+    result.part.sourceFingerprint = toUtf8(part.value(std::string("source_fingerprint")));
+    result.part.units = toUtf8(part.value(std::string("units")));
+    result.part.recognitionProfileVersion = toUtf8(part.value(std::string("recognition_profile_version")));
 
-    const QJsonObject stock = object.value(QStringLiteral("stock")).toObject();
-    result.stock.sourceKind = static_cast<StockSourceKind>(stock.value(QStringLiteral("source_kind")).toInt());
-    result.stock.sourcePath = toUtf8(stock.value(QStringLiteral("source_path")));
-    result.stock.sourceFingerprint = toUtf8(stock.value(QStringLiteral("source_fingerprint")));
-    result.stock.marginX = stock.value(QStringLiteral("margin_x")).toDouble();
-    result.stock.marginY = stock.value(QStringLiteral("margin_y")).toDouble();
-    result.stock.marginZ = stock.value(QStringLiteral("margin_z")).toDouble();
+    const oap::JsonObject stock = object.value(std::string("stock")).toObject();
+    result.stock.sourceKind = static_cast<StockSourceKind>(stock.value(std::string("source_kind")).toInt());
+    result.stock.sourcePath = toUtf8(stock.value(std::string("source_path")));
+    result.stock.sourceFingerprint = toUtf8(stock.value(std::string("source_fingerprint")));
+    result.stock.marginX = stock.value(std::string("margin_x")).toDouble();
+    result.stock.marginY = stock.value(std::string("margin_y")).toDouble();
+    result.stock.marginZ = stock.value(std::string("margin_z")).toDouble();
 
-    const QJsonObject post = object.value(QStringLiteral("post")).toObject();
-    result.post.id = toUtf8(post.value(QStringLiteral("id")));
-    result.post.version = toUtf8(post.value(QStringLiteral("version")));
-    result.post.options.programName = toUtf8(post.value(QStringLiteral("program_name")));
-    result.post.options.toolId = toUtf8(post.value(QStringLiteral("tool_id")));
-    result.post.options.toolName = toUtf8(post.value(QStringLiteral("tool_name")));
-    result.post.options.coolant = post.value(QStringLiteral("coolant")).toBool();
-    const QJsonObject collisionScene =
-        object.value(QStringLiteral("collision_scene")).toObject();
+    const oap::JsonObject post = object.value(std::string("post")).toObject();
+    result.post.id = toUtf8(post.value(std::string("id")));
+    result.post.version = toUtf8(post.value(std::string("version")));
+    result.post.options.programName = toUtf8(post.value(std::string("program_name")));
+    result.post.options.toolId = toUtf8(post.value(std::string("tool_id")));
+    result.post.options.toolName = toUtf8(post.value(std::string("tool_name")));
+    result.post.options.coolant = post.value(std::string("coolant")).toBool();
+    const oap::JsonObject collisionScene =
+        object.value(std::string("collision_scene")).toObject();
     result.collisionScene.confirmed =
-        collisionScene.value(QStringLiteral("confirmed")).toBool();
-    const QJsonArray collisionModels =
-        collisionScene.value(QStringLiteral("models")).toArray();
+        collisionScene.value(std::string("confirmed")).toBool();
+    const oap::JsonArray collisionModels =
+        collisionScene.value(std::string("models")).toArray();
     result.collisionScene.models.reserve(
         static_cast<std::size_t>(collisionModels.size()));
-    for (const QJsonValue& value : collisionModels) {
-        const QJsonObject modelObject = value.toObject();
+    for (const oap::JsonValue& value : collisionModels) {
+        const oap::JsonObject modelObject = value.toObject();
         CollisionModelReference model;
         model.sourcePath = toUtf8(
-            modelObject.value(QStringLiteral("source_path")));
+            modelObject.value(std::string("source_path")));
         model.sourceFingerprint = toUtf8(
-            modelObject.value(QStringLiteral("source_fingerprint")));
+            modelObject.value(std::string("source_fingerprint")));
         model.role = static_cast<toolpath::CollisionBodyRole>(
-            modelObject.value(QStringLiteral("role")).toInt());
+            modelObject.value(std::string("role")).toInt());
         model.translation = vectorFromJson(
-            modelObject.value(QStringLiteral("translation")));
+            modelObject.value(std::string("translation")));
         model.rotationDeg = vectorFromJson(
-            modelObject.value(QStringLiteral("rotation_deg")));
+            modelObject.value(std::string("rotation_deg")));
         result.collisionScene.models.push_back(std::move(model));
     }
 
-    result.activeToolLibraryId = toUtf8(object.value(QStringLiteral("active_tool_library_id")));
-    result.algorithmId = toUtf8(object.value(QStringLiteral("algorithm_id")));
-    result.holeParameters = parametersFromJson(object.value(QStringLiteral("hole_parameters")));
-    if (object.contains(QStringLiteral("pocket_parameters"))) {
+    result.activeToolLibraryId = toUtf8(object.value(std::string("active_tool_library_id")));
+    result.algorithmId = toUtf8(object.value(std::string("algorithm_id")));
+    result.holeParameters = parametersFromJson(object.value(std::string("hole_parameters")));
+    if (object.contains(std::string("pocket_parameters"))) {
         result.pocketParameters = parametersFromJson(
-            object.value(QStringLiteral("pocket_parameters")));
+            object.value(std::string("pocket_parameters")));
     } else {
         result.pocketParameters = result.holeParameters;
     }
-    if (object.contains(QStringLiteral("profile_parameters"))) {
+    if (object.contains(std::string("profile_parameters"))) {
         result.profileParameters = parametersFromJson(
-            object.value(QStringLiteral("profile_parameters")));
+            object.value(std::string("profile_parameters")));
     } else {
         result.profileParameters = result.pocketParameters;
     }
-    const QJsonArray recognizedHoles =
-        object.value(QStringLiteral("recognized_holes")).toArray();
+    const oap::JsonArray recognizedHoles =
+        object.value(std::string("recognized_holes")).toArray();
     result.recognizedHoles.reserve(
         static_cast<std::size_t>(recognizedHoles.size()));
-    for (const QJsonValue& value : recognizedHoles)
+    for (const oap::JsonValue& value : recognizedHoles)
         result.recognizedHoles.push_back(holeFromJson(value));
     result.recognizedPhysicalHoleCount = object.value(
-        QStringLiteral("recognized_physical_hole_count")).toInt();
+        std::string("recognized_physical_hole_count")).toInt();
 
-    const QJsonArray setups = object.value(QStringLiteral("setups")).toArray();
+    const oap::JsonArray setups = object.value(std::string("setups")).toArray();
     result.setups.reserve(static_cast<std::size_t>(setups.size()));
-    for (const QJsonValue& value : setups) {
-        const QJsonObject item = value.toObject();
+    for (const oap::JsonValue& value : setups) {
+        const oap::JsonObject item = value.toObject();
         SetupDefinition setup;
-        setup.id = toUtf8(item.value(QStringLiteral("id")));
-        setup.setupIndex = item.value(QStringLiteral("setup_index")).toInt();
-        setup.face = static_cast<MoldSetupFace>(item.value(QStringLiteral("face")).toInt());
-        setup.workOffset = static_cast<toolpath::WorkCoordinateSystem>(item.value(QStringLiteral("work_offset")).toInt());
-        setup.origin = vectorFromJson(item.value(QStringLiteral("origin")));
-        setup.xAxis = vectorFromJson(item.value(QStringLiteral("x_axis")));
-        setup.yAxis = vectorFromJson(item.value(QStringLiteral("y_axis")));
-        setup.zAxis = vectorFromJson(item.value(QStringLiteral("z_axis")));
-        setup.valid = item.value(QStringLiteral("valid")).toBool();
-        setup.requiresPhysicalReclamp = item.value(QStringLiteral("requires_physical_reclamp")).toBool();
-        setup.axisMapping = toUtf8(item.value(QStringLiteral("axis_mapping")));
-        setup.operatorInstruction = toUtf8(item.value(QStringLiteral("operator_instruction")));
-        const QJsonObject confirmation = item.value(QStringLiteral("confirmation")).toObject();
-        setup.confirmation.confirmed = confirmation.value(QStringLiteral("confirmed")).toBool();
-        setup.confirmation.confirmedBy = toUtf8(confirmation.value(QStringLiteral("confirmed_by")));
-        setup.confirmation.confirmedAt = toUtf8(confirmation.value(QStringLiteral("confirmed_at")));
-        setup.confirmation.confirmedInputFingerprint = toUtf8(confirmation.value(QStringLiteral("input_fingerprint")));
+        setup.id = toUtf8(item.value(std::string("id")));
+        setup.setupIndex = item.value(std::string("setup_index")).toInt();
+        setup.face = static_cast<MoldSetupFace>(item.value(std::string("face")).toInt());
+        setup.workOffset = static_cast<toolpath::WorkCoordinateSystem>(item.value(std::string("work_offset")).toInt());
+        setup.origin = vectorFromJson(item.value(std::string("origin")));
+        setup.xAxis = vectorFromJson(item.value(std::string("x_axis")));
+        setup.yAxis = vectorFromJson(item.value(std::string("y_axis")));
+        setup.zAxis = vectorFromJson(item.value(std::string("z_axis")));
+        setup.valid = item.value(std::string("valid")).toBool();
+        setup.requiresPhysicalReclamp = item.value(std::string("requires_physical_reclamp")).toBool();
+        setup.axisMapping = toUtf8(item.value(std::string("axis_mapping")));
+        setup.operatorInstruction = toUtf8(item.value(std::string("operator_instruction")));
+        const oap::JsonObject confirmation = item.value(std::string("confirmation")).toObject();
+        setup.confirmation.confirmed = confirmation.value(std::string("confirmed")).toBool();
+        setup.confirmation.confirmedBy = toUtf8(confirmation.value(std::string("confirmed_by")));
+        setup.confirmation.confirmedAt = toUtf8(confirmation.value(std::string("confirmed_at")));
+        setup.confirmation.confirmedInputFingerprint = toUtf8(confirmation.value(std::string("input_fingerprint")));
         result.setups.push_back(std::move(setup));
     }
 
-    const QJsonArray controllers = object.value(QStringLiteral("tool_controllers")).toArray();
+    const oap::JsonArray controllers = object.value(std::string("tool_controllers")).toArray();
     result.toolControllers.reserve(static_cast<std::size_t>(controllers.size()));
-    for (const QJsonValue& value : controllers) {
-        const QJsonObject item = value.toObject();
+    for (const oap::JsonValue& value : controllers) {
+        const oap::JsonObject item = value.toObject();
         JobToolController controller;
-        controller.id = toUtf8(item.value(QStringLiteral("id")));
-        controller.libraryId = toUtf8(item.value(QStringLiteral("library_id")));
-        controller.tool = toolContextFromJson(item.value(QStringLiteral("tool")));
+        controller.id = toUtf8(item.value(std::string("id")));
+        controller.libraryId = toUtf8(item.value(std::string("library_id")));
+        controller.tool = toolContextFromJson(item.value(std::string("tool")));
         result.toolControllers.push_back(std::move(controller));
     }
 
-    const QJsonArray operations = object.value(QStringLiteral("hole_operations")).toArray();
+    const oap::JsonArray operations = object.value(std::string("hole_operations")).toArray();
     result.holeOperations.reserve(static_cast<std::size_t>(operations.size()));
-    for (const QJsonValue& value : operations) {
-        const QJsonObject item = value.toObject();
+    for (const oap::JsonValue& value : operations) {
+        const oap::JsonObject item = value.toObject();
         HoleOperationDefinition operation;
-        operation.id = toUtf8(item.value(QStringLiteral("id")));
-        operation.setupId = toUtf8(item.value(QStringLiteral("setup_id")));
-        operation.toolControllerId = toUtf8(item.value(QStringLiteral("tool_controller_id")));
-        operation.phase = static_cast<toolpath::HoleMachiningPhase>(item.value(QStringLiteral("phase")).toInt());
-        operation.enabled = item.value(QStringLiteral("enabled")).toBool(true);
-        operation.sequence = item.value(QStringLiteral("sequence")).toInt();
-        operation.state = static_cast<JobOperationState>(item.value(QStringLiteral("state")).toInt());
-        operation.inputFingerprint = toUtf8(item.value(QStringLiteral("input_fingerprint")));
-        const QJsonArray targets = item.value(QStringLiteral("targets")).toArray();
+        operation.id = toUtf8(item.value(std::string("id")));
+        operation.setupId = toUtf8(item.value(std::string("setup_id")));
+        operation.toolControllerId = toUtf8(item.value(std::string("tool_controller_id")));
+        operation.phase = static_cast<toolpath::HoleMachiningPhase>(item.value(std::string("phase")).toInt());
+        operation.enabled = item.value(std::string("enabled")).toBool(true);
+        operation.sequence = item.value(std::string("sequence")).toInt();
+        operation.state = static_cast<JobOperationState>(item.value(std::string("state")).toInt());
+        operation.inputFingerprint = toUtf8(item.value(std::string("input_fingerprint")));
+        const oap::JsonArray targets = item.value(std::string("targets")).toArray();
         operation.targets.reserve(static_cast<std::size_t>(targets.size()));
-        for (const QJsonValue& targetValue : targets) {
-            const QJsonObject targetObject = targetValue.toObject();
+        for (const oap::JsonValue& targetValue : targets) {
+            const oap::JsonObject targetObject = targetValue.toObject();
             HoleTargetReference target;
-            target.featureId = toUtf8(targetObject.value(QStringLiteral("feature_id")));
-            target.geometryFingerprint = toUtf8(targetObject.value(QStringLiteral("geometry_fingerprint")));
-            target.sourceHoleIndex = targetObject.value(QStringLiteral("source_hole_index")).toInt(-1);
-            const QJsonArray coveredSourceIndices = targetObject.value(
-                QStringLiteral("covered_source_hole_indices")).toArray();
+            target.featureId = toUtf8(targetObject.value(std::string("feature_id")));
+            target.geometryFingerprint = toUtf8(targetObject.value(std::string("geometry_fingerprint")));
+            target.sourceHoleIndex = targetObject.value(std::string("source_hole_index")).toInt(-1);
+            const oap::JsonArray coveredSourceIndices = targetObject.value(
+                std::string("covered_source_hole_indices")).toArray();
             target.coveredSourceHoleIndices.reserve(
                 static_cast<std::size_t>(coveredSourceIndices.size()));
-            for (const QJsonValue& sourceIndex : coveredSourceIndices)
+            for (const oap::JsonValue& sourceIndex : coveredSourceIndices)
                 target.coveredSourceHoleIndices.push_back(sourceIndex.toInt(-1));
-            target.physicalHoleIndex = targetObject.value(QStringLiteral("physical_hole_index")).toInt(-1);
-            target.strategy = static_cast<toolpath::HoleMachiningStrategy>(targetObject.value(QStringLiteral("strategy")).toInt());
-            target.hole = holeFromJson(targetObject.value(QStringLiteral("hole")));
+            target.physicalHoleIndex = targetObject.value(std::string("physical_hole_index")).toInt(-1);
+            target.strategy = static_cast<toolpath::HoleMachiningStrategy>(targetObject.value(std::string("strategy")).toInt());
+            target.hole = holeFromJson(targetObject.value(std::string("hole")));
             operation.targets.push_back(std::move(target));
         }
         result.holeOperations.push_back(std::move(operation));
     }
-    const QJsonArray pocketOperations =
-        object.value(QStringLiteral("pocket_operations")).toArray();
+    const oap::JsonArray pocketOperations =
+        object.value(std::string("pocket_operations")).toArray();
     result.pocketOperations.reserve(
         static_cast<std::size_t>(pocketOperations.size()));
-    for (const QJsonValue& value : pocketOperations) {
-        const QJsonObject item = value.toObject();
+    for (const oap::JsonValue& value : pocketOperations) {
+        const oap::JsonObject item = value.toObject();
         PocketOperationDefinition operation;
-        if (item.contains(QStringLiteral("parameters")))
-            operation.parameters = parametersFromJson(item.value(QStringLiteral("parameters")));
-        operation.id = toUtf8(item.value(QStringLiteral("id")));
-        operation.setupId = toUtf8(item.value(QStringLiteral("setup_id")));
+        if (item.contains(std::string("parameters")))
+            operation.parameters = parametersFromJson(item.value(std::string("parameters")));
+        operation.id = toUtf8(item.value(std::string("id")));
+        operation.setupId = toUtf8(item.value(std::string("setup_id")));
         operation.toolControllerId = toUtf8(
-            item.value(QStringLiteral("tool_controller_id")));
+            item.value(std::string("tool_controller_id")));
         operation.restMachiningPreviousToolDiameter =
-            item.value(QStringLiteral("rest_previous_tool_diameter"))
+            item.value(std::string("rest_previous_tool_diameter"))
                 .toDouble(0.0);
         operation.algorithmId =
-            toUtf8(item.value(QStringLiteral("algorithm_id")));
-        const QJsonObject target =
-            item.value(QStringLiteral("target")).toObject();
+            toUtf8(item.value(std::string("algorithm_id")));
+        const oap::JsonObject target =
+            item.value(std::string("target")).toObject();
         operation.target.sourceKind =
             static_cast<PocketRegionSourceKind>(
-                target.value(QStringLiteral("source_kind")).toInt(
+                target.value(std::string("source_kind")).toInt(
                     static_cast<int>(
                         PocketRegionSourceKind::FeatureFaces)));
         operation.target.kind = static_cast<FeatureKind>(
-            target.value(QStringLiteral("kind")).toInt(
+            target.value(std::string("kind")).toInt(
                 static_cast<int>(FeatureKind::Pocket)));
         operation.target.sourceFaceIds = stringsFromJson(
-            target.value(QStringLiteral("source_face_ids")));
+            target.value(std::string("source_face_ids")));
         operation.target.floorFaceId =
-            toUtf8(target.value(QStringLiteral("floor_face_id")));
+            toUtf8(target.value(std::string("floor_face_id")));
         operation.target.rootFaceId =
-            toUtf8(target.value(QStringLiteral("root_face_id")));
+            toUtf8(target.value(std::string("root_face_id")));
         operation.target.rootWireId =
-            toUtf8(target.value(QStringLiteral("root_wire_id")));
+            toUtf8(target.value(std::string("root_wire_id")));
         operation.target.allowOpenSectionContours = target.value(
-            QStringLiteral("allow_open_section_contours")).toBool();
+            std::string("allow_open_section_contours")).toBool();
         operation.target.openBoundaryFaceCount = target.value(
-            QStringLiteral("open_boundary_face_count")).toInt();
+            std::string("open_boundary_face_count")).toInt();
         operation.target.geometryFingerprint = toUtf8(
-            target.value(QStringLiteral("geometry_fingerprint")));
+            target.value(std::string("geometry_fingerprint")));
         operation.enabled =
-            item.value(QStringLiteral("enabled")).toBool(true);
+            item.value(std::string("enabled")).toBool(true);
         operation.sequence =
-            item.value(QStringLiteral("sequence")).toInt();
+            item.value(std::string("sequence")).toInt();
         operation.state = static_cast<JobOperationState>(
-            item.value(QStringLiteral("state")).toInt());
+            item.value(std::string("state")).toInt());
         operation.inputFingerprint = toUtf8(
-            item.value(QStringLiteral("input_fingerprint")));
+            item.value(std::string("input_fingerprint")));
         result.pocketOperations.push_back(std::move(operation));
     }
-    const QJsonArray profileOperations =
-        object.value(QStringLiteral("profile_operations")).toArray();
+    const oap::JsonArray profileOperations =
+        object.value(std::string("profile_operations")).toArray();
     result.profileOperations.reserve(
         static_cast<std::size_t>(profileOperations.size()));
-    for (const QJsonValue& value : profileOperations) {
-        const QJsonObject item = value.toObject();
+    for (const oap::JsonValue& value : profileOperations) {
+        const oap::JsonObject item = value.toObject();
         ProfileOperationDefinition operation;
-        operation.id = toUtf8(item.value(QStringLiteral("id")));
-        operation.setupId = toUtf8(item.value(QStringLiteral("setup_id")));
+        operation.id = toUtf8(item.value(std::string("id")));
+        operation.setupId = toUtf8(item.value(std::string("setup_id")));
         operation.toolControllerId = toUtf8(
-            item.value(QStringLiteral("tool_controller_id")));
+            item.value(std::string("tool_controller_id")));
         operation.algorithmId = toUtf8(
-            item.value(QStringLiteral("algorithm_id")));
-        const QJsonObject target =
-            item.value(QStringLiteral("target")).toObject();
+            item.value(std::string("algorithm_id")));
+        const oap::JsonObject target =
+            item.value(std::string("target")).toObject();
         operation.target.axisLabel = toUtf8(
-            target.value(QStringLiteral("axis_label")));
+            target.value(std::string("axis_label")));
         operation.target.normalDirection = target.value(
-            QStringLiteral("normal_direction")).toInt(1);
+            std::string("normal_direction")).toInt(1);
         operation.target.sourceFaceIds = stringsFromJson(
-            target.value(QStringLiteral("source_face_ids")));
+            target.value(std::string("source_face_ids")));
         operation.target.machiningFaceIds = stringsFromJson(
-            target.value(QStringLiteral("machining_face_ids")));
+            target.value(std::string("machining_face_ids")));
         operation.target.terminalFaceIds = stringsFromJson(
-            target.value(QStringLiteral("terminal_face_ids")));
+            target.value(std::string("terminal_face_ids")));
         operation.target.mainOuterFaceIds = stringsFromJson(
-            target.value(QStringLiteral("main_outer_face_ids")));
+            target.value(std::string("main_outer_face_ids")));
         operation.target.rootFaceId = toUtf8(
-            target.value(QStringLiteral("root_face_id")));
+            target.value(std::string("root_face_id")));
         operation.target.rootWireId = toUtf8(
-            target.value(QStringLiteral("root_wire_id")));
+            target.value(std::string("root_wire_id")));
         operation.target.geometryFingerprint = toUtf8(
-            target.value(QStringLiteral("geometry_fingerprint")));
+            target.value(std::string("geometry_fingerprint")));
         operation.restMachiningPreviousToolDiameter = item.value(
-            QStringLiteral("rest_previous_tool_diameter")).toDouble(0.0);
+            std::string("rest_previous_tool_diameter")).toDouble(0.0);
         operation.finishPass = item.value(
-            QStringLiteral("finish_pass")).toBool(true);
+            std::string("finish_pass")).toBool(true);
         operation.enabled =
-            item.value(QStringLiteral("enabled")).toBool(true);
+            item.value(std::string("enabled")).toBool(true);
         operation.sequence =
-            item.value(QStringLiteral("sequence")).toInt();
+            item.value(std::string("sequence")).toInt();
         operation.state = static_cast<JobOperationState>(
-            item.value(QStringLiteral("state")).toInt());
+            item.value(std::string("state")).toInt());
         operation.inputFingerprint = toUtf8(
-            item.value(QStringLiteral("input_fingerprint")));
+            item.value(std::string("input_fingerprint")));
         result.profileOperations.push_back(std::move(operation));
     }
     return result;
@@ -1067,204 +1065,201 @@ void migrateLegacyHoleSources(
     }
 }
 
-bool parseDocument(const QByteArray& data,
-                   QJsonObject& root,
-                   QString* error)
+bool parseDocument(const std::string& data,
+                   oap::JsonObject& root,
+                   std::string* error)
 {
     // 统一入口：体积上限 → JSON 语法 → 格式标识 → schema 版本区间 → job 节点。
     if (data.size() > kMaxJobBytes) {
-        if (error) *error = QCoreApplication::translate("OpenAutoPath", "加工项目超过 %1 MB 上限")
-            .arg(kMaxJobBytes / (1024 * 1024));
+        if (error) *error = std::format("加工项目超过 {0} MB 上限", kMaxJobBytes / (1024 * 1024));
         return false;
     }
-    QJsonParseError parseError;
-    const QJsonDocument document = QJsonDocument::fromJson(data, &parseError);
-    if (parseError.error != QJsonParseError::NoError || !document.isObject()) {
-        if (error) *error = QCoreApplication::translate("OpenAutoPath", "加工项目 JSON 无效：%1")
-            .arg(parseError.errorString());
+    oap::JsonParseError parseError;
+    const oap::JsonDocument document = oap::JsonDocument::fromJson(data, &parseError);
+    if (parseError || !document.isObject()) {
+        if (error) *error = std::format("加工项目 JSON 无效：{0}", parseError.message);
         return false;
     }
     root = document.object();
     // 旧项目可显式打开；重新保存统一写入 OAP 格式标识。
-    const QString format = root.value(QStringLiteral("format")).toString();
-    if (format != QString::fromLatin1(kFormatId) &&
-        format != QStringLiteral("faceface-machining-job")) {
-        if (error) *error = QCoreApplication::translate("OpenAutoPath", "不是 OpenAutoPath 加工项目文件");
+    const std::string format = root.value(std::string("format")).toString();
+    if (format != kFormatId &&
+        format != std::string("faceface-machining-job")) {
+        if (error) *error = std::string("不是 OpenAutoPath 加工项目文件");
         return false;
     }
-    const int version = root.value(QStringLiteral("schema_version")).toInt();
+    const int version = root.value(std::string("schema_version")).toInt();
     if (version < kMinimumSupportedMachiningJobSchemaVersion ||
         version > kMachiningJobSchemaVersion) {
-        if (error) *error = QCoreApplication::translate("OpenAutoPath", "不支持的加工项目版本：%1").arg(version);
+        if (error) *error = std::format("不支持的加工项目版本：{0}", version);
         return false;
     }
-    const QJsonValue jobValue = root.value(QStringLiteral("job"));
+    const oap::JsonValue jobValue = root.value(std::string("job"));
     if (!jobValue.isObject()) {
-        if (error) *error = QCoreApplication::translate("OpenAutoPath", "加工项目缺少 job 定义");
+        if (error) *error = std::string("加工项目缺少 job 定义");
         return false;
     }
-    const QJsonValue legacySurfaces = jobValue.toObject()
-        .value(QStringLiteral("surface_operations"));
+    const oap::JsonValue legacySurfaces = jobValue.toObject()
+        .value(std::string("surface_operations"));
     if (!legacySurfaces.isUndefined() &&
-        (!legacySurfaces.isArray() || !legacySurfaces.toArray().isEmpty())) {
-        if (error) *error = QCoreApplication::translate("OpenAutoPath", "旧版曲面加工模块已移除，其工序与 OpenCAMLib 精加工定义不兼容，无法自动迁移。请使用旧版处理这些工序。");
+        (!legacySurfaces.isArray() || !legacySurfaces.toArray().empty())) {
+        if (error) *error = std::string("旧版曲面加工模块已移除，其工序与 OpenCAMLib 精加工定义不兼容，无法自动迁移。请使用旧版处理这些工序。");
         return false;
     }
     const int definitionVersion = jobValue.toObject()
-        .value(QStringLiteral("schema_version")).toInt();
+        .value(std::string("schema_version")).toInt();
     if (definitionVersion != version) {
         if (error) {
-            *error = QCoreApplication::translate("OpenAutoPath", "加工项目根版本与 job 定义版本不一致");
+            *error = std::string("加工项目根版本与 job 定义版本不一致");
         }
         return false;
     }
     return true;
 }
 
-QString retiredManualInputError(const QJsonObject& job)
+std::string retiredManualInputError(const oap::JsonObject& job)
 {
-    const auto plan = job.value(QStringLiteral("manual_hole_plan"));
+    const auto plan = job.value(std::string("manual_hole_plan"));
     if (!plan.isUndefined()) {
-        if (!plan.isObject() || !plan.toObject().value(QStringLiteral("stages")).isArray() ||
-            !plan.toObject().value(QStringLiteral("stages")).toArray().isEmpty())
-            return QCoreApplication::translate("OpenAutoPath", "项目包含已移除的人工孔段计划或无效人工计划；请使用旧版本处理原项目。");
+        if (!plan.isObject() || !plan.toObject().value(std::string("stages")).isArray() ||
+            !plan.toObject().value(std::string("stages")).toArray().empty())
+            return std::string("项目包含已移除的人工孔段计划或无效人工计划；请使用旧版本处理原项目。");
     }
-    for (const auto& value : job.value(QStringLiteral("hole_operations")).toArray()) {
+    for (const auto& value : job.value(std::string("hole_operations")).toArray()) {
         const auto operation = value.toObject();
-        const auto overrides = operation.value(QStringLiteral("operation_overrides"));
-        const auto local = operation.value(QStringLiteral("local_batch"));
+        const auto overrides = operation.value(std::string("operation_overrides"));
+        const auto local = operation.value(std::string("local_batch"));
         const auto overrideObject = overrides.toObject();
-        const auto retract = overrideObject.value(QStringLiteral("retract_preference"));
+        const auto retract = overrideObject.value(std::string("retract_preference"));
         // V4-V10 wrote the inherited retract preference even without any override.
         const bool inheritedOnly = overrideObject.size() == 1 && retract.isDouble() && retract.toDouble() == 0.0;
-        if ((!overrides.isUndefined() && (!overrides.isObject() || (!overrideObject.isEmpty() && !inheritedOnly))) ||
+        if ((!overrides.isUndefined() && (!overrides.isObject() || (!overrideObject.empty() && !inheritedOnly))) ||
             (!local.isUndefined() && (!local.isBool() || local.toBool())))
-            return QCoreApplication::translate("OpenAutoPath", "项目包含已移除的手动孔工艺覆盖或局部人工计划；请使用旧版本处理原项目。");
+            return std::string("项目包含已移除的手动孔工艺覆盖或局部人工计划；请使用旧版本处理原项目。");
     }
-    for (const auto& value : job.value(QStringLiteral("tool_controllers")).toArray()) {
+    for (const auto& value : job.value(std::string("tool_controllers")).toArray()) {
         const auto controller = value.toObject();
-        const auto manual = controller.value(QStringLiteral("manual"));
+        const auto manual = controller.value(std::string("manual"));
         if (!manual.isUndefined() && (!manual.isBool() || manual.toBool()))
-            return QCoreApplication::translate("OpenAutoPath", "项目包含已移除的手工刀具；请使用旧版本将工序绑定到刀库后再迁移。");
+            return std::string("项目包含已移除的手工刀具；请使用旧版本将工序绑定到刀库后再迁移。");
     }
     return {};
 }
 
-QString validateCurrentShape(const QJsonObject& job)
+std::string validateCurrentShape(const oap::JsonObject& job)
 {
-    if (!job.value(QStringLiteral("stock")).isObject() ||
-        !job.value(QStringLiteral("stock")).toObject().value(QStringLiteral("source_fingerprint")).isString())
-        return QStringLiteral("V12 planning stock content identity must be a string");
+    if (!job.value(std::string("stock")).isObject() ||
+        !job.value(std::string("stock")).toObject().value(std::string("source_fingerprint")).isString())
+        return std::string("V12 planning stock content identity must be a string");
     // 当前 schema 的快速结构预检（不含语义校验）。
-    const QJsonValue recognizedValue =
-        job.value(QStringLiteral("recognized_holes"));
+    const oap::JsonValue recognizedValue =
+        job.value(std::string("recognized_holes"));
     if (!recognizedValue.isArray())
-        return QStringLiteral("V4 recognized_holes is not an array");
-    for (const QJsonValue& value : recognizedValue.toArray()) {
-        const QJsonObject hole = value.toObject();
+        return std::string("V4 recognized_holes is not an array");
+    for (const oap::JsonValue& value : recognizedValue.toArray()) {
+        const oap::JsonObject hole = value.toObject();
         if (!value.isObject() ||
-            !hole.value(QStringLiteral("manual")).isBool() ||
-            !hole.value(QStringLiteral("stage_wall_face_ids")).isArray() ||
-            !hole.value(QStringLiteral("stage_role")).isDouble()) {
-            return QStringLiteral("V4 recognized hole fields are incomplete");
+            !hole.value(std::string("manual")).isBool() ||
+            !hole.value(std::string("stage_wall_face_ids")).isArray() ||
+            !hole.value(std::string("stage_role")).isDouble()) {
+            return std::string("V4 recognized hole fields are incomplete");
         }
     }
-    for (const auto& value : job.value(QStringLiteral("pocket_operations")).toArray()) {
-        const auto params = value.toObject().value(QStringLiteral("parameters"));
+    for (const auto& value : job.value(std::string("pocket_operations")).toArray()) {
+        const auto params = value.toObject().value(std::string("parameters"));
         if (params.isUndefined()) continue;
-        if (job.value(QStringLiteral("schema_version")).toInt() < 13)
-            return QStringLiteral("Independent pocket parameters require V13");
+        if (job.value(std::string("schema_version")).toInt() < 13)
+            return std::string("Independent pocket parameters require V13");
         const auto normalized = parametersToJson(parametersFromJson(params));
         if (!params.isObject() || normalized != params.toObject())
-            return QStringLiteral("Invalid pocket operation parameters");
+            return std::string("Invalid pocket operation parameters");
     }
-    const QJsonValue operationsValue =
-        job.value(QStringLiteral("hole_operations"));
+    const oap::JsonValue operationsValue =
+        job.value(std::string("hole_operations"));
     if (!operationsValue.isArray())
-        return QStringLiteral("V4 hole_operations is not an array");
-    for (const QJsonValue& value : operationsValue.toArray()) {
-        const QJsonObject operation = value.toObject();
+        return std::string("V4 hole_operations is not an array");
+    for (const oap::JsonValue& value : operationsValue.toArray()) {
+        const oap::JsonObject operation = value.toObject();
         if (!value.isObject()) {
-            return QStringLiteral("V4 hole operation fields are incomplete");
+            return std::string("V4 hole operation fields are incomplete");
         }
     }
-    if (!job.value(QStringLiteral("profile_parameters")).isObject() ||
-        !job.value(QStringLiteral("profile_operations")).isArray()) {
-        return QStringLiteral("V5 profile fields are incomplete");
+    if (!job.value(std::string("profile_parameters")).isObject() ||
+        !job.value(std::string("profile_operations")).isArray()) {
+        return std::string("V5 profile fields are incomplete");
     }
-    for (const QJsonValue& value :
-         job.value(QStringLiteral("profile_operations")).toArray()) {
-        const QJsonObject operation = value.toObject();
+    for (const oap::JsonValue& value :
+         job.value(std::string("profile_operations")).toArray()) {
+        const oap::JsonObject operation = value.toObject();
         if (!value.isObject() ||
             !operation.value(
-                QStringLiteral("rest_previous_tool_diameter")).isDouble() ||
-            !operation.value(QStringLiteral("finish_pass")).isBool()) {
-            return QStringLiteral(
-                "V6 profile rest-machining fields are incomplete");
+                std::string("rest_previous_tool_diameter")).isDouble() ||
+            !operation.value(std::string("finish_pass")).isBool()) {
+            return std::string("V6 profile rest-machining fields are incomplete");
         }
     }
     return {};
 }
 
-QJsonArray executionOperations(QJsonArray operations)
+oap::JsonArray executionOperations(oap::JsonArray operations)
 {
     // 归一化操作数组用于执行指纹：去掉运行期 state，并按 sequence+id 排序，
     // 使声明顺序等非执行因素不影响指纹。
-    std::vector<QJsonObject> normalized;
+    std::vector<oap::JsonObject> normalized;
     normalized.reserve(static_cast<std::size_t>(operations.size()));
-    for (qsizetype index = 0; index < operations.size(); ++index) {
-        QJsonObject operation = operations.at(index).toObject();
-        operation.remove(QStringLiteral("state"));
+    for (std::size_t index = 0; index < operations.size(); ++index) {
+        oap::JsonObject operation = operations.at(index).toObject();
+        operation.remove(std::string("state"));
         normalized.push_back(std::move(operation));
     }
     std::sort(
         normalized.begin(), normalized.end(),
-        [](const QJsonObject& left, const QJsonObject& right) {
+        [](const oap::JsonObject& left, const oap::JsonObject& right) {
             const int leftSequence =
-                left.value(QStringLiteral("sequence")).toInt();
+                left.value(std::string("sequence")).toInt();
             const int rightSequence =
-                right.value(QStringLiteral("sequence")).toInt();
+                right.value(std::string("sequence")).toInt();
             if (leftSequence != rightSequence)
                 return leftSequence < rightSequence;
-            return left.value(QStringLiteral("id")).toString() <
-                right.value(QStringLiteral("id")).toString();
+            return left.value(std::string("id")).toString() <
+                right.value(std::string("id")).toString();
         });
-    QJsonArray result;
-    for (const QJsonObject& operation : normalized)
+    oap::JsonArray result;
+    for (const oap::JsonObject& operation : normalized)
         result.append(operation);
     return result;
 }
 
-QJsonArray referencedResources(
-    const QJsonArray& resources,
-    const QJsonArray& operations,
-    const QString& referenceKey)
+oap::JsonArray referencedResources(
+    const oap::JsonArray& resources,
+    const oap::JsonArray& operations,
+    const std::string& referenceKey)
 {
     // 只保留执行指纹真正依赖的资源；Setup 还剔除确认/指令等非执行字段。
-    QSet<QString> referenced;
-    for (const QJsonValue& value : operations) {
+    std::set<std::string> referenced;
+    for (const oap::JsonValue& value : operations) {
         referenced.insert(
             value.toObject().value(referenceKey).toString());
     }
-    std::vector<QJsonObject> normalized;
-    for (const QJsonValue& value : resources) {
-        QJsonObject item = value.toObject();
-        if (!referenced.contains(item.value(QStringLiteral("id")).toString()))
+    std::vector<oap::JsonObject> normalized;
+    for (const oap::JsonValue& value : resources) {
+        oap::JsonObject item = value.toObject();
+        if (!referenced.contains(item.value(std::string("id")).toString()))
             continue;
-        if (referenceKey == QStringLiteral("setup_id")) {
-            item.remove(QStringLiteral("confirmation"));
-            item.remove(QStringLiteral("operator_instruction"));
+        if (referenceKey == std::string("setup_id")) {
+            item.remove(std::string("confirmation"));
+            item.remove(std::string("operator_instruction"));
         }
         normalized.push_back(std::move(item));
     }
     std::sort(
         normalized.begin(), normalized.end(),
-        [](const QJsonObject& left, const QJsonObject& right) {
-            return left.value(QStringLiteral("id")).toString() <
-                right.value(QStringLiteral("id")).toString();
+        [](const oap::JsonObject& left, const oap::JsonObject& right) {
+            return left.value(std::string("id")).toString() <
+                right.value(std::string("id")).toString();
         });
-    QJsonArray result;
-    for (const QJsonObject& item : normalized)
+    oap::JsonArray result;
+    for (const oap::JsonObject& item : normalized)
         result.append(item);
     return result;
 }
@@ -1278,83 +1273,81 @@ enum class ExecutionDomain {
     SurfaceFinishing,
 };
 
-QJsonObject domainExecutionJson(
+oap::JsonObject domainExecutionJson(
     const MachiningJobDefinition& definition, ExecutionDomain domain)
 {
     // 按领域（孔/槽腔）裁剪定义生成执行 JSON，作为各自执行指纹的输入；
     // 移除 id/名称/时间等元数据与另一领域的参数和工序。
-    QJsonObject result = definitionToJson(definition);
-    result.remove(QStringLiteral("id"));
-    result.remove(QStringLiteral("name"));
-    result.remove(QStringLiteral("created_at"));
-    result.remove(QStringLiteral("modified_at"));
-    result.remove(QStringLiteral("post"));
-    result.remove(QStringLiteral("active_tool_library_id"));
+    oap::JsonObject result = definitionToJson(definition);
+    result.remove(std::string("id"));
+    result.remove(std::string("name"));
+    result.remove(std::string("created_at"));
+    result.remove(std::string("modified_at"));
+    result.remove(std::string("post"));
+    result.remove(std::string("active_tool_library_id"));
 
-    const QString operationsKey =
+    const std::string operationsKey =
         domain == ExecutionDomain::Hole
-            ? QStringLiteral("hole_operations")
+            ? std::string("hole_operations")
             : domain == ExecutionDomain::Pocket
-                ? QStringLiteral("pocket_operations")
+                ? std::string("pocket_operations")
                 : domain == ExecutionDomain::Profile
-                    ? QStringLiteral("profile_operations") : QStringLiteral("surface_finishing_operations");
-    const QJsonArray operations = executionOperations(
+                    ? std::string("profile_operations") : std::string("surface_finishing_operations");
+    const oap::JsonArray operations = executionOperations(
         result.value(operationsKey).toArray());
     result.insert(operationsKey, operations);
     result.insert(
-        QStringLiteral("setups"),
+        std::string("setups"),
         referencedResources(
-            result.value(QStringLiteral("setups")).toArray(),
-            operations, QStringLiteral("setup_id")));
+            result.value(std::string("setups")).toArray(),
+            operations, std::string("setup_id")));
     result.insert(
-        QStringLiteral("tool_controllers"),
+        std::string("tool_controllers"),
         referencedResources(
-            result.value(QStringLiteral("tool_controllers")).toArray(),
-            operations, QStringLiteral("tool_controller_id")));
+            result.value(std::string("tool_controllers")).toArray(),
+            operations, std::string("tool_controller_id")));
     if (domain != ExecutionDomain::SurfaceFinishing)
-        result.remove(QStringLiteral("surface_finishing_operations"));
+        result.remove(std::string("surface_finishing_operations"));
     if (domain == ExecutionDomain::SurfaceFinishing) {
         for (const char* key : {"algorithm_id", "hole_parameters", "recognized_holes", "recognized_physical_hole_count",
              "hole_operations", "manual_hole_plan", "pocket_parameters", "pocket_operations", "profile_parameters", "profile_operations"})
-            result.remove(QLatin1String(key));
+            result.remove(key);
     }
     if (domain == ExecutionDomain::Hole) {
-        result.remove(QStringLiteral("pocket_parameters"));
-        result.remove(QStringLiteral("pocket_operations"));
-        result.remove(QStringLiteral("profile_parameters"));
-        result.remove(QStringLiteral("profile_operations"));
+        result.remove(std::string("pocket_parameters"));
+        result.remove(std::string("pocket_operations"));
+        result.remove(std::string("profile_parameters"));
+        result.remove(std::string("profile_operations"));
     } else if (domain == ExecutionDomain::Pocket) {
-        result.remove(QStringLiteral("algorithm_id"));
-        result.remove(QStringLiteral("hole_parameters"));
-        result.remove(QStringLiteral("recognized_holes"));
-        result.remove(QStringLiteral("recognized_physical_hole_count"));
-        result.remove(QStringLiteral("hole_operations"));
-        result.remove(QStringLiteral("manual_hole_plan"));
-        result.remove(QStringLiteral("profile_parameters"));
-        result.remove(QStringLiteral("profile_operations"));
+        result.remove(std::string("algorithm_id"));
+        result.remove(std::string("hole_parameters"));
+        result.remove(std::string("recognized_holes"));
+        result.remove(std::string("recognized_physical_hole_count"));
+        result.remove(std::string("hole_operations"));
+        result.remove(std::string("manual_hole_plan"));
+        result.remove(std::string("profile_parameters"));
+        result.remove(std::string("profile_operations"));
     } else if (domain == ExecutionDomain::Profile) {
-        result.remove(QStringLiteral("algorithm_id"));
-        result.remove(QStringLiteral("hole_parameters"));
-        result.remove(QStringLiteral("recognized_holes"));
-        result.remove(QStringLiteral("recognized_physical_hole_count"));
-        result.remove(QStringLiteral("hole_operations"));
-        result.remove(QStringLiteral("manual_hole_plan"));
-        result.remove(QStringLiteral("pocket_parameters"));
-        result.remove(QStringLiteral("pocket_operations"));
+        result.remove(std::string("algorithm_id"));
+        result.remove(std::string("hole_parameters"));
+        result.remove(std::string("recognized_holes"));
+        result.remove(std::string("recognized_physical_hole_count"));
+        result.remove(std::string("hole_operations"));
+        result.remove(std::string("manual_hole_plan"));
+        result.remove(std::string("pocket_parameters"));
+        result.remove(std::string("pocket_operations"));
     }
     return result;
 }
 
-QString jsonFingerprint(const QJsonObject& value)
+std::string jsonFingerprint(const oap::JsonObject& value)
 {
-    return QString::fromLatin1(QCryptographicHash::hash(
-        QJsonDocument(value).toJson(QJsonDocument::Compact),
-        QCryptographicHash::Sha256).toHex());
+    return std::string(oap::sha256Hex(oap::JsonDocument(value).toJson(oap::JsonDocument::Compact)));
 }
 
 } // namespace
 
-QByteArray MachiningJobStorage::serializeDefinition(
+std::string MachiningJobStorage::serializeDefinition(
     const MachiningJobDefinition& definition)
 {
     // 输出 {format, schema_version, job} 根结构，job 内嵌定义 JSON；
@@ -1363,45 +1356,44 @@ QByteArray MachiningJobStorage::serializeDefinition(
     const bool hasPocketOverrides = std::any_of(definition.pocketOperations.begin(), definition.pocketOperations.end(),
         [](const PocketOperationDefinition& op) { return op.parameters.has_value(); });
     const int fileVersion = hasPocketOverrides ? kMachiningJobSchemaVersion : 12;
-    job.insert(QStringLiteral("schema_version"), fileVersion);
-    const QJsonObject root{
-        {QStringLiteral("format"), QString::fromLatin1(kFormatId)},
-        {QStringLiteral("schema_version"), fileVersion},
-        {QStringLiteral("job"), job},
+    job.insert(std::string("schema_version"), fileVersion);
+    const oap::JsonObject root{
+        {std::string("format"), kFormatId},
+        {std::string("schema_version"), fileVersion},
+        {std::string("job"), job},
     };
-    return QJsonDocument(root).toJson(QJsonDocument::Indented);
+    return oap::JsonDocument(root).toJson(oap::JsonDocument::Indented);
 }
 
 bool MachiningJobStorage::deserializeDefinition(
-    const QByteArray& data,
+    const std::string& data,
     MachiningJobDefinition& definition,
-    QString* error)
+    std::string* error)
 {
     // 加载流水线：解析 → 当前结构预检 → 反序列化 → 旧版本迁移 →
     // Setup 确认失效校验 → 领域校验，全部通过后才提交到调用方定义。
-    QJsonObject root;
+    oap::JsonObject root;
     if (!parseDocument(data, root, error))
         return false;
-    const QJsonObject jobObject =
-        root.value(QStringLiteral("job")).toObject();
+    const oap::JsonObject jobObject =
+        root.value(std::string("job")).toObject();
     const int sourceVersion =
-        root.value(QStringLiteral("schema_version")).toInt();
-    const QString manualError = retiredManualInputError(jobObject);
-    if (!manualError.isEmpty()) {
+        root.value(std::string("schema_version")).toInt();
+    const std::string manualError = retiredManualInputError(jobObject);
+    if (!manualError.empty()) {
         if (error) *error = manualError;
         return false;
     }
-    const QString finishingShapeError = detail::validateFinishingJson(jobObject, sourceVersion >= 10);
-    if (!finishingShapeError.isEmpty()) {
+    const std::string finishingShapeError = detail::validateFinishingJson(jobObject, sourceVersion >= 10);
+    if (!finishingShapeError.empty()) {
         if (error) *error = finishingShapeError;
         return false;
     }
     if (sourceVersion >= 12) {
-        const QString shapeError = validateCurrentShape(jobObject);
-        if (!shapeError.isEmpty()) {
+        const std::string shapeError = validateCurrentShape(jobObject);
+        if (!shapeError.empty()) {
             if (error)
-                *error = QCoreApplication::translate("OpenAutoPath", "加工项目结构无效：%1")
-                    .arg(shapeError);
+                *error = std::format("加工项目结构无效：{0}", shapeError);
             return false;
         }
     }
@@ -1418,7 +1410,7 @@ bool MachiningJobStorage::deserializeDefinition(
 
             continue;
         const std::string expected = setupInputFingerprint(
-            parsed.part, setup).toStdString();
+            parsed.part, setup);
         if (setup.confirmation.confirmedInputFingerprint == expected)
             continue;
         setup.confirmation = {};
@@ -1453,8 +1445,7 @@ bool MachiningJobStorage::deserializeDefinition(
     job.definition() = parsed;
     const std::vector<std::string> errors = job.validationErrors();
     if (!errors.empty()) {
-        if (error) *error = QCoreApplication::translate("OpenAutoPath", "加工项目结构无效：%1")
-            .arg(QString::fromStdString(errors.front()));
+        if (error) *error = std::format("加工项目结构无效：{0}", std::string(errors.front()));
         return false;
     }
     definition = std::move(parsed);
@@ -1462,50 +1453,31 @@ bool MachiningJobStorage::deserializeDefinition(
 }
 
 bool MachiningJobStorage::save(
-    const QString& filePath,
+    const std::string& filePath,
     const MachiningJobDefinition& definition,
-    QString* error)
+    std::string* error)
 {
-    // 用 QSaveFile 先写临时文件再原子提交，避免中途失败损坏既有项目。
-    QSaveFile file(filePath);
-    if (!file.open(QIODevice::WriteOnly)) {
-        if (error) *error = file.errorString();
-        return false;
-    }
-    const QByteArray data = serializeDefinition(definition);
-    if (file.write(data) != data.size() || !file.commit()) {
-        if (error) *error = file.errorString();
-        return false;
-    }
-    return true;
+    return oap::writeFileAtomically(filePath, serializeDefinition(definition), error);
 }
 
 bool MachiningJobStorage::load(
-    const QString& filePath,
+    const std::string& filePath,
     MachiningJobDefinition& definition,
-    QString* error)
+    std::string* error)
 {
-    QFile file(filePath);
-    if (!file.open(QIODevice::ReadOnly)) {
-        if (error) *error = file.errorString();
-        return false;
-    }
-    if (file.size() < 0 || file.size() > kMaxJobBytes) {
-        if (error) *error = QCoreApplication::translate("OpenAutoPath", "加工项目文件大小无效或超过上限");
-        return false;
-    }
-    return deserializeDefinition(file.readAll(), definition, error);
+    std::string data;
+    return oap::readFile(filePath, data, error, kMaxJobBytes) &&
+           deserializeDefinition(data, definition, error);
 }
 
-QString MachiningJobStorage::definitionFingerprint(
+std::string MachiningJobStorage::definitionFingerprint(
     const MachiningJobDefinition& definition)
 {
     // 整个定义（含未启用内容）的规范化序列化哈希，任何字段变化都会改变它。
-    return QString::fromLatin1(QCryptographicHash::hash(
-        serializeDefinition(definition), QCryptographicHash::Sha256).toHex());
+    return std::string(oap::sha256Hex(serializeDefinition(definition)));
 }
 
-QString MachiningJobStorage::holeExecutionFingerprint(
+std::string MachiningJobStorage::holeExecutionFingerprint(
     const MachiningJobDefinition& definition)
 {
     // 孔执行指纹基于孔领域执行 JSON；其他工序族不参与其身份。
@@ -1513,7 +1485,7 @@ QString MachiningJobStorage::holeExecutionFingerprint(
         definition, ExecutionDomain::Hole));
 }
 
-QString MachiningJobStorage::pocketExecutionFingerprint(
+std::string MachiningJobStorage::pocketExecutionFingerprint(
     const MachiningJobDefinition& definition)
 {
     // 槽腔执行指纹基于槽腔领域执行 JSON；孔相关字段不参与其身份。
@@ -1521,62 +1493,51 @@ QString MachiningJobStorage::pocketExecutionFingerprint(
         definition, ExecutionDomain::Pocket));
 }
 
-QString MachiningJobStorage::profileExecutionFingerprint(
+std::string MachiningJobStorage::profileExecutionFingerprint(
     const MachiningJobDefinition& definition)
 {
     return jsonFingerprint(domainExecutionJson(
         definition, ExecutionDomain::Profile));
 }
 
-QString MachiningJobStorage::finishingExecutionFingerprint(const MachiningJobDefinition& definition)
+std::string MachiningJobStorage::finishingExecutionFingerprint(const MachiningJobDefinition& definition)
 {
     return jsonFingerprint(domainExecutionJson(definition, ExecutionDomain::SurfaceFinishing));
 }
 
-QString MachiningJobStorage::setupInputFingerprint(
+std::string MachiningJobStorage::setupInputFingerprint(
     const PartDefinition& part,
     const SetupDefinition& setup)
 {
     // 零件指纹 + 装夹关键值构成 Setup 的输入身份，用于确认失效与操作指纹。
-    const QJsonObject input{
-        {QStringLiteral("part_fingerprint"),
+    const oap::JsonObject input{
+        {std::string("part_fingerprint"),
          fromUtf8(part.sourceFingerprint)},
-        {QStringLiteral("setup_id"), fromUtf8(setup.id)},
-        {QStringLiteral("setup_index"), setup.setupIndex},
-        {QStringLiteral("face"), static_cast<int>(setup.face)},
-        {QStringLiteral("work_offset"),
+        {std::string("setup_id"), fromUtf8(setup.id)},
+        {std::string("setup_index"), setup.setupIndex},
+        {std::string("face"), static_cast<int>(setup.face)},
+        {std::string("work_offset"),
          static_cast<int>(setup.workOffset)},
-        {QStringLiteral("origin"), vectorToJson(setup.origin)},
-        {QStringLiteral("x_axis"), vectorToJson(setup.xAxis)},
-        {QStringLiteral("y_axis"), vectorToJson(setup.yAxis)},
-        {QStringLiteral("z_axis"), vectorToJson(setup.zAxis)},
-        {QStringLiteral("axis_mapping"), fromUtf8(setup.axisMapping)},
+        {std::string("origin"), vectorToJson(setup.origin)},
+        {std::string("x_axis"), vectorToJson(setup.xAxis)},
+        {std::string("y_axis"), vectorToJson(setup.yAxis)},
+        {std::string("z_axis"), vectorToJson(setup.zAxis)},
+        {std::string("axis_mapping"), fromUtf8(setup.axisMapping)},
     };
-    return QString::fromLatin1(QCryptographicHash::hash(
-        QJsonDocument(input).toJson(QJsonDocument::Compact),
-        QCryptographicHash::Sha256).toHex());
+    return oap::sha256Hex(oap::JsonDocument(input).toFingerprintJson());
 }
 
-QString MachiningJobStorage::sourceFileFingerprint(
-    const QString& filePath,
-    QString* error)
+std::string MachiningJobStorage::sourceFileFingerprint(
+    const std::string& filePath,
+    std::string* error)
 {
     // 对源文件做分块流式 SHA-256，避免一次性读入大模型文件。
-    QFile file(filePath);
-    if (!file.open(QIODevice::ReadOnly)) {
-        if (error) *error = file.errorString();
+    std::string hash;
+    if (!oap::sha256FileHex(filePath, hash)) {
+        if (error) *error = std::format("无法读取文件并计算指纹：{}", filePath);
         return {};
     }
-    QCryptographicHash hash(QCryptographicHash::Sha256);
-    while (!file.atEnd()) {
-        const QByteArray chunk = file.read(1024 * 1024);
-        if (chunk.isEmpty() && file.error() != QFileDevice::NoError) {
-            if (error) *error = file.errorString();
-            return {};
-        }
-        hash.addData(chunk);
-    }
-    return QString::fromLatin1(hash.result().toHex());
+    return hash;
 }
 
 } // namespace oap::manufacturing

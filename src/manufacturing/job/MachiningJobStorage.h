@@ -4,9 +4,8 @@
 // 定义/执行指纹均基于序列化 JSON 计算，任何字段变化都会改变指纹。
 #pragma once
 
-#include <QByteArray>
-#include <QString>
 
+#include <string>
 #include "manufacturing/job/MachiningJob.h"
 
 namespace oap::manufacturing {
@@ -16,40 +15,40 @@ namespace oap::manufacturing {
 // 全部为无状态静态方法，不维护任何缓存。
 class MachiningJobStorage {
 public:
-    static QByteArray serializeDefinition(
+    static std::string serializeDefinition(
         const MachiningJobDefinition& definition);
     static bool deserializeDefinition(
-        const QByteArray& data,
+        const std::string& data,
         MachiningJobDefinition& definition,
-        QString* error = nullptr);
+        std::string* error = nullptr);
 
-    // 保存到文件的同步读写，使用 QSaveFile 保证原子替换。
-    static bool save(const QString& filePath,
+    // 保存到文件的同步读写，通过临时文件原子替换。
+    static bool save(const std::string& filePath,
                      const MachiningJobDefinition& definition,
-                     QString* error = nullptr);
-    static bool load(const QString& filePath,
+                     std::string* error = nullptr);
+    static bool load(const std::string& filePath,
                      MachiningJobDefinition& definition,
-                     QString* error = nullptr);
+                     std::string* error = nullptr);
 
     // 定义指纹：整个 Job 定义的规范化 JSON 哈希，用于判定定义是否变化。
-    static QString definitionFingerprint(
+    static std::string definitionFingerprint(
         const MachiningJobDefinition& definition);
     // 执行指纹按领域隔离；孔草稿不参与任一活动结果的执行身份。
-    static QString holeExecutionFingerprint(
+    static std::string holeExecutionFingerprint(
         const MachiningJobDefinition& definition);
-    static QString pocketExecutionFingerprint(
+    static std::string pocketExecutionFingerprint(
         const MachiningJobDefinition& definition);
-    static QString profileExecutionFingerprint(
+    static std::string profileExecutionFingerprint(
         const MachiningJobDefinition& definition);
-    static QString finishingExecutionFingerprint(
+    static std::string finishingExecutionFingerprint(
         const MachiningJobDefinition& definition);
     // Setup 输入指纹：零件指纹 + 装夹几何/轴向/偏置，用于确认失效判定。
-    static QString setupInputFingerprint(
+    static std::string setupInputFingerprint(
         const PartDefinition& part,
         const SetupDefinition& setup);
     // 源文件内容指纹（分块 SHA-256），用于零件/碰撞模型变更检测。
-    static QString sourceFileFingerprint(const QString& filePath,
-                                         QString* error = nullptr);
+    static std::string sourceFileFingerprint(const std::string& filePath,
+                                         std::string* error = nullptr);
 };
 
 } // namespace oap::manufacturing

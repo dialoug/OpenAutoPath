@@ -23,14 +23,8 @@ if(EXISTS "${OAP_OCCT_ROOT}/build-record.json")
         set(oap_occt_native_allocator TRUE)
     endif()
 endif()
-if(OAP_BUILD_GUI AND OAP_DEPLOY_RUNTIME AND NOT oap_occt_without_ffmpeg)
-    message(FATAL_ERROR
-        "Desktop deployment requires OCCT built without FFmpeg. Run tools/Build-WindowsOCCT.ps1 "
-        "and set OAP_OCCT_ROOT to its install directory; see licenses/DEPENDENCY_SOURCES.md.")
-endif()
 if(NOT oap_occt_without_ffmpeg)
-    # The vendor SDK is still supported for core-only development/tests. These
-    # directories feed the test loader PATH; this SDK cannot produce our desktop ZIP.
+    # The official SDK may load FFmpeg through its third-party runtime.
     foreach(library avcodec-57 avformat-57 avutil-55 swscale-4)
         list(APPEND OAP_THIRDPARTY_DLLS
             "${OAP_THIRDPARTY_ROOT}/ffmpeg-3.3.4-64/bin/${library}.dll")

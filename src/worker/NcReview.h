@@ -1,11 +1,10 @@
 #pragma once
-#include <QJsonArray>
-#include <QJsonObject>
+#include "support/Json.h"
 #include <string>
 
 namespace oap::worker {
-QJsonObject reviewNc(const std::string &text, const QString &filename, const QString &setup,
-                     const QString &tool, const QJsonArray &operations, QJsonArray warnings);
-void writeNcReport(const QJsonArray &programs);
-int reviewSingleNc(const QString &setup, const QString &tool, const QJsonArray &operations, QJsonArray warnings = {});
+oap::JsonObject reviewNc(const std::string &text, const std::string &filename, const std::string &setup,
+                     const std::string &tool, const oap::JsonArray &operations, oap::JsonArray warnings);
+void writeNcReport(const oap::JsonArray &programs);
+int reviewSingleNc(const std::string &setup, const std::string &tool, const oap::JsonArray &operations, oap::JsonArray warnings = {});
 }

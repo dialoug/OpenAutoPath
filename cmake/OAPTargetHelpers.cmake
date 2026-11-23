@@ -31,12 +31,6 @@ function(oap_configure_occt_core_target target visibility)
 endfunction()
 
 # 视图目标在核心组件基础上追加 OpenGL/交互式查看器组件。
-function(oap_configure_occt_viewer_target target visibility)
-    oap_configure_occt_target_with_libraries(
-        ${target} ${visibility}
-        ${OAP_OCCT_CORE_LIBRARIES} ${OAP_OCCT_VIEWER_LIBRARIES})
-endfunction()
-
 function(oap_enable_utf8 target)
     if(MSVC)
         # Visual Studio 的 MultiToolTask 用根配置中的共享进程预算约束并行度。
@@ -107,8 +101,7 @@ function(oap_place_test target)
     oap_set_runtime_subdirectory(${target} "tests")
 endfunction()
 
-# 测试 EXE 位于 tests/，运行时从已配置的 SDK 目录加载 Qt/OCCT DLL；测试目标
-# 不依赖桌面应用，因此只构建某个快速测试时不会触发 GUI 链接和部署。
+# Native tests use the OCCT and OpenCAMLib runtime selected at configure time.
 function(oap_add_test_with_runtime test_name target)
     if(WIN32)
         add_test(NAME ${test_name}

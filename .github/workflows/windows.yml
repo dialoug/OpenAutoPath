@@ -1,15 +1,9 @@
-name: Windows build
+name: Windows Web application
 
 on:
   push:
   pull_request:
   workflow_dispatch:
-  workflow_call:
-    inputs:
-      package_version:
-        description: Nonempty only when the caller requests a desktop ZIP
-        type: string
-        default: ''
 
 permissions:
   contents: read
@@ -22,144 +16,48 @@ jobs:
   build:
     runs-on: windows-2022
     timeout-minutes: 120
-    strategy:
-      fail-fast: false
-      matrix:
-        include:
-          - preset: windows-vs2022
-          - preset: windows-core
-    defaults:
-      run:
-        shell: pwsh
     steps:
       - uses: actions/checkout@v4
-      - name: Verify SDK downloader
-        run: ./tools/tests/Test-WindowsOcctDownload.ps1
-      - name: Install Qt
-        uses: jurplel/install-qt-action@v4
+      - uses: actions/setup-go@v5
         with:
-          version: '6.11.1'
-          arch: win64_msvc2022_64
-          modules: qtshadertools
-          # aqtinstall 3.3.0 cannot resolve Qt 6.11's Windows repository layout.
-          # Pin the upstream Qt 6.11 support fix instead of a moving branch.
-          aqtsource: git+https://github.com/miurahr/aqtinstall.git@7e5a5c3d95cf962cfc2f36c86ffa0d2c07f1a0d4
-          cache: true
-      - name: Cache OCCT SDK
-        uses: actions/cache@v4
+          go-version-file: server/go.mod
+          cache: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: web/package-lock.json
+      - uses: actions/cache@v4
         with:
           path: external
           key: windows-occt-7.9.3-${{ hashFiles('tools/Install-WindowsOcct.ps1') }}
       - name: Install OCCT SDK
         run: ./tools/Install-WindowsOcct.ps1
-      - name: Cache source-built runtime SDKs
-        id: source-sdks
-        if: matrix.preset == 'windows-vs2022'
-        uses: actions/cache@v4
-        with:
-          path: |
-            build/dependencies/freeimage/bin
-            build/dependencies/freeimage/lib
-            build/dependencies/freeimage/include
-            build/dependencies/freeimage/build-record.json
-            build/dependencies/occt/install
-          key: windows-source-sdks-no-video-v2-${{ hashFiles('licenses/windows-runtime.json', 'tools/Build-Windows*.ps1', 'tools/Install-WindowsOcct.ps1', 'tools/tests/Test-*Runtime.ps1', 'tools/dependencies/*') }}
-      - name: Build FreeImage from reviewed source
-        if: matrix.preset == 'windows-vs2022' && steps.source-sdks.outputs.cache-hit != 'true'
+      - name: Configure native worker
+        run: cmake --preset windows-core "-DFETCHCONTENT_BASE_DIR=$env:RUNNER_TEMP/oap-dependencies"
+      - name: Build native worker and tests
+        run: cmake --build --preset windows-core
+      - name: Run native tests
         run: |
-          $manifest = Get-Content licenses/windows-runtime.json -Raw | ConvertFrom-Json
-          $source = $manifest.sources | Where-Object component -eq 'freeimage'
-          $cache = 'external/release-sources'
-          New-Item -ItemType Directory -Force -Path $cache | Out-Null
-          $archive = Join-Path $cache $source.file
-          if (-not (Test-Path -LiteralPath $archive)) {
-            Invoke-WebRequest -Uri $source.url -OutFile $archive
-          }
-          ./tools/Build-WindowsFreeImage.ps1 -SourceArchive $archive `
-            -OutputDir build/dependencies/freeimage -Toolset v143 -Parallel 4
-      - name: Build OCCT without video support
-        if: matrix.preset == 'windows-vs2022' && steps.source-sdks.outputs.cache-hit != 'true'
-        run: |
-          $manifest = Get-Content licenses/windows-runtime.json -Raw | ConvertFrom-Json
-          $source = $manifest.sources | Where-Object component -eq 'occt'
-          $archive = Join-Path 'external/release-sources' $source.file
-          if (-not (Test-Path -LiteralPath $archive)) {
-            Invoke-WebRequest -Uri $source.url -OutFile $archive
-          }
-          ./tools/Build-WindowsOCCT.ps1 -SourceArchive $archive `
-            -ThirdPartyRoot external/3rdparty-vc14-64 -FreeImageRoot build/dependencies/freeimage `
-            -OutputDir build/dependencies/occt -Parallel 4
-      - name: Test source-built runtime libraries
-        if: matrix.preset == 'windows-vs2022'
-        run: |
-          ./tools/tests/Test-FreeImageRuntime.ps1 -Dll build/dependencies/freeimage/bin/FreeImage.dll -OutputDir build/dependency-tests/freeimage
-      - name: Configure
+          ctest --preset windows-core
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          ctest --preset windows-core-packaging
+      - name: Install native worker
+        run: cmake --install build/windows-core --config Release --component ServerWorker --prefix build/cam-server-package
+      - name: Run HTTP and real-worker tests
         env:
-          BUILD_PRESET: ${{ matrix.preset }}
+          OAP_TEST_WORKER: ${{ github.workspace }}/build/cam-server-package/bin/oap-worker.exe
+        run: go -C server test -count=1 ./...
+      - name: Build HTTP server
+        run: go -C server build -o ../build/cam-server-package/oap-server.exe ./cmd/oap-server
+      - name: Build browser assets
+        working-directory: web
         run: |
-          $options = @("-DOAP_QT_ROOT=$env:QT_ROOT_DIR",
-            "-DFETCHCONTENT_BASE_DIR=$env:RUNNER_TEMP/oap-dependencies")
-          if ($env:BUILD_PRESET -eq 'windows-vs2022') {
-            $options += "-DOAP_FREEIMAGE_ROOT=$env:GITHUB_WORKSPACE/build/dependencies/freeimage"
-            $options += "-DOAP_OCCT_ROOT=$env:GITHUB_WORKSPACE/build/dependencies/occt/install"
-          }
-          cmake --preset $env:BUILD_PRESET @options
-      - name: Build application and tests
-        run: cmake --build --preset ${{ matrix.preset }}
-      - name: Verify desktop DLL loading
-        if: matrix.preset == 'windows-vs2022'
-        run: ./tools/tests/Test-WindowsRuntimeLoad.ps1 -BinDir build/windows-vs2022/RelWithDebInfo/bin
-      - name: Verify actual desktop runtime inventory
-        if: matrix.preset == 'windows-vs2022'
-        run: |
-          $stage = Join-Path $env:RUNNER_TEMP ('oap-runtime-audit-' + [guid]::NewGuid().ToString('N'))
-          cmake --install build/windows-vs2022 --config RelWithDebInfo --component Runtime --prefix $stage
-          if ($LASTEXITCODE -ne 0) { throw 'Runtime audit installation failed' }
-          ./tools/Complete-WindowsReleaseMetadata.ps1 -Stage $stage -BuildDir build/windows-vs2022 `
-            -VerifyOnly -RequireSourceBuilds
-      - name: Run fast tests
-        run: ctest --preset ${{ matrix.preset }}
-      - name: Verify installed package
-        run: ctest --preset ${{ matrix.preset }}-packaging
-      - name: Verify release metadata guards
-        if: matrix.preset == 'windows-vs2022'
-        run: >-
-          ./tools/tests/Test-WindowsReleaseMetadata.ps1 -BuildDir build/${{ matrix.preset }}
-          -FreeImageRoot build/dependencies/freeimage -OCCTRoot build/dependencies/occt/install
-      - name: Cache dependency source archives
-        if: matrix.preset == 'windows-vs2022' && inputs.package_version != ''
-        uses: actions/cache@v4
+          npm ci
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          npm run build -- --outDir ../build/cam-server-package/web
+      - uses: actions/upload-artifact@v4
         with:
-          path: build/${{ matrix.preset }}/release-source-cache
-          key: windows-release-sources-${{ hashFiles('licenses/windows-runtime.json') }}
-      - name: Package desktop runtime
-        if: matrix.preset == 'windows-vs2022' && inputs.package_version != ''
-        env:
-          PACKAGE_VERSION: ${{ inputs.package_version }}
-        run: >-
-          ./tools/Package-WindowsRelease.ps1
-          -BuildDir build/windows-vs2022
-          -Version $env:PACKAGE_VERSION
-          -OutputDir artifacts/release
-      - name: Upload desktop package
-        if: matrix.preset == 'windows-vs2022' && inputs.package_version != ''
-        uses: actions/upload-artifact@v4
-        with:
-          name: windows-desktop-package
-          path: |
-            artifacts/release/*.zip
-            artifacts/release/SHA256SUMS.txt
+          name: openautopath-web-windows-x64
+          path: build/cam-server-package/
           if-no-files-found: error
-      - name: Upload test logs
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: test-logs-${{ matrix.preset }}
-          path: |
-            build/${{ matrix.preset }}/Testing/Temporary/
-            build/dependencies/**/build.log
-            build/dependencies/**/configure.log
-            build/dependencies/**/install.log
-            build/dependencies/**/config.log
-            build/dependencies/**/build-record.json
-          if-no-files-found: ignore

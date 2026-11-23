@@ -71,7 +71,6 @@ if (result.ok) {
 - 拒绝非法或非有限参数，限制采样点、三角形和输出移动数量；默认 `maxMoves=2000000`，失败、取消不返回部分刀路。
   三角形上限在 OCCT 网格化完成后收集时检查，不是网格化阶段的硬内存上限；
   单次 OCCT 网格化与 OCL 投影调用内部不能立即中断。
-- Qt 入口复用 `HeavyJobScheduler`，后台进度采用原子数据与现有进度窗口。
 - 两种模式的扫描行通过 `ToolpathParallelLease` 借用进程统一预算并行投影；每个 worker 独立持有 OCL 刀具与 KD tree，从毛坯模式额外复用单行接触缓存，仅读取共享三角网。小网格自动串行，并限制复制索引的三角形总量；取不到工作槽立即串行回退。
 - 各层复用模板内的接触高度，按固定行序组装移动并检查上一层覆盖；采样及校验预算跨 worker 共享，失败或取消会等待所有 worker 退出，不发布部分刀路。进度与取消回调串行调用，租约在组装前释放。
 - 仅精雕与网格化暂保留串行路径；OpenCAMLib 内部 OpenMP 继续关闭，不另建线程池。
@@ -116,11 +115,11 @@ IPW 减料结果不等同于完整工具装配碰撞认证。
 先按 [BUILDING.md](../../../BUILDING.md) 配置并构建桌面预设，在仓库根目录运行：
 
 ```powershell
-cmake --build --preset windows-vs2022
-ctest --test-dir build/windows-vs2022 -C RelWithDebInfo -R surface_finishing --output-on-failure --parallel 1 --no-tests=error
+cmake --build --preset windows-core
+ctest --test-dir build/windows-core -C Release -R surface_finishing --output-on-failure --parallel 1 --no-tests=error
 ```
 
-VS 2026 同时替换预设名和目录为 `windows-vs2026`；核心构建须使用对应预设的目录与配置。
+VS 2026 同时替换预设名和目录为 `windows-core-vs2026`；核心构建须使用对应预设的目录与配置。
 以下带日期的测试数量和日志是历史验证记录，不代表本次文档更新重新执行了这些测试。
 
 测试可执行文件支持 `--write-samples <目录>`，生成斜面、球体、平面块和分离岛屿

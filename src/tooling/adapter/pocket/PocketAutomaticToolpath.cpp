@@ -1,7 +1,9 @@
 // 活动刀库槽腔多刀自动粗加工实现：候选铣刀筛选 → 兼容区域分组 →
 // 逐组最短路径动态规划选刀（全量/余料阶段）→ 汇总工序与审计。
+#include <format>
+#include <vector>
+#include <string>
 #include "tooling/adapter/pocket/PocketAutomaticToolpath.h"
-#include <QCoreApplication>
 #include "tooling/adapter/AssignedToolContext.h"
 
 #include <algorithm>
@@ -422,33 +424,23 @@ std::string finalPlanningFailure(
             return audit.tool.toolNumber == smallest.toolNumber &&
                    audit.previousToolDiameter <= kDiameterTolerance;
         });
-    QString message = QCoreApplication::translate("OpenAutoPath", "最小铣刀 T%1（%2，D%3 mm）无法完成全部 %4 个槽腔区域")
-        .arg(smallest.toolNumber)
-        .arg(smallest.toolName.empty()
-                 ? QCoreApplication::translate("OpenAutoPath", "未命名刀具")
-                 : QString::fromStdString(smallest.toolName))
-        .arg(smallest.diameter, 0, 'f', 3)
-        .arg(static_cast<qulonglong>(regionCount));
+    std::string message = std::format("最小铣刀 T{0}（{1}，D{2:.3f} mm）无法完成全部 {3} 个槽腔区域", smallest.toolNumber, smallest.toolName.empty()
+                 ? std::string("未命名刀具")
+                 : smallest.toolName, smallest.diameter, static_cast<std::uint64_t>(regionCount));
     if (found == audits.end())
-        return message.toUtf8().toStdString();
+        return message;
 
-    message += QCoreApplication::translate("OpenAutoPath", "：生成工序 %1，失败区域 %2，无需余料区域 %3，验证错误 %4。")
-        .arg(found->operationCount)
-        .arg(found->failedRegionCount)
-        .arg(found->noRestMaterialRegionCount)
-        .arg(found->validationErrorCount);
+    message += std::format("：生成工序 {0}，失败区域 {1}，无需余料区域 {2}，验证错误 {3}。", found->operationCount, found->failedRegionCount, found->noRestMaterialRegionCount, found->validationErrorCount);
     const std::size_t detailLimit = std::min<std::size_t>(
         5u, found->failureDetails.size());
     for (std::size_t index = 0; index < detailLimit; ++index) {
-        message += QStringLiteral("\n- %1").arg(
-            QString::fromStdString(found->failureDetails[index]));
+        message += std::format("\n- {0}", std::string(found->failureDetails[index]));
     }
     if (found->failureDetails.size() > detailLimit) {
-        message += QCoreApplication::translate("OpenAutoPath", "\n- 其余 %1 项见腔清腔日志")
-            .arg(static_cast<qulonglong>(
+        message += std::format("\n- 其余 {0} 项见腔清腔日志", static_cast<std::uint64_t>(
                 found->failureDetails.size() - detailLimit));
     }
-    return message.toUtf8().toStdString();
+    return message;
 }
 
 // 用指定刀具（可带前序直径做余料开粗）生成一批工序并汇总；判定是否可用。
@@ -1342,8 +1334,8 @@ PocketAutomaticToolpathResult PocketAutomaticToolpath::generate(
     // after the region scheduler has restored its nested local scope.
     oap::toolpath::ToolpathParallelScope parallelScope(control);
     PocketAutomaticToolpathResult result;
-    result.libraryId = library.id().toUtf8().toStdString();
-    result.libraryName = library.name().toUtf8().toStdString();
+    result.libraryId = library.id();
+    result.libraryName = library.name();
     if (regions.empty()) {
         result.error = "automatic pocket roughing requires at least one region";
         return result;
@@ -1355,20 +1347,10 @@ PocketAutomaticToolpathResult PocketAutomaticToolpath::generate(
     result.candidateToolCount =
         static_cast<int>(candidates.size());
     if (candidates.empty()) {
-        result.error = QCoreApplication::translate("OpenAutoPath", "活动刀库“%1”没有可用的已分配铣刀：最大单层切深 %2 mm，"
-            "最深刀具可达距离 %3 mm；已分配刀具 %4 把，其中铣刀 %5 把；"
-            "几何无效 %6 把，不支持的切削几何 %7 把，刃长不足 %8 把，"
-            "总长不足 %9 把。")
-            .arg(library.name())
-            .arg(candidateAudit.requiredCuttingEdgeLength, 0, 'f', 3)
-            .arg(candidateAudit.requiredReach, 0, 'f', 3)
-            .arg(candidateAudit.assignedToolCount)
-            .arg(candidateAudit.assignedEndMillCount)
-            .arg(candidateAudit.invalidGeometryCount)
-            .arg(candidateAudit.unsupportedGeometryCount)
-            .arg(candidateAudit.cuttingLengthTooShortCount)
-            .arg(candidateAudit.overallLengthTooShortCount)
-            .toUtf8().toStdString();
+        result.error = std::format("活动刀库“{0}”没有可用的已分配铣刀：最大单层切深 {1:.3f} mm，"
+            "最深刀具可达距离 {2:.3f} mm；已分配刀具 {3} 把，其中铣刀 {4} 把；"
+            "几何无效 {5} 把，不支持的切削几何 {6} 把，刃长不足 {7} 把，"
+            "总长不足 {8} 把。", library.name(), candidateAudit.requiredCuttingEdgeLength, candidateAudit.requiredReach, candidateAudit.assignedToolCount, candidateAudit.assignedEndMillCount, candidateAudit.invalidGeometryCount, candidateAudit.unsupportedGeometryCount, candidateAudit.cuttingLengthTooShortCount, candidateAudit.overallLengthTooShortCount);
         return result;
     }
 
@@ -1393,12 +1375,8 @@ PocketAutomaticToolpathResult PocketAutomaticToolpath::generate(
                 group.candidates.push_back(candidate);
         }
         if (group.candidates.empty()) {
-            result.error = QCoreApplication::translate("OpenAutoPath", "槽腔区域 %1 没有满足刃长和总长要求的已分配铣刀"
-                "（单层切深 %2 mm，可达距离 %3 mm）。")
-                .arg(static_cast<qulonglong>(regionIndex + 1))
-                .arg(requirements.cuttingEdgeLength, 0, 'f', 3)
-                .arg(requirements.reach, 0, 'f', 3)
-                .toUtf8().toStdString();
+            result.error = std::format("槽腔区域 {0} 没有满足刃长和总长要求的已分配铣刀"
+                "（单层切深 {1:.3f} mm，可达距离 {2:.3f} mm）。", static_cast<std::uint64_t>(regionIndex + 1), requirements.cuttingEdgeLength, requirements.reach);
             return result;
         }
 

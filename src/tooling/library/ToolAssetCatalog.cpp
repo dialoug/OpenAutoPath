@@ -1,8 +1,12 @@
 // ToolAssetCatalog 实现（oap_toollibrary）。
 // FreeCAD 式刀具资产目录：库引用、资产增删改与快照一致性维护，见
 // ToolAssetCatalog.h。
+#include "support/Text.h"
+#include <format>
+#include <map>
+#include <vector>
+#include <string>
 #include "tooling/library/ToolAssetCatalog.h"
-#include <QCoreApplication>
 
 #include <algorithm>
 #include <utility>
@@ -16,28 +20,28 @@ ToolLibrary emptyLibraryLike(const ToolLibrary& source)
     result.setDescription(source.description());
     for (auto it = source.attributes().cbegin();
          it != source.attributes().cend(); ++it) {
-        result.setAttribute(it.key(), it.value());
+        result.setAttribute(it->first, it->second);
     }
     return result;
 }
 
-QString conflictFreeAssetId(const QString& requestedId,
-                            const QString& libraryId,
-                            const QMap<QString, ToolBit>& assets)
+std::string conflictFreeAssetId(const std::string& requestedId,
+                            const std::string& libraryId,
+                            const std::map<std::string, ToolBit>& assets)
 {
-    const QString stem = requestedId + QLatin1Char('@') + libraryId;
-    QString candidate = stem;
+    const std::string stem = requestedId + '@' + libraryId;
+    std::string candidate = stem;
     int suffix = 2;
     while (assets.contains(candidate))
-        candidate = stem + QLatin1Char('-') + QString::number(suffix++);
+        candidate = stem + '-' + std::to_string(suffix++);
     return candidate;
 }
 
-bool validateAsset(const ToolBit& tool, QString* error)
+bool validateAsset(const ToolBit& tool, std::string* error)
 {
-    ToolLibrary validator(QStringLiteral("asset-validator"),
-                          QStringLiteral("asset-validator"));
-    QString itemError;
+    ToolLibrary validator(std::string("asset-validator"),
+                          std::string("asset-validator"));
+    std::string itemError;
     if (!validator.upsertTool(tool, &itemError) ||
         !validator.isValid(&itemError)) {
         if (error)
@@ -70,9 +74,9 @@ bool sameToolAsset(const ToolBit& first, const ToolBit& second) noexcept
            a.spindleEnvelopeLength == b.spindleEnvelopeLength;
 }
 
-bool ToolAssetCatalog::fromLibraries(QVector<ToolLibrary> libraries,
+bool ToolAssetCatalog::fromLibraries(std::vector<ToolLibrary> libraries,
                                      ToolAssetCatalog& catalog,
-                                     QString* error,
+                                     std::string* error,
                                      bool* identifiersMigrated)
 {
     ToolAssetCatalog parsed;
@@ -89,14 +93,14 @@ bool ToolAssetCatalog::fromLibraries(QVector<ToolLibrary> libraries,
     return true;
 }
 
-const ToolBit* ToolAssetCatalog::assetById(const QString& assetId) const noexcept
+const ToolBit* ToolAssetCatalog::assetById(const std::string& assetId) const noexcept
 {
-    const auto found = m_assets.constFind(assetId);
-    return found == m_assets.cend() ? nullptr : &found.value();
+    const auto found = m_assets.find(assetId);
+    return found == m_assets.cend() ? nullptr : &found->second;
 }
 
 const ToolLibrary* ToolAssetCatalog::libraryById(
-    const QString& libraryId) const noexcept
+    const std::string& libraryId) const noexcept
 {
     const auto found = std::find_if(
         m_libraries.cbegin(), m_libraries.cend(),
@@ -106,7 +110,7 @@ const ToolLibrary* ToolAssetCatalog::libraryById(
     return found == m_libraries.cend() ? nullptr : &*found;
 }
 
-ToolLibrary* ToolAssetCatalog::libraryById(const QString& libraryId) noexcept
+ToolLibrary* ToolAssetCatalog::libraryById(const std::string& libraryId) noexcept
 {
     const auto found = std::find_if(
         m_libraries.begin(), m_libraries.end(),
@@ -117,18 +121,18 @@ ToolLibrary* ToolAssetCatalog::libraryById(const QString& libraryId) noexcept
 }
 
 bool ToolAssetCatalog::addLibrary(ToolLibrary library,
-                                  QString* error,
+                                  std::string* error,
                                   bool* identifiersMigrated)
 {
     if (identifiersMigrated)
         *identifiersMigrated = false;
     if (libraryById(library.id())) {
         if (error)
-            *error = QCoreApplication::translate("OpenAutoPath", "刀库 ID 已存在：%1").arg(library.id());
+            *error = std::format("刀库 ID 已存在：{0}", library.id());
         return false;
     }
 
-    QString validationError;
+    std::string validationError;
     if (!library.isValid(&validationError)) {
         if (error)
             *error = validationError;
@@ -137,35 +141,35 @@ bool ToolAssetCatalog::addLibrary(ToolLibrary library,
 
     ToolAssetCatalog candidate = *this;
     ToolLibrary normalized = emptyLibraryLike(library);
-    QMap<QString, QString> remappedIds;
+    std::map<std::string, std::string> remappedIds;
     bool migrated = false;
-    for (const ToolBit& source : library.tools()) {
+    for (const auto& [key, source] : library.tools()) {
         ToolBit tool = source;
         const ToolBit* existing = candidate.assetById(tool.id);
         if (existing && !sameToolAsset(*existing, tool)) {
-            const QString oldId = tool.id;
-            QString reusableId;
-            for (const ToolBit& asset : candidate.m_assets) {
-                if (asset.attributes.value(
-                        QStringLiteral("legacy_tool_id")) != oldId) {
+            const std::string oldId = tool.id;
+            std::string reusableId;
+            for (const auto& [key, asset] : candidate.m_assets) {
+                const auto legacy = asset.attributes.find("legacy_tool_id");
+                if (legacy == asset.attributes.end() || legacy->second != oldId) {
                     continue;
                 }
                 ToolBit remapped = tool;
                 remapped.id = asset.id;
-                remapped.attributes.insert(
-                    QStringLiteral("legacy_tool_id"), oldId);
+                remapped.attributes.insert_or_assign(
+                    std::string("legacy_tool_id"), oldId);
                 if (sameToolAsset(asset, remapped)) {
                     reusableId = asset.id;
                     break;
                 }
             }
-            tool.id = reusableId.isEmpty()
+            tool.id = reusableId.empty()
                 ? conflictFreeAssetId(oldId, library.id(),
                                       candidate.m_assets)
                 : reusableId;
-            tool.attributes.insert(
-                QStringLiteral("legacy_tool_id"), oldId);
-            remappedIds.insert(oldId, tool.id);
+            tool.attributes.insert_or_assign(
+                std::string("legacy_tool_id"), oldId);
+            remappedIds.insert_or_assign(oldId, tool.id);
             migrated = true;
         }
         if (!normalized.upsertTool(tool, &validationError)) {
@@ -174,12 +178,13 @@ bool ToolAssetCatalog::addLibrary(ToolLibrary library,
             return false;
         }
         if (!candidate.m_assets.contains(tool.id))
-            candidate.m_assets.insert(tool.id, tool);
+            candidate.m_assets.insert_or_assign(tool.id, tool);
     }
 
-    for (const LibraryToolSlot& sourceSlot : library.toolSlots()) {
+    for (const auto& [key, sourceSlot] : library.toolSlots()) {
         LibraryToolSlot slot = sourceSlot;
-        slot.toolId = remappedIds.value(slot.toolId, slot.toolId);
+        if (const auto found = remappedIds.find(slot.toolId); found != remappedIds.end())
+            slot.toolId = found->second;
         if (!normalized.assignToolToSlot(slot, &validationError)) {
             if (error)
                 *error = validationError;
@@ -199,17 +204,17 @@ bool ToolAssetCatalog::addLibrary(ToolLibrary library,
 }
 
 bool ToolAssetCatalog::replaceLibrary(ToolLibrary library,
-                                      QString* error,
+                                      std::string* error,
                                       bool* identifiersMigrated)
 {
     ToolAssetCatalog candidate = *this;
-    const QString id = library.id();
+    const std::string id = library.id();
     const ToolLibrary* previous = candidate.libraryById(id);
     if (previous) {
-        for (const ToolBit& incoming : library.tools()) {
+        for (const auto& [key, incoming] : library.tools()) {
             if (previous->toolById(incoming.id) &&
                 candidate.referencingLibraryIds(incoming.id).size() == 1) {
-                candidate.m_assets.remove(incoming.id);
+                candidate.m_assets.erase(incoming.id);
             }
         }
     }
@@ -228,9 +233,9 @@ bool ToolAssetCatalog::replaceLibrary(ToolLibrary library,
     return true;
 }
 
-bool ToolAssetCatalog::removeLibrary(const QString& libraryId, QString* error)
+bool ToolAssetCatalog::removeLibrary(const std::string& libraryId, std::string* error)
 {
-    const qsizetype oldSize = m_libraries.size();
+    const std::size_t oldSize = m_libraries.size();
     m_libraries.erase(
         std::remove_if(m_libraries.begin(), m_libraries.end(),
                        [&libraryId](const ToolLibrary& library) {
@@ -239,18 +244,18 @@ bool ToolAssetCatalog::removeLibrary(const QString& libraryId, QString* error)
         m_libraries.end());
     if (m_libraries.size() == oldSize) {
         if (error)
-            *error = QCoreApplication::translate("OpenAutoPath", "刀库不存在：%1").arg(libraryId);
+            *error = std::format("刀库不存在：{0}", libraryId);
         return false;
     }
     return true;
 }
 
-bool ToolAssetCatalog::upsertAsset(ToolBit tool, QString* error)
+bool ToolAssetCatalog::upsertAsset(ToolBit tool, std::string* error)
 {
     if (!validateAsset(tool, error))
         return false;
     ToolAssetCatalog candidate = *this;
-    candidate.m_assets.insert(tool.id, tool);
+    candidate.m_assets.insert_or_assign(tool.id, tool);
     for (ToolLibrary& library : candidate.m_libraries) {
         if (library.toolById(tool.id) && !library.upsertTool(tool, error))
             return false;
@@ -259,11 +264,11 @@ bool ToolAssetCatalog::upsertAsset(ToolBit tool, QString* error)
     return true;
 }
 
-bool ToolAssetCatalog::removeAsset(const QString& assetId, QString* error)
+bool ToolAssetCatalog::removeAsset(const std::string& assetId, std::string* error)
 {
     if (!m_assets.contains(assetId)) {
         if (error)
-            *error = QCoreApplication::translate("OpenAutoPath", "刀具资产不存在：%1").arg(assetId);
+            *error = std::format("刀具资产不存在：{0}", assetId);
         return false;
     }
     ToolAssetCatalog candidate = *this;
@@ -273,47 +278,47 @@ bool ToolAssetCatalog::removeAsset(const QString& assetId, QString* error)
             return false;
         }
     }
-    candidate.m_assets.remove(assetId);
+    candidate.m_assets.erase(assetId);
     *this = std::move(candidate);
     return true;
 }
 
-bool ToolAssetCatalog::attachAsset(const QString& libraryId,
-                                   const QString& assetId,
-                                   QString* error)
+bool ToolAssetCatalog::attachAsset(const std::string& libraryId,
+                                   const std::string& assetId,
+                                   std::string* error)
 {
     ToolLibrary* library = libraryById(libraryId);
     const ToolBit* tool = assetById(assetId);
     if (!library) {
         if (error)
-            *error = QCoreApplication::translate("OpenAutoPath", "刀库不存在：%1").arg(libraryId);
+            *error = std::format("刀库不存在：{0}", libraryId);
         return false;
     }
     if (!tool) {
         if (error)
-            *error = QCoreApplication::translate("OpenAutoPath", "刀具资产不存在：%1").arg(assetId);
+            *error = std::format("刀具资产不存在：{0}", assetId);
         return false;
     }
     return library->upsertTool(*tool, error);
 }
 
-bool ToolAssetCatalog::detachAsset(const QString& libraryId,
-                                   const QString& assetId,
-                                   QString* error)
+bool ToolAssetCatalog::detachAsset(const std::string& libraryId,
+                                   const std::string& assetId,
+                                   std::string* error)
 {
     ToolLibrary* library = libraryById(libraryId);
     if (!library) {
         if (error)
-            *error = QCoreApplication::translate("OpenAutoPath", "刀库不存在：%1").arg(libraryId);
+            *error = std::format("刀库不存在：{0}", libraryId);
         return false;
     }
     return library->removeTool(assetId, error);
 }
 
-QStringList ToolAssetCatalog::referencingLibraryIds(
-    const QString& assetId) const
+std::vector<std::string> ToolAssetCatalog::referencingLibraryIds(
+    const std::string& assetId) const
 {
-    QStringList result;
+    std::vector<std::string> result;
     for (const ToolLibrary& library : m_libraries) {
         if (library.toolById(assetId))
             result.push_back(library.id());
@@ -321,10 +326,10 @@ QStringList ToolAssetCatalog::referencingLibraryIds(
     return result;
 }
 
-QStringList ToolAssetCatalog::referencingLibraryNames(
-    const QString& assetId) const
+std::vector<std::string> ToolAssetCatalog::referencingLibraryNames(
+    const std::string& assetId) const
 {
-    QStringList result;
+    std::vector<std::string> result;
     for (const ToolLibrary& library : m_libraries) {
         if (library.toolById(assetId))
             result.push_back(library.name());
@@ -332,23 +337,23 @@ QStringList ToolAssetCatalog::referencingLibraryNames(
     return result;
 }
 
-bool ToolAssetCatalog::synchronize(QString* error)
+bool ToolAssetCatalog::synchronize(std::string* error)
 {
     ToolAssetCatalog candidate = *this;
     for (ToolLibrary& library : candidate.m_libraries) {
-        QVector<ToolBit> canonicalTools;
+        std::vector<ToolBit> canonicalTools;
         canonicalTools.reserve(library.tools().size());
-        for (const ToolBit& tool : library.tools()) {
+        for (const auto& [key, tool] : library.tools()) {
             const ToolBit* canonical = candidate.assetById(tool.id);
             if (!canonical) {
                 if (!validateAsset(tool, error))
                     return false;
-                candidate.m_assets.insert(tool.id, tool);
+                candidate.m_assets.insert_or_assign(tool.id, tool);
                 canonical = candidate.assetById(tool.id);
             }
             canonicalTools.push_back(*canonical);
         }
-        for (const ToolBit& tool : canonicalTools) {
+        for (const auto& tool : canonicalTools) {
             if (!library.upsertTool(tool, error))
                 return false;
         }
@@ -359,53 +364,50 @@ bool ToolAssetCatalog::synchronize(QString* error)
     return true;
 }
 
-QStringList ToolAssetCatalog::validationErrors() const
+std::vector<std::string> ToolAssetCatalog::validationErrors() const
 {
-    QStringList errors;
+    std::vector<std::string> errors;
     for (auto it = m_assets.cbegin(); it != m_assets.cend(); ++it) {
-        if (it.key() != it.value().id) {
+        if (it->first != it->second.id) {
             errors.push_back(
-                QCoreApplication::translate("OpenAutoPath", "资产映射键与刀具 ID 不一致：%1").arg(it.key()));
+                std::format("资产映射键与刀具 ID 不一致：{0}", it->first));
         }
-        QString assetError;
-        if (!validateAsset(it.value(), &assetError))
+        std::string assetError;
+        if (!validateAsset(it->second, &assetError))
             errors.push_back(assetError);
     }
 
-    QMap<QString, int> libraryIds;
+    std::map<std::string, int> libraryIds;
     for (const ToolLibrary& library : m_libraries) {
         libraryIds[library.id()] += 1;
-        const QStringList libraryErrors = library.validationErrors();
-        for (const QString& item : libraryErrors) {
-            errors.push_back(QCoreApplication::translate("OpenAutoPath", "刀库“%1”：%2")
-                                 .arg(library.name(), item));
+        const std::vector<std::string> libraryErrors = library.validationErrors();
+        for (const std::string& item : libraryErrors) {
+            errors.push_back(std::format("刀库“{0}”：{1}", library.name(), item));
         }
-        for (const ToolBit& tool : library.tools()) {
+        for (const auto& [key, tool] : library.tools()) {
             const ToolBit* canonical = assetById(tool.id);
             if (!canonical) {
                 errors.push_back(
-                    QCoreApplication::translate("OpenAutoPath", "刀库“%1”引用了不存在的资产：%2")
-                        .arg(library.name(), tool.id));
+                    std::format("刀库“{0}”引用了不存在的资产：{1}", library.name(), tool.id));
             } else if (!sameToolAsset(*canonical, tool)) {
                 errors.push_back(
-                    QCoreApplication::translate("OpenAutoPath", "刀库“%1”的刀具快照与全局资产不一致：%2")
-                        .arg(library.name(), tool.id));
+                    std::format("刀库“{0}”的刀具快照与全局资产不一致：{1}", library.name(), tool.id));
             }
         }
     }
     for (auto it = libraryIds.cbegin(); it != libraryIds.cend(); ++it) {
-        if (it.value() > 1)
-            errors.push_back(QCoreApplication::translate("OpenAutoPath", "刀库 ID 重复：%1").arg(it.key()));
+        if (it->second > 1)
+            errors.push_back(std::format("刀库 ID 重复：{0}", it->first));
     }
     return errors;
 }
 
-bool ToolAssetCatalog::isValid(QString* error) const
+bool ToolAssetCatalog::isValid(std::string* error) const
 {
-    const QStringList errors = validationErrors();
+    const std::vector<std::string> errors = validationErrors();
     if (error)
-        *error = errors.join(QLatin1Char('\n'));
-    return errors.isEmpty();
+        *error = oap::joinLines(errors);
+    return errors.empty();
 }
 
 } // namespace oap::tooling

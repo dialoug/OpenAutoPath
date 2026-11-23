@@ -3,12 +3,12 @@
 # Keep it closed under first-party includes: installing private directories to
 # compensate for an incomplete public manifest hides accidental API leakage.
 include("${CMAKE_CURRENT_LIST_DIR}/OAPPublicHeaders.cmake")
-set(OAP_SDK_HEADERS ${OAP_PUBLIC_TARGET_HEADERS})
+set(OAP_SDK_HEADERS ${OAP_PUBLIC_TARGET_HEADERS} ${OAP_SDK_ONLY_HEADERS})
 list(FILTER OAP_SDK_HEADERS INCLUDE REGEX
     "^src/(analysis|recognition|toolpath|tooling|manufacturing)/")
 # MachiningJob embeds this store by value; IpwExecutor exposes its checkpoint
 # type. Installing it does not authorize new cross-module source dependencies.
-set(OAP_SDK_SUPPORT_HEADERS src/manufacturing/ipw/IpwCheckpointStore.h)
+set(OAP_SDK_SUPPORT_HEADERS src/manufacturing/ipw/IpwCheckpointStore.h src/support/Utf8Path.h)
 list(APPEND OAP_SDK_HEADERS ${OAP_SDK_SUPPORT_HEADERS})
 list(REMOVE_DUPLICATES OAP_SDK_HEADERS)
 list(SORT OAP_SDK_HEADERS)

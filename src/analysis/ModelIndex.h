@@ -1,5 +1,5 @@
 // ModelIndex — 为一个已分析完成的 oap::Model 建立 id->记录指针 的平均 O(1) 查找。
-// UI 无关、不依赖 Qt、不参与序列化(故不影响 ModelIO 的缓存格式)。
+// UI 无关、不参与序列化(故不影响 ModelIO 的缓存格式)。
 //
 // 设计:指针指向 Model 内 vector 的元素。Model 在分析完成后不再 mutate,
 // 在索引使用期间必须存活。每次加载新模型后调用 build() 重建即可。

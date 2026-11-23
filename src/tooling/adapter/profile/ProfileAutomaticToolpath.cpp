@@ -521,8 +521,8 @@ ProfileAutomaticToolpathResult ProfileAutomaticToolpath::generate(
         result.totalMilliseconds = elapsedMilliseconds(totalStart);
         return std::move(result);
     };
-    result.libraryId = library.id().toUtf8().toStdString();
-    result.libraryName = library.name().toUtf8().toStdString();
+    result.libraryId = library.id();
+    result.libraryName = library.name();
     result.evaluationCacheByteLimit =
         automaticControl.profileEvaluationCacheByteLimit;
     if (regions.empty()) {

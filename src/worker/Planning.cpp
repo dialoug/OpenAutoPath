@@ -1,3 +1,6 @@
+#include "support/Json.h"
+#include <vector>
+#include <string>
 #include "Planning.h"
 #include "analysis/ModelIndex.h"
 #include "analysis/MoldSurfaceClassifier.h"
@@ -32,37 +35,36 @@ ThreeAxisWireTraceUseCaseResult traceRegions(const Model &model, const StepIndex
 
 namespace
 {
-QString featureId(const char *kind, const std::string &face, const std::string &wire)
+std::string featureId(const char *kind, const std::string &face, const std::string &wire)
 {
-    return QString::fromLatin1(kind) + "-" + QString::fromStdString(face) + "-" +
-           QString::fromStdString(wire);
+    return std::string(kind) + "-" + face + "-" + wire;
 }
 
-template <class Source> QJsonObject wireFeature(const char *kind, const Source &source)
+template <class Source> oap::JsonObject wireFeature(const char *kind, const Source &source)
 {
-    QJsonArray faces;
+    oap::JsonArray faces;
     for (const auto &id : source.sourceFaceIds)
-        faces.append(QString::fromStdString(id));
+        faces.append(id);
     return {{"kind", kind}, {"id", featureId(kind, source.rootFaceId, source.rootWireId)}, {"faces", faces}};
 }
 } // namespace
 
-QJsonArray planningFeatures(const ThreeAxisWireTraceUseCaseResult &trace)
+oap::JsonArray planningFeatures(const ThreeAxisWireTraceUseCaseResult &trace)
 {
-    QJsonArray features;
+    oap::JsonArray features;
     for (const auto &s : trace.pocketSources)
         features.append(wireFeature("pocket", s));
     for (const auto &s : trace.profileSources)
         features.append(wireFeature("profile", s));
     for (const auto f : {MoldSetupFace::PositiveZ, MoldSetupFace::NegativeZ, MoldSetupFace::PositiveX,
                          MoldSetupFace::NegativeX, MoldSetupFace::PositiveY, MoldSetupFace::NegativeY})
-        features.append(QJsonObject{{"kind", "engrave"},
-                                    {"id", QString("engrave-") + moldSetupFaceName(f)},
-                                    {"faces", QJsonArray{}}});
+        features.append(oap::JsonObject{{"kind", "engrave"},
+                                    {"id", std::string("engrave-") + moldSetupFaceName(f)},
+                                    {"faces", oap::JsonArray{}}});
     return features;
 }
 
-void planFeature(MachiningJob &job, const QJsonObject &request, const Model &model, const StepIndexer &index,
+void planFeature(MachiningJob &job, const oap::JsonObject &request, const Model &model, const StepIndexer &index,
                  const tooling::ToolLibrary &library, const toolpath::MoldSetupWorkFrames &frames,
                  const TopoDS_Shape &part)
 {
@@ -71,8 +73,8 @@ void planFeature(MachiningJob &job, const QJsonObject &request, const Model &mod
     const auto *bit = library.toolById(toolId);
     const auto *slot = library.slotForTool(toolId);
     const bool automatic = request["autoTool"].toBool();
-    if (automatic && (feature.startsWith("engrave-") ||
-                      (feature.startsWith("profile-") && request["strategy"] == "contour")))
+    if (automatic && (feature.starts_with("engrave-") ||
+                      (feature.starts_with("profile-") && request["strategy"] == "contour")))
         throw std::runtime_error("此策略需要指定铣刀");
     if (!automatic && (!bit || !slot || !tooling::hasSupportedMillingGeometry(*bit)))
         throw std::runtime_error("请选择有有效刀位的铣刀");
@@ -81,9 +83,9 @@ void planFeature(MachiningJob &job, const QJsonObject &request, const Model &mod
     const double step = request["step"].toDouble(1);
     if (!(step > 0 && (automatic || step <= bit->geometry.cuttingEdgeLength)))
         throw std::runtime_error("步距或层深超出刀具范围");
-    const auto libraryId = library.id().toStdString();
+    const auto libraryId = library.id();
     std::string error;
-    if (feature.startsWith("engrave-"))
+    if (feature.starts_with("engrave-"))
     {
         const bool allFaces = feature == "engrave-all";
         std::vector<toolpath::SurfaceFinishingResult> results;
@@ -92,7 +94,7 @@ void planFeature(MachiningJob &job, const QJsonObject &request, const Model &mod
         for (const auto face : {MoldSetupFace::PositiveZ, MoldSetupFace::NegativeZ, MoldSetupFace::PositiveX,
                                 MoldSetupFace::NegativeX, MoldSetupFace::PositiveY, MoldSetupFace::NegativeY})
         {
-            if (!allFaces && feature != QString("engrave-") + moldSetupFaceName(face))
+            if (!allFaces && feature != std::string("engrave-") + moldSetupFaceName(face))
                 continue;
             const auto *frame = frames.forFace(face);
             if (!frame || !frame->valid)
@@ -128,7 +130,7 @@ void planFeature(MachiningJob &job, const QJsonObject &request, const Model &mod
                 p.mode = toolpath::EngravingMachiningMode::StockRoughingAndFinishing;
                 stock = SurfaceFinishingMachiningJobService::buildPlanningStock(
                     job.definition().stock, targets, &error, nullptr,
-                    request["stockFile"].toString().toStdString());
+                    request["stockFile"].toString());
                 if (stock.IsNull())
                     throw std::runtime_error(error);
             }
@@ -194,12 +196,13 @@ void planFeature(MachiningJob &job, const QJsonObject &request, const Model &mod
         if (!PocketMachiningJobService().capture(job, capture, &error))
             throw std::runtime_error(error);
     };
-    if (feature.startsWith("manual-pocket-") || feature.startsWith("manual-slot-"))
+    if (feature.starts_with("manual-pocket-") || feature.starts_with("manual-slot-"))
     {
         FeatureInstance instance;
         instance.manual = true;
-        instance.kind = feature.startsWith("manual-slot-") ? FeatureKind::Slot : FeatureKind::Pocket;
-        instance.floorFaceId = feature.section('-', 2).toStdString();
+        instance.kind = feature.starts_with("manual-slot-") ? FeatureKind::Slot : FeatureKind::Pocket;
+        const std::string_view prefix = instance.kind == FeatureKind::Slot ? "manual-slot-" : "manual-pocket-";
+        instance.floorFaceId = feature.substr(prefix.size());
         instance.faceIds =
             toolpath::PocketRegionBuilder::expandManualFloorSeed(instance.floorFaceId, model, &error);
         if (instance.faceIds.empty())

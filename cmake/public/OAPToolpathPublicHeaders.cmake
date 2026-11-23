@@ -40,13 +40,10 @@ list(APPEND OAP_PUBLIC_TARGET_HEADERS
     src/toolpath/hole/HoleCoverage.h
     src/toolpath/hole/HoleMachining.h
     src/toolpath/hole/HoleMachiningInput.h
-    src/toolpath/hole/HoleMoldEnvelopeEntryResolver.h
     src/toolpath/hole/HolePhysicalGrouping.h
     src/toolpath/hole/HoleProgramAdapter.h
-    src/toolpath/hole/HoleStageWallHighlightResolver.h
     src/toolpath/hole/HoleStockSimulator.h
     src/toolpath/hole/HoleToolpathValidator.h
-    src/toolpath/pocket/simulation/DexelDisplayMesh.h
     src/toolpath/pocket/simulation/IpwQuality.h
     src/toolpath/pocket/simulation/DexelIntervalOps.h
     src/toolpath/pocket/simulation/MultiDexelStock.h
@@ -86,12 +83,9 @@ list(APPEND OAP_PUBLIC_TARGET_HEADERS
 
     src/toolpath/algorithms/ToolpathAlgorithm.h
     src/toolpath/workflow/hole/HoleToolpathService.h
-    src/toolpath/workflow/hole/HoleSimulationAdapter.h
     src/toolpath/workflow/pocket/PocketToolpathService.h
     src/toolpath/workflow/profile/ProfileToolpathService.h
 
-    src/toolpath/workflow/ToolpathProgramAdapters.h
     src/toolpath/workflow/HoleBatchExecutor.h
-    src/toolpath/workflow/ToolpathAsyncExecutor.h
     src/toolpath/workflow/ToolpathWorkflow.h
 )

@@ -65,9 +65,6 @@ elseif(OAP_BOUNDARY_FIXTURE STREQUAL "private_header")
 elseif(OAP_BOUNDARY_FIXTURE STREQUAL "transitive_target")
     list(APPEND OAP_BOUNDARY_SOURCE_FILES
         "${OAP_SOURCE_DIR}/cmake/fixtures/module_boundaries/transitive_target.cpp")
-elseif(OAP_BOUNDARY_FIXTURE STREQUAL "workflow_reverse_target")
-    list(APPEND OAP_BOUNDARY_SOURCE_FILES
-        "${OAP_SOURCE_DIR}/cmake/fixtures/module_boundaries/workflow_reverse_target.cpp")
 endif()
 
 set(OAP_PRODUCTION_TARGETS)
@@ -139,11 +136,9 @@ foreach(source_file IN LISTS OAP_BOUNDARY_SOURCE_FILES)
         set(source_target "${OAP_SOURCE_OWNER_${source_key}}")
     elseif(relative_file MATCHES "^tests/smoke/")
         set(source_target oap_tests)
-    elseif(relative_file MATCHES "^src/launcher/")
-        set(source_target oap_launcher)
     elseif(relative_file MATCHES
            "^cmake/fixtures/module_boundaries/forbidden_target\\.cpp$")
-        set(source_target oap_app_view)
+        set(source_target oap_toollibrary)
     elseif(relative_file MATCHES
            "^cmake/fixtures/module_boundaries/private_header\\.cpp$")
         set(source_target oap_tests)
@@ -151,80 +146,12 @@ foreach(source_file IN LISTS OAP_BOUNDARY_SOURCE_FILES)
            "^cmake/fixtures/module_boundaries/transitive_target\\.cpp$")
         set(source_target oap_toolpath_workflow)
     elseif(relative_file MATCHES
-           "^cmake/fixtures/module_boundaries/workflow_reverse_target\\.cpp$")
-        set(source_target oap_app_workflow_cam)
-    elseif(relative_file MATCHES
-           "^src/(analysis|recognition|toolpath|tooling|manufacturing|app)/")
+           "^src/(analysis|recognition|toolpath|tooling|manufacturing|support|worker)/")
         list(APPEND OAP_BOUNDARY_VIOLATIONS
             "${relative_file}: source is not assigned by OAPSources.cmake")
         continue()
     else()
         continue()
-    endif()
-
-    if(source_target STREQUAL OpenAutoPathApp AND
-       relative_file MATCHES "^src/app/ui/shell/MainWindow.*\\.(cpp|h)$")
-        file(READ "${source_file}" main_window_source)
-        set(main_window_workspace_escape_tokens
-            "m_machiningWorkspace->session("
-            "m_machiningWorkspace->jobForWorkflow("
-            "m_machiningWorkspace->resetForModel("
-            "m_machiningWorkspace->installProject("
-            "m_machiningWorkspace->holeManualWorkflowForWorkflow("
-            "m_stockSimulationWorkspace->session("
-            "m_stockSimulationWorkspace->taskCoordinator("
-            "m_stockSimulationWorkspace->resetForModel("
-            "m_playbackWorkspace->session("
-            "m_playbackWorkspace->cancelAndWait("
-            "m_recognitionWorkspace->session("
-            "m_recognitionWorkspace->resetForModel("
-            "recognitionSession("
-            "m_documentWorkspace->session("
-            "m_documentWorkspace->cancelAndWait("
-            "documentSession(")
-        foreach(escape_token IN LISTS main_window_workspace_escape_tokens)
-            string(FIND "${main_window_source}" "${escape_token}"
-                escape_index)
-            if(NOT escape_index EQUAL -1)
-                list(APPEND OAP_BOUNDARY_VIOLATIONS
-                    "${relative_file}: MainWindow bypasses a Workspace facade via '${escape_token}'")
-            endif()
-        endforeach()
-    endif()
-
-    if(relative_file MATCHES
-       "^src/app/.+/[A-Za-z0-9_]*WorkspaceCoordinator\\.h$")
-        file(READ "${source_file}" workspace_header_source)
-        set(workspace_session_escape_tokens
-            " session("
-            " sessionFor")
-        foreach(escape_token IN LISTS workspace_session_escape_tokens)
-            string(FIND "${workspace_header_source}" "${escape_token}"
-                escape_index)
-            if(NOT escape_index EQUAL -1)
-                list(APPEND OAP_BOUNDARY_VIOLATIONS
-                    "${relative_file}: Workspace facade exposes Session access via '${escape_token}'")
-            endif()
-        endforeach()
-    endif()
-
-    if(relative_file STREQUAL "src/app/ui/shell/MainWindow.cpp")
-        file(READ "${source_file}" main_window_root_source)
-        set(main_window_moved_definition_tokens
-            "MainWindow::setupMenus("
-            "MainWindow::setupToolbars("
-            "MainWindow::setupDocks("
-            "MainWindow::loadFile("
-            "MainWindow::onEntityPicked("
-            "MainWindow::recognizeInnerOuterStructures(")
-        foreach(moved_token IN LISTS main_window_moved_definition_tokens)
-            string(FIND "${main_window_root_source}" "${moved_token}"
-                moved_index)
-            if(NOT moved_index EQUAL -1)
-                list(APPEND OAP_BOUNDARY_VIOLATIONS
-                    "${relative_file}: composition root regained moved adapter '${moved_token}'")
-            endif()
-        endforeach()
     endif()
 
     file(STRINGS "${source_file}" internal_includes
@@ -244,7 +171,7 @@ foreach(source_file IN LISTS OAP_BOUNDARY_SOURCE_FILES)
                 "${relative_file}: textual implementation include '${raw_include_path}' is forbidden")
         endif()
         if(raw_include_path MATCHES
-           "^(analysis|recognition|toolpath|tooling|manufacturing|app)/")
+           "^(analysis|recognition|toolpath|tooling|manufacturing|support|worker)/")
             set(include_path "${raw_include_path}")
             set(include_file "src/${include_path}")
         elseif(include_line MATCHES

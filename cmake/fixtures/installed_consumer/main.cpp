@@ -4,7 +4,6 @@
 #include <toolpath/finishing/SurfaceFinishing.h>
 #include <BRepPrimAPI_MakeBox.hxx>
 #include <TopoDS_Shape.hxx>
-#include <QString>
 
 int main()
 {
@@ -14,9 +13,8 @@ int main()
     // Even a rejected input links the real finishing implementation and its
     // replaceable OpenCAMLib dependency from the installed package.
     const auto rejected = oap::toolpath::SurfaceFinishing{}.generate({}, gp_Ax3{}, {});
-    const auto qtText = QString::fromUtf8("installed consumer");
     return path.empty() || box.IsNull()
-        || rejected.ok || rejected.error.empty() || qtText.isEmpty()
+        || rejected.ok || rejected.error.empty()
         || hash != "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
         ? 1 : 0;
 }

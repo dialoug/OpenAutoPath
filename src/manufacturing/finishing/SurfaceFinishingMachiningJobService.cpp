@@ -1,3 +1,7 @@
+#include "analysis/ContentHash.h"
+#include "support/Identity.h"
+#include <vector>
+#include <string>
 #include "SurfaceFinishingMachiningJobService.h"
 
 #include <algorithm>
@@ -5,8 +9,6 @@
 #include <limits>
 #include <map>
 #include <unordered_set>
-#include <QCryptographicHash>
-#include <QDateTime>
 #include <BRep_Builder.hxx>
 #include <BRepBndLib.hxx>
 #include <Bnd_Box.hxx>
@@ -24,12 +26,12 @@ namespace oap::manufacturing {
 namespace {
 std::string targetFingerprint(const PartDefinition& part, const std::vector<std::string>& units)
 {
-    QByteArray input = QByteArray::fromStdString(part.sourceFingerprint);
+    std::string input = part.sourceFingerprint;
     for (const auto& id : units) {
         input += '\0';
-        input += QByteArray::fromStdString(id);
+        input += id;
     }
-    return QCryptographicHash::hash(input, QCryptographicHash::Sha256).toHex().toStdString();
+    return oap::sha256Hex(input);
 }
 void fail(toolpath::SurfaceFinishingBatch& batch, const std::string& message)
 {
@@ -123,19 +125,19 @@ TopoDS_Shape SurfaceFinishingMachiningJobService::buildPlanningStock(
     if (control && control->cancelled()) return reject("Planning stock construction was cancelled.");
     if (stock.sourceKind == StockSourceKind::StepModel) {
         const auto& path = resolvedStockPath.empty() ? stock.sourcePath : resolvedStockPath;
-        QString failure;
+        std::string failure;
         const auto before = MachiningJobStorage::sourceFileFingerprint(
-            QString::fromStdString(path), &failure);
-        if (before.isEmpty()) return reject(failure.toStdString());
-        if (!stock.sourceFingerprint.empty() && stock.sourceFingerprint != before.toStdString())
+            path, &failure);
+        if (before.empty()) return reject(failure);
+        if (!stock.sourceFingerprint.empty() && stock.sourceFingerprint != before)
             return reject("Planning stock STEP content changed; explicitly reselect the stock and regenerate the job.");
         const auto loaded = toolpath::StockModelLoader().loadStep(path, control);
         if (!loaded.ok()) return reject(loaded.message);
         const auto after = MachiningJobStorage::sourceFileFingerprint(
-            QString::fromStdString(path), &failure);
-        if (after.isEmpty() || after != before)
+            path, &failure);
+        if (after.empty() || after != before)
             return reject("Planning stock STEP changed while it was being read.");
-        stock.sourceFingerprint = before.toStdString();
+        stock.sourceFingerprint = before;
         return loaded.shape;
     }
     if (stock.sourceKind != StockSourceKind::PerUnitBoxes && stock.sourceKind != StockSourceKind::ModelBox)
@@ -185,7 +187,7 @@ std::string SurfaceFinishingMachiningJobService::operationFingerprint(
     normalized.inputFingerprint.clear();
     normalized.sequence = 0;
     normalized.enabled = true;
-    return MachiningJobStorage::finishingExecutionFingerprint(one).toStdString();
+    return MachiningJobStorage::finishingExecutionFingerprint(one);
 }
 
 bool SurfaceFinishingMachiningJobService::capture(
@@ -217,7 +219,7 @@ bool SurfaceFinishingMachiningJobService::capture(
         def.setups.push_back(created);
     }
     MachiningJobApplicationService::captureSetups(def, *request.setupFrames,
-        QDateTime::currentDateTimeUtc().toString(Qt::ISODate).toStdString());
+        oap::utcTimestamp(false));
     for (const auto& original : job.definition().setups) {
         const auto* updated = next.setupById(original.id);
         if (!updated || MachiningJobStorage::setupInputFingerprint(def.part, *updated) !=
@@ -276,7 +278,7 @@ bool SurfaceFinishingMachiningJobService::capture(
     if (!batch.validation.ok()) return reject(batch.validation.summary());
     const auto errors = next.validationErrors();
     if (!errors.empty()) return reject(errors.front());
-    next.setFinishingResult(std::move(batch), MachiningJobStorage::finishingExecutionFingerprint(def).toStdString());
+    next.setFinishingResult(std::move(batch), MachiningJobStorage::finishingExecutionFingerprint(def));
     if (!refreshActivePlan(next, job)) return reject("Updated engraving cannot restore the active IPW plan.");
     job = std::move(next);
     return true;
@@ -318,7 +320,7 @@ bool SurfaceFinishingMachiningJobService::replaceFamily(
         def.setups.push_back(std::move(created));
     }
     MachiningJobApplicationService::captureSetups(def, *requests.front().setupFrames,
-        QDateTime::currentDateTimeUtc().toString(Qt::ISODate).toStdString());
+        oap::utcTimestamp(false));
     for (const auto& previous : job.definition().setups) {
         const auto* updated = next.setupById(previous.id);
         if (!updated || MachiningJobStorage::setupInputFingerprint(def.part, *updated) !=
@@ -394,7 +396,7 @@ bool SurfaceFinishingMachiningJobService::replaceFamily(
     if (!batch.validation.ok()) return reject(batch.validation.summary());
     const auto errors = next.validationErrors();
     if (!errors.empty()) return reject(errors.front());
-    next.setFinishingResult(std::move(batch), MachiningJobStorage::finishingExecutionFingerprint(def).toStdString());
+    next.setFinishingResult(std::move(batch), MachiningJobStorage::finishingExecutionFingerprint(def));
     if (!refreshActivePlan(next, job)) return reject("Updated engraving cannot restore the active IPW plan.");
     job = std::move(next);
     return true;
@@ -477,7 +479,7 @@ toolpath::SurfaceFinishingBatch SurfaceFinishingMachiningJobService::regenerate(
     validateBatch(batch);
     if (!batch.validation.ok()) { batch.operations.clear(); return batch; }
     if (control && control->cancelled()) { batch.cancelled = true; batch.operations.clear(); return batch; }
-    next.setFinishingResult(batch, MachiningJobStorage::finishingExecutionFingerprint(def).toStdString());
+    next.setFinishingResult(batch, MachiningJobStorage::finishingExecutionFingerprint(def));
     if (!refreshActivePlan(next, job)) { fail(batch, "Regenerated engraving cannot restore the active IPW plan."); return batch; }
     job = std::move(next);
     return batch;

@@ -22,14 +22,14 @@ add_test(NAME module_boundaries_forbidden_target
     COMMAND "${CMAKE_COMMAND}"
         "-DOAP_SOURCE_DIR=${CMAKE_CURRENT_SOURCE_DIR}"
         "-DOAP_BOUNDARY_FIXTURE=forbidden_target"
-        "-DOAP_EXPECTED_MESSAGE=forbidden target dependency oap_app_view -> oap_analysis"
+        "-DOAP_EXPECTED_MESSAGE=forbidden target dependency oap_toollibrary -> oap_analysis"
         -P "${CMAKE_CURRENT_SOURCE_DIR}/cmake/RunExpectedBoundaryFailure.cmake")
 
 add_test(NAME module_boundaries_private_header
     COMMAND "${CMAKE_COMMAND}"
         "-DOAP_SOURCE_DIR=${CMAKE_CURRENT_SOURCE_DIR}"
         "-DOAP_BOUNDARY_FIXTURE=private_header"
-        "-DOAP_EXPECTED_MESSAGE=includes private header 'app/ui/shell/MainWindow.h'"
+        "-DOAP_EXPECTED_MESSAGE=includes private header 'analysis/detail/StepIndexGeometry.h'"
         -P "${CMAKE_CURRENT_SOURCE_DIR}/cmake/RunExpectedBoundaryFailure.cmake")
 
 add_test(NAME module_boundaries_transitive_target
@@ -46,23 +46,11 @@ add_test(NAME module_boundaries_dependency_cycle
         "-DOAP_EXPECTED_MESSAGE=First-party dependency cycle detected"
         -P "${CMAKE_CURRENT_SOURCE_DIR}/cmake/RunExpectedBoundaryFailure.cmake")
 
-add_test(NAME module_boundaries_workflow_reverse_target
-    COMMAND "${CMAKE_COMMAND}"
-        "-DOAP_SOURCE_DIR=${CMAKE_CURRENT_SOURCE_DIR}"
-        "-DOAP_BOUNDARY_FIXTURE=workflow_reverse_target"
-        "-DOAP_EXPECTED_MESSAGE=forbidden target dependency oap_app_workflow_cam -> oap_app_workflow_simulation"
-        -P "${CMAKE_CURRENT_SOURCE_DIR}/cmake/RunExpectedBoundaryFailure.cmake")
-
-add_test(NAME workflow_internal_boundaries
-    COMMAND "${CMAKE_COMMAND}"
-        "-DOAP_SOURCE_DIR=${CMAKE_CURRENT_SOURCE_DIR}"
-        -P "${CMAKE_CURRENT_SOURCE_DIR}/cmake/CheckWorkflowBoundaries.cmake")
-
 add_test(NAME documentation_links
     COMMAND "${CMAKE_COMMAND}"
         "-DOAP_SOURCE_DIR=${CMAKE_CURRENT_SOURCE_DIR}"
         -P "${CMAKE_CURRENT_SOURCE_DIR}/cmake/CheckDocumentationLinks.cmake")
 
-set_tests_properties(module_boundaries module_boundaries_forbidden_target module_boundaries_private_header module_boundaries_transitive_target module_boundaries_dependency_cycle module_boundaries_workflow_reverse_target workflow_internal_boundaries documentation_links PROPERTIES
+set_tests_properties(module_boundaries module_boundaries_forbidden_target module_boundaries_private_header module_boundaries_transitive_target module_boundaries_dependency_cycle documentation_links PROPERTIES
         LABELS "fast;architecture"
         TIMEOUT 30)

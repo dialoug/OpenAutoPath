@@ -1,12 +1,12 @@
 #pragma once
 
+#include "support/Json.h"
 #include "manufacturing/ipw/IpwExecutor.h"
-#include <QJsonObject>
 
 namespace oap::worker
 {
-QJsonObject replayResult(const manufacturing::MachiningJob &job, bool selectedOnly, int quality);
-QJsonObject stockResult(const manufacturing::MachiningJob &job,
-                        const manufacturing::ipw::IpwExecutionResult &simulation, const QJsonObject &request,
+oap::JsonObject replayResult(const manufacturing::MachiningJob &job, bool selectedOnly, int quality);
+oap::JsonObject stockResult(const manufacturing::MachiningJob &job,
+                        const manufacturing::ipw::IpwExecutionResult &simulation, const oap::JsonObject &request,
                         const TopoDS_Shape &target);
 }

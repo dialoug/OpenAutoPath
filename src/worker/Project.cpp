@@ -1,3 +1,10 @@
+#include "support/Files.h"
+#include "support/Utf8Path.h"
+#include <format>
+#include "support/Json.h"
+#include "support/Identity.h"
+#include <vector>
+#include <string>
 #include "Project.h"
 #include "Planning.h"
 #include "Simulation.h"
@@ -24,12 +31,6 @@
 #include <TopoDS_Iterator.hxx>
 #include <set>
 
-#include <QDateTime>
-#include <QFileInfo>
-#include <QJsonArray>
-#include <QJsonDocument>
-#include <QSaveFile>
-#include <QUuid>
 #include <algorithm>
 #include <cmath>
 #include <limits>
@@ -40,34 +41,34 @@ namespace oap::worker
 namespace
 {
 using namespace manufacturing;
-QString modelHash(const QJsonObject &request)
+std::string modelHash(const oap::JsonObject &request)
 {
-    QString error;
+    std::string error;
     auto hash = MachiningJobStorage::sourceFileFingerprint(request["model"].toString(), &error);
-    if (hash.isEmpty())
-        throw std::runtime_error(error.toStdString());
+    if (hash.empty())
+        throw std::runtime_error(error);
     return hash;
 }
 void saveDefinition(const MachiningJobDefinition &def)
 {
-    QString error;
+    std::string error;
     if (!MachiningJobStorage::save("project.oapjob", def, &error))
-        throw std::runtime_error(error.toStdString());
+        throw std::runtime_error(error);
 }
 
 // Generated Web operations have one recognized hole and one physical hole.
 // Remap the batch-local indices before installing it into the project's global order.
-void appendGeneratedHole(MachiningJobDefinition &def, const QString &file)
+void appendGeneratedHole(MachiningJobDefinition &def, const std::string &file)
 {
     MachiningJob source;
     auto &add = source.definition();
-    QString error;
+    std::string error;
     if (!MachiningJobStorage::load(file, add, &error))
-        throw std::runtime_error(error.toStdString());
+        throw std::runtime_error(error);
     if (add.part.sourceFingerprint != def.part.sourceFingerprint || add.recognizedHoles.size() != 1 ||
         add.recognizedPhysicalHoleCount != 1 || add.holeOperations.empty())
         throw std::runtime_error("工序与项目的零件或识别结果不匹配");
-    const std::string prefix = QUuid::createUuid().toString(QUuid::WithoutBraces).toStdString() + "-";
+    const std::string prefix = oap::randomUuid() + "-";
     const auto operations = MachiningOperationService::operations(def);
     int sequence = operations.empty() ? 0 : operations.back().sequence + 1;
     int holeIndex = -1, physicalIndex = -1;
@@ -121,10 +122,10 @@ void appendGeneratedHole(MachiningJobDefinition &def, const QString &file)
         def.holeOperations.push_back(std::move(op));
     }
 }
-void changePocketTool(MachiningJob& job, const QJsonObject& request, const tooling::ToolLibrary& library)
+void changePocketTool(MachiningJob& job, const oap::JsonObject& request, const tooling::ToolLibrary& library)
 {
     auto& def = job.definition();
-    const auto id = request["operation"].toString().toStdString();
+    const auto id = request["operation"].toString();
     auto op = std::find_if(def.pocketOperations.begin(), def.pocketOperations.end(),
                            [&](const auto& item) { return item.id == id && item.enabled; });
     if (op == def.pocketOperations.end())
@@ -139,8 +140,8 @@ void changePocketTool(MachiningJob& job, const QJsonObject& request, const tooli
     if (params.depth.stepDown > replacement.cuttingEdgeLength)
         throw std::runtime_error("工序层深超过所选刀具刃长");
     const auto oldId = op->toolControllerId;
-    op->toolControllerId = "tool-controller-pocket-" + QUuid::createUuid().toString(QUuid::WithoutBraces).toStdString();
-    def.toolControllers.push_back({op->toolControllerId, library.id().toStdString(), replacement});
+    op->toolControllerId = "tool-controller-pocket-" + oap::randomUuid();
+    def.toolControllers.push_back({op->toolControllerId, library.id(), replacement});
     const auto all = MachiningOperationService::operations(def);
     if (std::none_of(all.begin(), all.end(), [&](const auto& item){return item.toolControllerId == oldId;}))
         std::erase_if(def.toolControllers, [&](const auto& item){return item.id == oldId;});
@@ -208,7 +209,7 @@ RebuiltOperation rebuildFamily(MachiningJob &job, JobOperationKind kind, const S
     return {std::move(program), params, std::move(report)};
 }
 
-QJsonArray point(const gp_Pnt &p)
+oap::JsonArray point(const gp_Pnt &p)
 {
     return {p.X(), p.Y(), p.Z()};
 }
@@ -235,7 +236,7 @@ ipw::IpwExecutionResult executeProject(MachiningJob &job, const StepIndexer &ind
     if (stock.IsNull())
         throw std::runtime_error(error);
     const auto simulation = ipw::IpwExecutor().execute(
-        job, stock, MachiningJobStorage::definitionFingerprint(job.definition()).toStdString(),
+        job, stock, MachiningJobStorage::definitionFingerprint(job.definition()),
         ipw::kHybridIpwEngineId, options);
     if (!simulation.complete() || !simulation.finalCheckpoint || !simulation.finalCheckpoint->dexelStock)
         throw std::runtime_error("IPW: " + simulation.message);
@@ -263,41 +264,41 @@ void selectPrefix(MachiningJobDefinition &def, const std::string &last)
     trim(def.finishingOperations);
 }
 
-void confirmSetups(MachiningJob &job, toolpath::MoldSetupWorkFrames frames, const QJsonArray &ids)
+void confirmSetups(MachiningJob &job, toolpath::MoldSetupWorkFrames frames, const oap::JsonArray &ids)
 {
     auto &def = job.definition();
     for (const auto &setup : def.setups)
         frames.setConfirmed(setup.face, false);
     for (const auto &id : ids)
     {
-        const auto *setup = job.setupById(id.toString().toStdString());
+        const auto *setup = job.setupById(id.toString());
         if (!setup || !setup->valid || !frames.setConfirmed(setup->face, true))
             throw std::runtime_error("无法确认无效装夹");
     }
     MachiningJobApplicationService::captureSetups(
-        def, frames, QDateTime::currentDateTimeUtc().toString(Qt::ISODateWithMs).toStdString(),
+        def, frames, oap::utcTimestamp(),
         "browser-session");
 }
 
-QJsonArray ncMachiningWarnings(const MachiningJob &job, JobOperationKind kind)
+oap::JsonArray ncMachiningWarnings(const MachiningJob &job, JobOperationKind kind)
 {
-    QJsonArray warnings;
+    oap::JsonArray warnings;
     if (kind == JobOperationKind::Hole && job.holeResult())
     {
         const auto &batch = *job.holeResult();
         if (!batch.coverage.complete())
             warnings.append(
-                QJsonObject{{"line", 0}, {"message", QString::fromStdString(batch.coverage.summary())}});
+                oap::JsonObject{{"line", 0}, {"message", std::string(batch.coverage.summary())}});
         if (!batch.productionSafety.complete())
-            warnings.append(QJsonObject{{"line", 0}, {"message", "刀具装配实体扫掠审计未完成"}});
+            warnings.append(oap::JsonObject{{"line", 0}, {"message", "刀具装配实体扫掠审计未完成"}});
     }
     if (kind == JobOperationKind::SurfaceFinishing)
-        warnings.append(QJsonObject{{"line", 0},
+        warnings.append(oap::JsonObject{{"line", 0},
                                     {"message", "雕刻刀刃接触采用采样计算，连续刀柄与夹具碰撞仍需复核"}});
     return warnings;
 }
 
-QJsonObject exportPrograms(const MachiningJob &job, toolpath::MoldSetupWorkFrames frames,
+oap::JsonObject exportPrograms(const MachiningJob &job, toolpath::MoldSetupWorkFrames frames,
                            const std::map<JobOperationKind, toolpath::ToolpathParams> &parameters)
 {
     const auto result = MachiningProgramPartitioner().partition(job);
@@ -306,7 +307,7 @@ QJsonObject exportPrograms(const MachiningJob &job, toolpath::MoldSetupWorkFrame
     if (!result.ok())
         throw std::runtime_error(result.issues.empty() ? "没有可导出的程序" : result.issues.front().message);
     const auto operations = MachiningOperationService::operations(job.definition());
-    QJsonArray programs;
+    oap::JsonArray programs;
     int ncErrors = 0;
     for (const auto &part : result.partitions)
     {
@@ -319,11 +320,10 @@ QJsonObject exportPrograms(const MachiningJob &job, toolpath::MoldSetupWorkFrame
         frames.setConfirmed(setup->face, true);
         const auto frame = frames.forFace(setup->face)->machiningSetup();
         auto options = job.definition().post.options;
-        const QString filename = QString("%1-%2-T%3.nc")
-                                     .arg(part.index + 1, 3, 10, QChar('0'))
-                                     .arg(toolpath::workCoordinateCode(part.workOffset))
-                                     .arg(part.toolNumber);
-        options.programName += " " + filename.toStdString();
+        const auto filename = std::format("{:03}-{}-T{}.nc", part.index + 1,
+                                          toolpath::workCoordinateCode(part.workOffset), part.toolNumber);
+
+        options.programName += " " + filename;
         options.toolId = part.toolId;
         options.toolName = controller->tool.toolName;
         std::string error;
@@ -344,11 +344,11 @@ QJsonObject exportPrograms(const MachiningJob &job, toolpath::MoldSetupWorkFrame
                                                              error))
             throw std::runtime_error(error);
         const auto nc = buffer.str();
-        QJsonArray ids;
+        oap::JsonArray ids;
         for (const auto &id : part.formalOperationIds)
-            ids.append(QString::fromStdString(id));
-        const auto program = reviewNc(nc, filename, QString::fromStdString(setup->id),
-                                      QString::fromStdString(options.toolName), ids, ncMachiningWarnings(job, op->kind));
+            ids.append(id);
+        const auto program = reviewNc(nc, filename, std::string(setup->id),
+                                      options.toolName, ids, ncMachiningWarnings(job, op->kind));
         ncErrors += static_cast<int>(program["errors"].toArray().size());
         programs.append(program);
     }
@@ -356,7 +356,7 @@ QJsonObject exportPrograms(const MachiningJob &job, toolpath::MoldSetupWorkFrame
     return {{"programCount", programs.size()}, {"ncErrors", ncErrors}};
 }
 
-QJsonObject planHoles(MachiningJob &job, const Model &model, const StepIndexer &index,
+oap::JsonObject planHoles(MachiningJob &job, const Model &model, const StepIndexer &index,
                       const tooling::ToolLibrary &library, const toolpath::MoldSetupWorkFrames &frames,
                       const toolpath::HoleRapidPlanningContext &context)
 {
@@ -380,16 +380,16 @@ QJsonObject planHoles(MachiningJob &job, const Model &model, const StepIndexer &
     capture.automaticSelection = &generated.selection;
     capture.generated = &generated.batch;
     capture.setupFrames = &frames;
-    capture.toolLibraryId = library.id().toStdString();
+    capture.toolLibraryId = library.id();
     std::string error;
     if (!HoleMachiningJobService().capture(job, capture, &error))
         throw std::runtime_error(error);
     const auto &coverage = generated.batch.coverage;
-    QJsonArray issues;
+    oap::JsonArray issues;
     for (const auto &issue : coverage.blockingIssues)
-        issues.append(QString::fromStdString(issue.message));
+        issues.append(issue.message);
     for (const auto &issue : coverage.warningIssues)
-        issues.append(QString::fromStdString(issue.message));
+        issues.append(issue.message);
     return {{"input", coverage.inputHoleSegmentCount},
             {"covered", coverage.coveredHoleSegmentCount},
             {"eligible", coverage.sixFaceHoleSegmentCount},
@@ -397,19 +397,19 @@ QJsonObject planHoles(MachiningJob &job, const Model &model, const StepIndexer &
 }
 } // namespace
 
-void captureProject(const QJsonObject &request, const tooling::HoleAutomaticToolpathResult &generated,
+void captureProject(const oap::JsonObject &request, const tooling::HoleAutomaticToolpathResult &generated,
                     const std::vector<toolpath::HoleMachiningInput> &inputs,
                     const toolpath::MoldSetupWorkFrames &frames, const tooling::ToolLibrary &library)
 {
     HoleJobCaptureRequest capture;
     auto &def = capture.definition;
-    def.id = QUuid::createUuid().toString(QUuid::WithoutBraces).toStdString();
-    const QString name = QFileInfo(request["sourceName"].toString("model.step")).fileName();
-    def.name = QFileInfo(name).completeBaseName().toStdString();
-    def.part.sourcePath = name.toStdString();
-    def.part.sourceFingerprint = modelHash(request).toStdString();
-    def.activeToolLibraryId = library.id().toStdString();
-    def.createdAt = QDateTime::currentDateTimeUtc().toString(Qt::ISODateWithMs).toStdString();
+    def.id = oap::randomUuid();
+    const std::string name = oap::pathUtf8(oap::utf8Path(request["sourceName"].toString("model.step")).filename());
+    def.name = oap::pathUtf8(oap::utf8Path(name).stem());
+    def.part.sourcePath = name;
+    def.part.sourceFingerprint = modelHash(request);
+    def.activeToolLibraryId = library.id();
+    def.createdAt = oap::utcTimestamp();
     def.modifiedAt = def.createdAt;
     capture.inputs = &inputs;
     capture.automaticSelection = &generated.selection;
@@ -423,7 +423,7 @@ void captureProject(const QJsonObject &request, const tooling::HoleAutomaticTool
     saveDefinition(job.definition());
 }
 
-QJsonObject processProject(const QJsonObject &request, const StepIndexer &index, const Model &model,
+oap::JsonObject processProject(const oap::JsonObject &request, const StepIndexer &index, const Model &model,
                            const tooling::ToolLibrary &library,
                            const toolpath::MoldSetupWorkFrames &modelFrames,
                            const toolpath::HoleRapidPlanningContext &context)
@@ -431,41 +431,41 @@ QJsonObject processProject(const QJsonObject &request, const StepIndexer &index,
     auto frames = modelFrames;
     manufacturing::MachiningJob job;
     auto &def = job.definition();
-    QString error;
+    std::string error;
     if (!request.contains("document") &&
         (request["action"].toString() == "project" || request["action"].toString() == "plan" ||
          request["action"].toString() == "holes"))
     {
-        def.id = QUuid::createUuid().toString(QUuid::WithoutBraces).toStdString();
+        def.id = oap::randomUuid();
         def.part.sourcePath =
-            QFileInfo(request["sourceName"].toString("model.step")).fileName().toStdString();
-        def.name = QFileInfo(QString::fromStdString(def.part.sourcePath)).completeBaseName().toStdString();
-        def.part.sourceFingerprint = modelHash(request).toStdString();
-        def.createdAt = QDateTime::currentDateTimeUtc().toString(Qt::ISODateWithMs).toStdString();
+            oap::pathUtf8(oap::utf8Path(request["sourceName"].toString("model.step")).filename());
+        def.name = oap::pathUtf8(oap::utf8Path(def.part.sourcePath).stem());
+        def.part.sourceFingerprint = modelHash(request);
+        def.createdAt = oap::utcTimestamp();
         MachiningJobApplicationService::captureSetups(def, frames, {});
     }
     else if (!MachiningJobStorage::deserializeDefinition(
-                 QJsonDocument(request["document"].toObject()).toJson(), def, &error))
-        throw std::runtime_error(error.toStdString());
-    if (def.part.sourceFingerprint != modelHash(request).toStdString())
+                 oap::JsonDocument(request["document"].toObject()).toJson(), def, &error))
+        throw std::runtime_error(error);
+    if (def.part.sourceFingerprint != modelHash(request))
         throw std::runtime_error("项目引用的 STEP 指纹与当前模型不一致");
-    // The desktop reload path clears legacy collision references. Keep them in portable project versions.
+    // Keep imported collision references in portable project versions.
     auto collisionScene = std::move(def.collisionScene);
     MachiningJobApplicationService::rebindLoadedSetups(def, frames);
     def.collisionScene = std::move(collisionScene);
     for (const auto &setup : def.setups)
         frames.setConfirmed(setup.face, setup.confirmation.confirmed);
     const auto action = request["action"].toString();
-    const auto stockPath = request["stockFile"].toString().toStdString();
+    const auto stockPath = request["stockFile"].toString();
     if (action == "stock")
     {
         const auto expected = request["stockHash"].toString();
-        if (stockPath.empty() || expected.isEmpty() ||
+        if (stockPath.empty() || expected.empty() ||
             expected != MachiningJobStorage::sourceFileFingerprint(request["stockFile"].toString(), &error))
             throw std::runtime_error("毛坯 STEP 指纹校验失败");
         def.stock.sourceKind = StockSourceKind::StepModel;
-        def.stock.sourcePath = QFileInfo(request["stockName"].toString()).fileName().toStdString();
-        def.stock.sourceFingerprint = expected.toStdString();
+        def.stock.sourcePath = oap::pathUtf8(oap::utf8Path(request["stockName"].toString()).filename());
+        def.stock.sourceFingerprint = expected;
     }
     const bool computing = action == "plan" || action == "rebuild" || action == "simulate" ||
                            action == "export" || action == "holes" || action == "replay";
@@ -477,18 +477,18 @@ QJsonObject processProject(const QJsonObject &request, const StepIndexer &index,
         appendGeneratedHole(def, request["appendFile"].toString());
     if (action == "setups")
         confirmSetups(job, frames, request["confirmedSetups"].toArray());
-    QJsonObject result;
+    oap::JsonObject result;
     if (action == "holes")
         result.insert("holeCoverage", planHoles(job, model, index, library, frames, context));
     if (action == "plan")
     {
         planFeature(job, request, model, index, library, frames, context.obstacleShape);
     }
-    if (action == "rebuild" && !request["tool"].toString().isEmpty())
+    if (action == "rebuild" && !request["tool"].toString().empty())
         changePocketTool(job, request, library);
-    def.modifiedAt = QDateTime::currentDateTimeUtc().toString(Qt::ISODateWithMs).toStdString();
+    def.modifiedAt = oap::utcTimestamp();
     saveDefinition(def);
-    result.insert("name", QString::fromStdString(def.name));
+    result.insert("name", def.name);
     if (action == "project" || action == "plan" || action == "setups" || action == "stock" ||
         action == "holes")
         return result;
@@ -513,8 +513,8 @@ QJsonObject processProject(const QJsonObject &request, const StepIndexer &index,
             options.hole = options.pocket;
         }
         const auto through = request["operation"].toString();
-        if ((action == "simulate" || action == "replay") && !through.isEmpty())
-            selectPrefix(def, through.toStdString());
+        if ((action == "simulate" || action == "replay") && !through.empty())
+            selectPrefix(def, through);
         if (action == "export")
         {
             for (const auto &op : MachiningOperationService::operations(def))
@@ -527,7 +527,7 @@ QJsonObject processProject(const QJsonObject &request, const StepIndexer &index,
         std::map<JobOperationKind, toolpath::ToolpathParams> parameters;
         const auto simulation = executeProject(job, index, context, parameters, stockPath, options);
         if (action == "replay")
-            return replayResult(job, !through.isEmpty(), quality);
+            return replayResult(job, !through.empty(), quality);
         if (action == "export")
             return exportPrograms(job, frames, parameters);
         result = stockResult(job, simulation, request, context.obstacleShape);
@@ -535,7 +535,7 @@ QJsonObject processProject(const QJsonObject &request, const StepIndexer &index,
         return result;
     }
 
-    const auto id = request["operation"].toString().toStdString();
+    const auto id = request["operation"].toString();
     const auto operations = MachiningOperationService::operations(def);
     const auto it = std::find_if(operations.begin(), operations.end(),
                                  [&](const auto &op) { return op.id == id && op.enabled; });
@@ -576,23 +576,22 @@ QJsonObject processProject(const QJsonObject &request, const StepIndexer &index,
     if (!toolpath::ToolpathProgramExport().writeGCode(program, params, setup->machiningSetup(), options,
                                                       "reference.nc", why))
         throw std::runtime_error(why);
-    QJsonArray path;
+    oap::JsonArray path;
     for (const auto &op : program.operations)
         for (const auto &move : op.moves)
-            path.append(QJsonArray{point(move.from), point(move.to)});
-    const auto data = QJsonDocument(path).toJson(QJsonDocument::Compact);
-    QSaveFile file("path.json");
-    if (!file.open(QIODevice::WriteOnly) || file.write(data) != data.size() || !file.commit())
+            path.append(oap::JsonArray{point(move.from), point(move.to)});
+    const auto data = oap::JsonDocument(path).toJson(oap::JsonDocument::Compact);
+    if (!oap::writeFileAtomically("path.json", data))
         throw std::runtime_error("无法写入刀路预览");
-    result.insert("operation", QString::fromStdString(id));
+    result.insert("operation", id);
     const auto *boundTool = job.toolControllerById(it->toolControllerId);
-    const auto toolName = QString::fromStdString(boundTool ? boundTool->tool.toolName : options.toolName);
+    const auto toolName = std::string(boundTool ? boundTool->tool.toolName : options.toolName);
     result.insert("tool", toolName);
     result.insert("singleNcReview", true);
     result.insert("ncErrors", reviewSingleNc(toolpath::workCoordinateCode(setup->workOffset), toolName,
-                                              {QString::fromStdString(id)}, ncMachiningWarnings(selected, it->kind)));
+                                              {id}, ncMachiningWarnings(selected, it->kind)));
     result.insert("moves", path.size());
-    result.insert("validation", QString::fromStdString(report.summary()));
+    result.insert("validation", std::string(report.summary()));
     return result;
 }
 } // namespace oap::worker

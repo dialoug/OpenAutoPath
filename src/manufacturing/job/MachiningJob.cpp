@@ -156,7 +156,7 @@ const toolpath::PocketToolpathBatch* MachiningJob::currentPocketResult(
         return reject("Pocket result has validation errors.");
     if (m_runtime.pocketExecutionFingerprint.empty() ||
         m_runtime.pocketExecutionFingerprint !=
-            MachiningJobStorage::pocketExecutionFingerprint(m_definition).toStdString())
+            MachiningJobStorage::pocketExecutionFingerprint(m_definition))
         return reject("Pocket result is stale; regenerate the toolpath.");
     return batch;
 }
@@ -242,7 +242,7 @@ const toolpath::SurfaceFinishingBatch* MachiningJob::currentFinishingResult(std:
     const auto* result = finishingResult();
     if (!result || result->cancelled || !result->validation.ok() ||
         m_runtime.finishingExecutionFingerprint.empty() ||
-        m_runtime.finishingExecutionFingerprint != MachiningJobStorage::finishingExecutionFingerprint(m_definition).toStdString()) {
+        m_runtime.finishingExecutionFingerprint != MachiningJobStorage::finishingExecutionFingerprint(m_definition)) {
         return reject("Engraving result is missing, invalid or stale; regenerate it.");
     }
     std::unordered_set<std::string> matched;

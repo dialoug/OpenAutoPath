@@ -22,7 +22,7 @@ endfunction()
 
 # Keep sources, dependencies and CTest policy together at the call site.
 function(oap_add_smoke_test name)
-    cmake_parse_arguments(PARSE_ARGV 1 TEST "AUTOMOC;OCCT_VIEWER;RUN_SERIAL"
+    cmake_parse_arguments(PARSE_ARGV 1 TEST "RUN_SERIAL"
         "TIMEOUT;SKIP_RETURN_CODE" "SOURCES;LIBRARIES;ARGS;LABELS;ENVIRONMENT")
     # Parse executable settings separately; forward CTest settings explicitly.
     if(TEST_UNPARSED_ARGUMENTS OR TEST_KEYWORDS_MISSING_VALUES OR
@@ -32,12 +32,6 @@ function(oap_add_smoke_test name)
     set(target oap_test_${name})
     add_executable(${target} ${TEST_SOURCES})
     target_link_libraries(${target} PRIVATE ${TEST_LIBRARIES})
-    if(TEST_AUTOMOC)
-        set_target_properties(${target} PROPERTIES AUTOMOC ON)
-    endif()
-    if(TEST_OCCT_VIEWER)
-        oap_configure_occt_viewer_target(${target} PRIVATE)
-    endif()
     oap_configure_fast_test(${target})
     set(test_options)
     foreach(property ARGS LABELS ENVIRONMENT TIMEOUT SKIP_RETURN_CODE)

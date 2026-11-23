@@ -1,3 +1,11 @@
+#include "DefaultToolLibrary.h"
+#include "support/Files.h"
+#include "support/Utf8Path.h"
+#include <algorithm>
+#include <array>
+#include "support/Json.h"
+#include <vector>
+#include <string>
 #include "analysis/AnalysisPipeline.h"
 #include "Project.h"
 #include "NcReview.h"
@@ -15,12 +23,6 @@
 #include <BRep_Tool.hxx>
 #include <TopoDS_Compound.hxx>
 #include <XCAFApp_Application.hxx>
-#include <QCoreApplication>
-#include <QFile>
-#include <QJsonArray>
-#include <QJsonDocument>
-#include <QJsonObject>
-#include <QSaveFile>
 #include <iostream>
 #include <stdexcept>
 #include <set>
@@ -28,21 +30,20 @@
 namespace {
 using namespace oap;
 
-void writeJson(const QString& path, const QJsonDocument& json)
+void writeJson(const std::string& path, const oap::JsonDocument& json)
 {
-    QSaveFile file(path);
-    const QByteArray data = json.toJson(QJsonDocument::Compact);
-    if (!file.open(QIODevice::WriteOnly) || file.write(data) != data.size() || !file.commit())
+    const std::string data = json.toJson(oap::JsonDocument::Compact);
+    if (!oap::writeFileAtomically(path, data))
         throw std::runtime_error("Cannot save worker result");
 }
 
 void stage(const char* name)
 {
-    std::cout << QJsonDocument(QJsonObject{{"stage", name}}).toJson(QJsonDocument::Compact).constData()
+    std::cout << oap::JsonDocument(oap::JsonObject{{"stage", name}}).toJson(oap::JsonDocument::Compact).c_str()
               << std::endl;
 }
 
-QJsonArray xyz(const gp_Pnt& p)
+oap::JsonArray xyz(const gp_Pnt& p)
 {
     return {p.X(), p.Y(), p.Z()};
 }
@@ -50,13 +51,13 @@ QJsonArray xyz(const gp_Pnt& p)
 void writeMesh(const StepIndexer& index, const TopoDS_Shape& part)
 {
     BRepMesh_IncrementalMesh mesh(part, 0.15);
-    QJsonArray faces;
+    oap::JsonArray faces;
     index.forEachFace([&](const std::string& id, const TopoDS_Face& face) {
         TopLoc_Location location;
         const auto triangles = BRep_Tool::Triangulation(face, location);
         if (triangles.IsNull())
             return;
-        QJsonArray positions, indices;
+        oap::JsonArray positions, indices;
         for (int n = 1; n <= triangles->NbNodes(); ++n) {
             const auto p = triangles->Node(n).Transformed(location.Transformation());
             positions.append(p.X());
@@ -72,10 +73,10 @@ void writeMesh(const StepIndexer& index, const TopoDS_Shape& part)
             indices.append(b - 1);
             indices.append(c - 1);
         }
-        faces.append(QJsonObject{{"id", QString::fromStdString(id)},
+        faces.append(oap::JsonObject{{"id", id},
                                  {"positions", positions}, {"indices", indices}});
     });
-    writeJson("mesh.json", QJsonDocument(faces));
+    writeJson("mesh.json", oap::JsonDocument(faces));
 }
 
 struct Document {
@@ -83,7 +84,7 @@ struct Document {
     ~Document() { if (!value.IsNull()) XCAFApp_Application::GetApplication()->Close(value); }
 };
 
-double positive(const QJsonObject& request, const char* key)
+double positive(const oap::JsonObject& request, const char* key)
 {
     const double value = request.value(key).toDouble();
     if (!(value > 0.0 && value <= 100000.0))
@@ -91,7 +92,7 @@ double positive(const QJsonObject& request, const char* key)
     return value;
 }
 
-QJsonObject generate(const RecognizedHoleGeometry& hole, const QJsonObject& request,
+oap::JsonObject generate(const RecognizedHoleGeometry& hole, const oap::JsonObject& request,
                      const Model& model, toolpath::HoleRapidPlanningContext context,
                      const tooling::ToolLibrary& library)
 {
@@ -131,76 +132,78 @@ QJsonObject generate(const RecognizedHoleGeometry& hole, const QJsonObject& requ
     if (!setup || !setup->valid)
         throw std::runtime_error("No valid work frame for this hole");
     toolpath::GCodeProgramOptions options;
-    options.programName = "OpenAutoPath hole " + request.value("hole").toString().toStdString();
-    options.toolId = bit->id.toStdString();
-    options.toolName = bit->name.toStdString();
+    options.programName = "OpenAutoPath hole " + request.value("hole").toString();
+    options.toolId = bit->id;
+    options.toolName = bit->name;
     if (!toolpath::ToolpathProgramExport().writeGCode(program, batch.effectiveParams,
             setup->machiningSetup(), options, "reference.nc", error))
         throw std::runtime_error(error);
-    QJsonArray segments;
-    QJsonArray operationIds;
+    oap::JsonArray segments;
+    oap::JsonArray operationIds;
     for (const auto& op : program.operations) {
-        operationIds.append(QString::fromStdString(op.operationId));
+        operationIds.append(op.operationId);
         for (const auto& move : op.moves)
-            segments.append(QJsonArray{xyz(move.from), xyz(move.to)});
+            segments.append(oap::JsonArray{xyz(move.from), xyz(move.to)});
     }
-    writeJson("path.json", QJsonDocument(segments));
+    writeJson("path.json", oap::JsonDocument(segments));
     worker::captureProject(request, generated, inputs, frames, library);
-    QJsonArray issues;
+    oap::JsonArray issues;
     for (const auto& issue : batch.validation.issues) {
-        issues.append(QJsonObject{{"code", QString::fromStdString(issue.code)},
-                                  {"message", QString::fromStdString(issue.message)}});
+        issues.append(oap::JsonObject{{"code", issue.code},
+                                  {"message", issue.message}});
     }
-    QJsonArray warnings;
+    oap::JsonArray warnings;
     if (!batch.coverage.complete())
-        warnings.append(QJsonObject{{"line", 0}, {"message", QString::fromStdString(batch.coverage.summary())}});
+        warnings.append(oap::JsonObject{{"line", 0}, {"message", std::string(batch.coverage.summary())}});
     if (!batch.productionSafety.complete())
-        warnings.append(QJsonObject{{"line", 0}, {"message", "刀具装配实体扫掠审计未完成"}});
+        warnings.append(oap::JsonObject{{"line", 0}, {"message", "刀具装配实体扫掠审计未完成"}});
     const auto ncErrors = worker::reviewSingleNc(toolpath::workCoordinateCode(setup->workOffset), bit->name,
                                                  operationIds, warnings);
     return {{"singleNcReview", true}, {"ncErrors", ncErrors}, {"hole", request.value("hole")}, {"tool", bit->name}, {"toolId", bit->id},
             {"feed", params.tool.vertFeed}, {"rpm", params.tool.spindleSpeed},
-            {"validation", QString::fromStdString(batch.validation.summary())}, {"issues", issues},
+            {"validation", std::string(batch.validation.summary())}, {"issues", issues},
             {"coverageComplete", batch.coverage.complete()},
             {"sweepComplete", batch.productionSafety.complete()}, {"moves", segments.size()}};
 }
 
-void run(const QString& fileName)
+void run(const std::string& fileName)
 {
-    QFile file(fileName);
-    if (!file.open(QIODevice::ReadOnly))
-        throw std::runtime_error("Cannot open request");
-    const auto request = QJsonDocument::fromJson(file.readAll()).object();
+    std::string requestBytes, requestError;
+    if (!oap::readFile(fileName, requestBytes, &requestError))
+        throw std::runtime_error(requestError);
+    const auto request = oap::JsonDocument::fromJson(requestBytes).object();
     const auto action = request.value("action").toString();
-    const QStringList projectActions{"project", "rebuild", "simulate", "replay", "stock",
+    static constexpr std::string_view projectActions[]{"project", "rebuild", "simulate", "replay", "stock",
                                      "setups",  "export",  "holes",    "plan"};
-    const bool projectAction = projectActions.contains(action);
+    const bool projectAction = std::ranges::find(projectActions, action) != std::end(projectActions);
     if (request.value("version").toInt() != 1 ||
         (!projectAction && action != "analyze" && action != "generate" && action != "features" &&
          action != "library"))
         throw std::runtime_error("Unsupported worker request");
     tooling::ToolLibrary library;
-    QString libraryError;
-    if (action == "library" && request.contains("document")) {
-        if (!tooling::ToolLibraryStorage::deserializeLibrary(
-                QJsonDocument(request["document"].toObject()).toJson(), library, &libraryError))
-            throw std::runtime_error(libraryError.toStdString());
-    } else if (!tooling::ToolLibraryStorage::loadLibrary(
-                   request["libraryFile"].toString(":/tools/general-simulation.oaptl"), library, &libraryError))
-        throw std::runtime_error(libraryError.toStdString());
+    std::string libraryError;
+    const auto libraryPath = request["libraryFile"].toString();
+    const bool loaded = action == "library" && request.contains("document")
+        ? tooling::ToolLibraryStorage::deserializeLibrary(
+              oap::JsonDocument(request["document"].toObject()).toJson(), library, &libraryError)
+        : libraryPath.empty()
+            ? tooling::ToolLibraryStorage::deserializeLibrary(
+                  std::string(oap::worker::defaultToolLibrary), library, &libraryError)
+            : tooling::ToolLibraryStorage::loadLibrary(libraryPath, library, &libraryError);
+    if (!loaded) throw std::runtime_error(libraryError);
     if (action == "library" || action == "analyze") {
         if (!tooling::ToolLibraryStorage::saveLibrary("library.oaptl", library, &libraryError))
-            throw std::runtime_error(libraryError.toStdString());
+            throw std::runtime_error(libraryError);
     }
     if (action == "library") {
-        writeJson("result.json", QJsonDocument(QJsonObject{{"version", 1}, {"name", library.name()}}));
+        writeJson("result.json", oap::JsonDocument(oap::JsonObject{{"version", 1}, {"name", library.name()}}));
         return;
     }
     stage("analyzing");
     Model model;
     Document document;
     StepIndexer index;
-    const auto report = AnalysisPipeline().execute(request.value("model").toString().toStdString(),
+    const auto report = AnalysisPipeline().execute(request.value("model").toString(),
                                                    document.value, index, model);
     if (!report.ok())
         throw std::runtime_error("STEP analysis failed");
@@ -224,42 +227,42 @@ void run(const QString& fileName)
         context.moldFrame = &frame;
         auto project = worker::processProject(request, index, model, library, frames, context);
         project.insert("version", 1);
-        writeJson("result.json", QJsonDocument(project));
+        writeJson("result.json", oap::JsonDocument(project));
         return;
     }
     const auto geometries = FeatureRecognizer().recognizeHoleGeometries(model, index).geometries;
-    QJsonObject result;
+    oap::JsonObject result;
     if (action == "analyze" || action == "features") {
         const auto trace = worker::traceRegions(model, index, geometries);
         result.insert("features", worker::planningFeatures(trace));
-        QJsonArray throughFaces, axes;
+        oap::JsonArray throughFaces, axes;
         for (const auto &id : std::set<std::string>(trace.throughStructureFaceIds.begin(),
                                                     trace.throughStructureFaceIds.end()))
-            throughFaces.append(QString::fromStdString(id));
+            throughFaces.append(id);
         for (const auto &axis : trace.axisStats)
-            axes.append(QJsonObject{{"axis", QString::fromStdString(axis.axisLabel)},
+            axes.append(oap::JsonObject{{"axis", axis.axisLabel},
                                     {"roots", axis.rootFaceCount},
                                     {"slots", axis.blindSlotPathCount},
                                     {"pockets", axis.blindPocketPathCount},
-                                    {"faces", static_cast<qint64>(axis.traceFaceIds.size())}});
-        result.insert("recognition", QJsonObject{{"throughFaces", throughFaces}, {"axes", axes}});
-        if (!trace.ok()) result.insert("featureError", QString::fromStdString(trace.error));
+                                    {"faces", static_cast<std::int64_t>(axis.traceFaceIds.size())}});
+        result.insert("recognition", oap::JsonObject{{"throughFaces", throughFaces}, {"axes", axes}});
+        if (!trace.ok()) result.insert("featureError", trace.error);
         if (action == "features") {
             result.insert("version", 1);
-            writeJson("result.json", QJsonDocument(result));
+            writeJson("result.json", oap::JsonDocument(result));
             return;
         }
     }
-    QJsonArray holes;
+    oap::JsonArray holes;
     const RecognizedHoleGeometry* selected = nullptr;
     for (const auto& hole : geometries) {
         if (hole.stageWallFaceIds.empty())
             continue;
-        const auto id = QString::fromStdString(hole.stageWallFaceIds.front());
-        QJsonArray faces;
+        const auto id = std::string(hole.stageWallFaceIds.front());
+        oap::JsonArray faces;
         for (const auto& face : hole.sourceFaceIds)
-            faces.append(QString::fromStdString(face));
-        holes.append(QJsonObject{{"id", id},
+            faces.append(face);
+        holes.append(oap::JsonObject{{"id", id},
                                  {"diameter", 2 * hole.radius},
                                  {"depth", hole.depth()},
                                  {"faces", faces},
@@ -273,13 +276,13 @@ void run(const QString& fileName)
         stage("meshing");
         writeMesh(index, part);
         result.insert("holes", holes);
-        QJsonArray units;
-        for(const auto& unit:model.units) units.append(QJsonObject{{"id",QString::fromStdString(unit.unit_id)},
-            {"name",QString::fromStdString(unit.decoded_name)},{"faces",static_cast<int>(unit.face_ids.size())}});
+        oap::JsonArray units;
+        for(const auto& unit:model.units) units.append(oap::JsonObject{{"id",unit.unit_id},
+            {"name",unit.decoded_name},{"faces",static_cast<int>(unit.face_ids.size())}});
         result.insert("units",units);
-        QJsonArray tools;
+        oap::JsonArray tools;
         for (const auto& item : library.assignedTools()) {
-            tools.append(QJsonObject{{"id", item.tool.id}, {"name", item.tool.name},
+            tools.append(oap::JsonObject{{"id", item.tool.id}, {"name", item.tool.name},
                                      {"diameter", item.tool.geometry.diameter},
                                      {"type", tooling::toolTypeId(item.tool.type)}});
         }
@@ -291,17 +294,24 @@ void run(const QString& fileName)
         result = generate(*selected, request, model, context, library);
     }
     result.insert("version", 1);
-    writeJson("result.json", QJsonDocument(result));
+    writeJson("result.json", oap::JsonDocument(result));
 }
 } // namespace
 
+#ifdef _WIN32
+int wmain(int argc, wchar_t** argv)
+#else
 int main(int argc, char** argv)
+#endif
 {
-    QCoreApplication app(argc, argv);
     try {
-        if (app.arguments().size() != 2)
+        if (argc != 2)
             throw std::runtime_error("Usage: oap-worker request.json");
-        run(app.arguments().at(1));
+        #ifdef _WIN32
+        run(oap::pathUtf8(std::filesystem::path(argv[1])));
+#else
+        run(argv[1]);
+#endif
         return 0;
     } catch (const Standard_Failure& failure) {
         std::cerr << failure.GetMessageString() << std::endl;

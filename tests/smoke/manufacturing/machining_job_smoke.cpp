@@ -1,5 +1,10 @@
 // 加工项目快速回归测试：覆盖 IPW 状态链与 Job 的全局工序映射。
 // 测试只构造内存对象，不依赖本地 STEP、刀库或图形环境。
+#include "support/Files.h"
+#include "support/Identity.h"
+#include "analysis/Utf8Path.h"
+#include <filesystem>
+#include "support/Json.h"
 #include "manufacturing/ipw/IpwSession.h"
 #include "manufacturing/ipw/IpwExecutor.h"
 #include "manufacturing/job/MachiningJob.h"
@@ -19,12 +24,6 @@
 #include <XCAFDoc_DocumentTool.hxx>
 #include <XCAFDoc_ShapeTool.hxx>
 
-#include <QDir>
-#include <QFile>
-#include <QJsonArray>
-#include <QJsonDocument>
-#include <QJsonObject>
-#include <QTemporaryDir>
 
 #include <algorithm>
 #include <iostream>
@@ -570,9 +569,9 @@ bool checkpointStoreRejectsConflictingContent()
                   "clear should remove every checkpoint");
 }
 
-QByteArray frozenV1Job()
+std::string frozenV1Job()
 {
-    return QByteArray(R"JSON({
+    return std::string(R"JSON({
   "format": "oap-machining-job",
   "schema_version": 1,
   "job": {
@@ -672,7 +671,7 @@ bool helixPrecisionSurvivesStorageAndChangesExecutionIdentity()
 {
     using namespace oap::manufacturing;
     MachiningJobDefinition definition;
-    QString error;
+    std::string error;
     if (!expect(MachiningJobStorage::deserializeDefinition(
                     frozenV1Job(), definition, &error),
                 "legacy job must load for precision migration test") ||
@@ -692,15 +691,32 @@ bool helixPrecisionSurvivesStorageAndChangesExecutionIdentity()
                   "chord tolerance must participate in hole execution identity");
 }
 
+bool existingSetupConfirmationKeepsItsFingerprint()
+{
+    using namespace oap;
+    manufacturing::PartDefinition part;
+    part.sourceFingerprint = "old-part";
+    manufacturing::SetupDefinition setup;
+    setup.id = "setup-a";
+    setup.setupIndex = 2;
+    setup.face = MoldSetupFace::NegativeY;
+    setup.workOffset = toolpath::WorkCoordinateSystem::G54;
+    setup.origin = {0.0001, 0.0, 25.5};
+    setup.axisMapping = "X+Y+Z+";
+    return expect(manufacturing::MachiningJobStorage::setupInputFingerprint(part, setup) ==
+                  "eee626a78269fa054564ec3649d22642b510920a68067bded13991fb60c26653",
+                  "existing setup confirmations must use the original coordinate fingerprint");
+}
+
 bool jobStorageMigratesAndSavesAtomically()
 {
     namespace manufacturing = oap::manufacturing;
 
     manufacturing::MachiningJobDefinition migrated;
-    QString error;
+    std::string error;
     if (!expect(manufacturing::MachiningJobStorage::deserializeDefinition(
                     frozenV1Job(), migrated, &error),
-                error.toStdString().c_str()) ||
+                error.c_str()) ||
         !expect(migrated.schemaVersion ==
                         manufacturing::kMachiningJobSchemaVersion &&
                     migrated.recognizedHoles.size() == 1 &&
@@ -774,95 +790,95 @@ bool jobStorageMigratesAndSavesAtomically()
     migrated.profileParameters.profile.finishPass = false;
     migrated.profileParameters.profile.radialPassCount = 3;
 
-    const QByteArray v4 =
+    const std::string v4 =
         manufacturing::MachiningJobStorage::serializeDefinition(migrated);
-    const QJsonObject currentRoot = QJsonDocument::fromJson(v4).object();
-    if (!expect(currentRoot.value(QStringLiteral("schema_version")).toInt() == 12 &&
-                    !currentRoot.value(QStringLiteral("job")).toObject()
-                         .contains(QStringLiteral("surface_operations")),
+    const oap::JsonObject currentRoot = oap::JsonDocument::fromJson(v4).object();
+    if (!expect(currentRoot.value(std::string("schema_version")).toInt() == 12 &&
+                    !currentRoot.value(std::string("job")).toObject()
+                         .contains(std::string("surface_operations")),
                 "current schema must omit removed legacy surface operations")) {
         return false;
     }
     // Empty retired fields migrate; authored or malformed manual input never disappears silently.
-    QJsonObject automaticV10 = currentRoot;
-    automaticV10.insert(QStringLiteral("schema_version"), 10);
-    QJsonObject automaticJob = automaticV10.value(QStringLiteral("job")).toObject();
-    automaticJob.insert(QStringLiteral("schema_version"), 10);
-    automaticJob.insert(QStringLiteral("manual_hole_plan"), QJsonObject{
-        {QStringLiteral("version"), 1}, {QStringLiteral("stages"), QJsonArray{}},
-        {QStringLiteral("last_application_sequence"), 0}});
-    QJsonArray automaticOperations = automaticJob.value(QStringLiteral("hole_operations")).toArray();
-    QJsonObject automaticOperation = automaticOperations.at(0).toObject();
-    automaticOperation.insert(QStringLiteral("operation_overrides"),
-        QJsonObject{{QStringLiteral("retract_preference"), 0}});
-    automaticOperation.insert(QStringLiteral("local_batch"), false);
+    oap::JsonObject automaticV10 = currentRoot;
+    automaticV10.insert(std::string("schema_version"), 10);
+    oap::JsonObject automaticJob = automaticV10.value(std::string("job")).toObject();
+    automaticJob.insert(std::string("schema_version"), 10);
+    automaticJob.insert(std::string("manual_hole_plan"), oap::JsonObject{
+        {std::string("version"), 1}, {std::string("stages"), oap::JsonArray{}},
+        {std::string("last_application_sequence"), 0}});
+    oap::JsonArray automaticOperations = automaticJob.value(std::string("hole_operations")).toArray();
+    oap::JsonObject automaticOperation = automaticOperations.at(0).toObject();
+    automaticOperation.insert(std::string("operation_overrides"),
+        oap::JsonObject{{std::string("retract_preference"), 0}});
+    automaticOperation.insert(std::string("local_batch"), false);
     automaticOperations.replace(0, automaticOperation);
-    automaticJob.insert(QStringLiteral("hole_operations"), automaticOperations);
-    automaticV10.insert(QStringLiteral("job"), automaticJob);
+    automaticJob.insert(std::string("hole_operations"), automaticOperations);
+    automaticV10.insert(std::string("job"), automaticJob);
     manufacturing::MachiningJobDefinition restoredAutomatic;
     if (!expect(manufacturing::MachiningJobStorage::deserializeDefinition(
-                    QJsonDocument(automaticV10).toJson(), restoredAutomatic, &error) &&
+                    oap::JsonDocument(automaticV10).toJson(), restoredAutomatic, &error) &&
                     restoredAutomatic.schemaVersion == manufacturing::kMachiningJobSchemaVersion &&
-                    !QJsonDocument::fromJson(manufacturing::MachiningJobStorage::serializeDefinition(restoredAutomatic))
-                        .object().value(QStringLiteral("job")).toObject().contains(QStringLiteral("manual_hole_plan")),
+                    !oap::JsonDocument::fromJson(manufacturing::MachiningJobStorage::serializeDefinition(restoredAutomatic))
+                        .object().value(std::string("job")).toObject().contains(std::string("manual_hole_plan")),
                 "automatic V10 projects must migrate without retired manual fields")) return false;
     for (int invalidCase = 0; invalidCase < 11; ++invalidCase) {
-        QJsonObject rejected = automaticV10;
-        QJsonObject rejectedJob = automaticJob;
+        oap::JsonObject rejected = automaticV10;
+        oap::JsonObject rejectedJob = automaticJob;
         if (invalidCase < 3) {
-            rejectedJob.insert(QStringLiteral("manual_hole_plan"), invalidCase == 0
-                ? QJsonValue(QJsonObject{{QStringLiteral("stages"), QJsonArray{QJsonObject{}}}})
-                : invalidCase == 1 ? QJsonValue(QJsonValue::Null) : QJsonValue(QJsonObject{}));
+            rejectedJob.insert(std::string("manual_hole_plan"), invalidCase == 0
+                ? oap::JsonValue(oap::JsonObject{{std::string("stages"), oap::JsonArray{oap::JsonObject{}}}})
+                : invalidCase == 1 ? oap::JsonValue(oap::JsonValue::Null) : oap::JsonValue(oap::JsonObject{}));
         } else if (invalidCase < 6) {
-            QJsonObject operation = automaticOperation;
-            if (invalidCase == 3) operation.insert(QStringLiteral("operation_overrides"), QJsonObject{{QStringLiteral("feed"), 12}});
-            if (invalidCase == 4) operation.insert(QStringLiteral("operation_overrides"), QJsonValue(QJsonValue::Null));
-            if (invalidCase == 5) operation.insert(QStringLiteral("local_batch"), true);
-            QJsonArray operations = automaticOperations;
+            oap::JsonObject operation = automaticOperation;
+            if (invalidCase == 3) operation.insert(std::string("operation_overrides"), oap::JsonObject{{std::string("feed"), 12}});
+            if (invalidCase == 4) operation.insert(std::string("operation_overrides"), oap::JsonValue(oap::JsonValue::Null));
+            if (invalidCase == 5) operation.insert(std::string("local_batch"), true);
+            oap::JsonArray operations = automaticOperations;
             operations.replace(0, operation);
-            rejectedJob.insert(QStringLiteral("hole_operations"), operations);
+            rejectedJob.insert(std::string("hole_operations"), operations);
         } else if (invalidCase < 8) {
-            QJsonArray controllers = rejectedJob.value(QStringLiteral("tool_controllers")).toArray();
-            QJsonObject controller = controllers.at(0).toObject();
-            controller.insert(QStringLiteral("manual"), invalidCase == 6 ? QJsonValue(true) : QJsonValue(QStringLiteral("invalid")));
+            oap::JsonArray controllers = rejectedJob.value(std::string("tool_controllers")).toArray();
+            oap::JsonObject controller = controllers.at(0).toObject();
+            controller.insert(std::string("manual"), invalidCase == 6 ? oap::JsonValue(true) : oap::JsonValue(std::string("invalid")));
             controllers.replace(0, controller);
-            rejectedJob.insert(QStringLiteral("tool_controllers"), controllers);
+            rejectedJob.insert(std::string("tool_controllers"), controllers);
         } else if (invalidCase < 10) {
-            QJsonObject operation = automaticOperation;
-            operation.insert(QStringLiteral("operation_overrides"), QJsonObject{
-                {QStringLiteral("retract_preference"), invalidCase == 8 ? QJsonValue(1) : QJsonValue(QStringLiteral("0"))}});
-            QJsonArray operations = automaticOperations;
+            oap::JsonObject operation = automaticOperation;
+            operation.insert(std::string("operation_overrides"), oap::JsonObject{
+                {std::string("retract_preference"), invalidCase == 8 ? oap::JsonValue(1) : oap::JsonValue(std::string("0"))}});
+            oap::JsonArray operations = automaticOperations;
             operations.replace(0, operation);
-            rejectedJob.insert(QStringLiteral("hole_operations"), operations);
+            rejectedJob.insert(std::string("hole_operations"), operations);
         } else {
-            QJsonArray controllers = rejectedJob.value(QStringLiteral("tool_controllers")).toArray();
-            QJsonObject controller = controllers.at(0).toObject();
-            QJsonObject tool = controller.value(QStringLiteral("tool")).toObject();
-            tool.insert(QStringLiteral("valid"), false);
-            controller.insert(QStringLiteral("tool"), tool);
+            oap::JsonArray controllers = rejectedJob.value(std::string("tool_controllers")).toArray();
+            oap::JsonObject controller = controllers.at(0).toObject();
+            oap::JsonObject tool = controller.value(std::string("tool")).toObject();
+            tool.insert(std::string("valid"), false);
+            controller.insert(std::string("tool"), tool);
             controllers.replace(0, controller);
-            rejectedJob.insert(QStringLiteral("tool_controllers"), controllers);
+            rejectedJob.insert(std::string("tool_controllers"), controllers);
         }
-        rejected.insert(QStringLiteral("job"), rejectedJob);
+        rejected.insert(std::string("job"), rejectedJob);
         auto unchanged = migrated;
         if (!expect(!manufacturing::MachiningJobStorage::deserializeDefinition(
-                        QJsonDocument(rejected).toJson(), unchanged, &error) && !error.isEmpty() &&
+                        oap::JsonDocument(rejected).toJson(), unchanged, &error) && !error.empty() &&
                         manufacturing::MachiningJobStorage::serializeDefinition(unchanged) == v4,
                     "removed manual input must fail atomically with an explanatory error")) return false;
     }
     for (const int legacyVersion : {8, 9}) {
       for (const bool withEmptyArray : {false, true}) {
-        QJsonObject legacyRoot = currentRoot;
-        legacyRoot.insert(QStringLiteral("schema_version"), legacyVersion);
-        QJsonObject legacyJob = legacyRoot.value(QStringLiteral("job")).toObject();
-        legacyJob.insert(QStringLiteral("schema_version"), legacyVersion);
-        legacyJob.remove(QStringLiteral("surface_finishing_operations"));
+        oap::JsonObject legacyRoot = currentRoot;
+        legacyRoot.insert(std::string("schema_version"), legacyVersion);
+        oap::JsonObject legacyJob = legacyRoot.value(std::string("job")).toObject();
+        legacyJob.insert(std::string("schema_version"), legacyVersion);
+        legacyJob.remove(std::string("surface_finishing_operations"));
         if (withEmptyArray)
-            legacyJob.insert(QStringLiteral("surface_operations"), QJsonArray{});
-        legacyRoot.insert(QStringLiteral("job"), legacyJob);
+            legacyJob.insert(std::string("surface_operations"), oap::JsonArray{});
+        legacyRoot.insert(std::string("job"), legacyJob);
         manufacturing::MachiningJobDefinition restored;
         if (!expect(manufacturing::MachiningJobStorage::deserializeDefinition(
-                        QJsonDocument(legacyRoot).toJson(), restored, &error) &&
+                        oap::JsonDocument(legacyRoot).toJson(), restored, &error) &&
                         restored.schemaVersion == manufacturing::kMachiningJobSchemaVersion &&
                         restored.holeOperations.size() == migrated.holeOperations.size() &&
                         restored.pocketOperations.size() == migrated.pocketOperations.size() &&
@@ -872,22 +888,22 @@ bool jobStorageMigratesAndSavesAtomically()
         }
       }
     }
-    const std::vector<QJsonValue> removedSurfaceValues{
-        QJsonArray{QJsonObject{{QStringLiteral("id"), QStringLiteral("legacy-surface")}}},
-        QJsonObject{}, QJsonValue(QJsonValue::Null), QStringLiteral("invalid")};
+    const std::vector<oap::JsonValue> removedSurfaceValues{
+        oap::JsonArray{oap::JsonObject{{std::string("id"), std::string("legacy-surface")}}},
+        oap::JsonObject{}, oap::JsonValue(oap::JsonValue::Null), std::string("invalid")};
     for (const int version : {8, 9}) {
-        for (const QJsonValue& surfaceValue : removedSurfaceValues) {
-            QJsonObject rejectedRoot = currentRoot;
-            rejectedRoot.insert(QStringLiteral("schema_version"), version);
-            QJsonObject rejectedJob = rejectedRoot.value(QStringLiteral("job")).toObject();
-            rejectedJob.insert(QStringLiteral("schema_version"), version);
-            rejectedJob.insert(QStringLiteral("surface_operations"), surfaceValue);
-            rejectedRoot.insert(QStringLiteral("job"), rejectedJob);
+        for (const oap::JsonValue& surfaceValue : removedSurfaceValues) {
+            oap::JsonObject rejectedRoot = currentRoot;
+            rejectedRoot.insert(std::string("schema_version"), version);
+            oap::JsonObject rejectedJob = rejectedRoot.value(std::string("job")).toObject();
+            rejectedJob.insert(std::string("schema_version"), version);
+            rejectedJob.insert(std::string("surface_operations"), surfaceValue);
+            rejectedRoot.insert(std::string("job"), rejectedJob);
             manufacturing::MachiningJobDefinition unchanged = migrated;
             error.clear();
             if (!expect(!manufacturing::MachiningJobStorage::deserializeDefinition(
-                            QJsonDocument(rejectedRoot).toJson(), unchanged, &error) &&
-                            error.contains(QStringLiteral("曲面加工模块已移除")) &&
+                            oap::JsonDocument(rejectedRoot).toJson(), unchanged, &error) &&
+                            error.find("曲面加工模块已移除") != std::string::npos &&
                             manufacturing::MachiningJobStorage::serializeDefinition(unchanged) == v4,
                         "removed or malformed surface operations must fail without replacing the active definition")) {
                 return false;
@@ -896,12 +912,12 @@ bool jobStorageMigratesAndSavesAtomically()
     }
 
     for (const int legacyVersion : {2, 3, 4}) {
-        QJsonObject root = QJsonDocument::fromJson(v4).object();
-        root.insert(QStringLiteral("schema_version"), legacyVersion);
-        QJsonObject job = root.value(QStringLiteral("job")).toObject();
-        job.insert(QStringLiteral("schema_version"), legacyVersion);
-        root.insert(QStringLiteral("job"), job);
-        const QByteArray versioned = QJsonDocument(root).toJson();
+        oap::JsonObject root = oap::JsonDocument::fromJson(v4).object();
+        root.insert(std::string("schema_version"), legacyVersion);
+        oap::JsonObject job = root.value(std::string("job")).toObject();
+        job.insert(std::string("schema_version"), legacyVersion);
+        root.insert(std::string("job"), job);
+        const std::string versioned = oap::JsonDocument(root).toJson();
         manufacturing::MachiningJobDefinition loaded;
         error.clear();
         if (!expect(
@@ -964,67 +980,67 @@ bool jobStorageMigratesAndSavesAtomically()
                                 .restMachiningPreviousToolDiameter -
                             12.0) < 1.0e-9,
                 "V2-V4 documents should normalize to the current schema")) {
-            if (!error.isEmpty())
-                std::cerr << error.toStdString() << '\n';
+            if (!error.empty())
+                std::cerr << error << '\n';
             return false;
         }
     }
 
     // V5 已有 Profile 工序，但没有多刀余料字段；迁移时应恢复为
     // “单刀全量 + 保留精修”的旧行为。
-    QJsonObject legacyV5Root = QJsonDocument::fromJson(v4).object();
-    legacyV5Root.insert(QStringLiteral("schema_version"), 5);
-    QJsonObject legacyV5Job =
-        legacyV5Root.value(QStringLiteral("job")).toObject();
-    legacyV5Job.insert(QStringLiteral("schema_version"), 5);
-    QJsonArray legacyV5Profiles = legacyV5Job.value(
-        QStringLiteral("profile_operations")).toArray();
-    QJsonObject legacyV5Profile = legacyV5Profiles.at(0).toObject();
+    oap::JsonObject legacyV5Root = oap::JsonDocument::fromJson(v4).object();
+    legacyV5Root.insert(std::string("schema_version"), 5);
+    oap::JsonObject legacyV5Job =
+        legacyV5Root.value(std::string("job")).toObject();
+    legacyV5Job.insert(std::string("schema_version"), 5);
+    oap::JsonArray legacyV5Profiles = legacyV5Job.value(
+        std::string("profile_operations")).toArray();
+    oap::JsonObject legacyV5Profile = legacyV5Profiles.at(0).toObject();
     legacyV5Profile.remove(
-        QStringLiteral("rest_previous_tool_diameter"));
-    legacyV5Profile.remove(QStringLiteral("finish_pass"));
+        std::string("rest_previous_tool_diameter"));
+    legacyV5Profile.remove(std::string("finish_pass"));
     legacyV5Profiles.replace(0, legacyV5Profile);
     legacyV5Job.insert(
-        QStringLiteral("profile_operations"), legacyV5Profiles);
-    legacyV5Root.insert(QStringLiteral("job"), legacyV5Job);
+        std::string("profile_operations"), legacyV5Profiles);
+    legacyV5Root.insert(std::string("job"), legacyV5Job);
     manufacturing::MachiningJobDefinition migratedV5;
     if (!expect(
             manufacturing::MachiningJobStorage::deserializeDefinition(
-                QJsonDocument(legacyV5Root).toJson(), migratedV5, &error) &&
+                oap::JsonDocument(legacyV5Root).toJson(), migratedV5, &error) &&
                 migratedV5.profileOperations.size() == 1 &&
                 migratedV5.profileOperations.front()
                         .restMachiningPreviousToolDiameter == 0.0 &&
                 migratedV5.profileOperations.front().finishPass,
             "a V5 profile operation should migrate to single-tool defaults")) {
-        if (!error.isEmpty())
-            std::cerr << error.toStdString() << '\n';
+        if (!error.empty())
+            std::cerr << error << '\n';
         return false;
     }
 
     // 真实 V4 文档不含 Profile 字段；迁移到当前版本时必须保留旧槽腔参数并
     // 让新工序族保持空定义，不能把缺字段判为损坏。
-    QJsonObject legacyV4Root = QJsonDocument::fromJson(v4).object();
-    legacyV4Root.insert(QStringLiteral("format"), QStringLiteral("faceface-machining-job"));
-    legacyV4Root.insert(QStringLiteral("schema_version"), 4);
-    QJsonObject legacyV4Job =
-        legacyV4Root.value(QStringLiteral("job")).toObject();
-    legacyV4Job.insert(QStringLiteral("schema_version"), 4);
-    legacyV4Job.remove(QStringLiteral("profile_parameters"));
-    legacyV4Job.remove(QStringLiteral("profile_operations"));
-    legacyV4Root.insert(QStringLiteral("job"), legacyV4Job);
+    oap::JsonObject legacyV4Root = oap::JsonDocument::fromJson(v4).object();
+    legacyV4Root.insert(std::string("format"), std::string("faceface-machining-job"));
+    legacyV4Root.insert(std::string("schema_version"), 4);
+    oap::JsonObject legacyV4Job =
+        legacyV4Root.value(std::string("job")).toObject();
+    legacyV4Job.insert(std::string("schema_version"), 4);
+    legacyV4Job.remove(std::string("profile_parameters"));
+    legacyV4Job.remove(std::string("profile_operations"));
+    legacyV4Root.insert(std::string("job"), legacyV4Job);
     manufacturing::MachiningJobDefinition migratedV4;
     if (!expect(
             manufacturing::MachiningJobStorage::deserializeDefinition(
-                QJsonDocument(legacyV4Root).toJson(), migratedV4, &error) &&
+                oap::JsonDocument(legacyV4Root).toJson(), migratedV4, &error) &&
                 migratedV4.profileOperations.empty() &&
-                QJsonDocument::fromJson(manufacturing::MachiningJobStorage::serializeDefinition(migratedV4))
-                    .object().value(QStringLiteral("format")).toString() ==
-                    QStringLiteral("oap-machining-job") &&
+                oap::JsonDocument::fromJson(manufacturing::MachiningJobStorage::serializeDefinition(migratedV4))
+                    .object().value(std::string("format")).toString() ==
+                    std::string("oap-machining-job") &&
                 migratedV4.profileParameters.clearing.entryMode ==
                     migratedV4.pocketParameters.clearing.entryMode,
             "a genuine V4 document should migrate with an empty Profile family")) {
-        if (!error.isEmpty())
-            std::cerr << error.toStdString() << '\n';
+        if (!error.empty())
+            std::cerr << error << '\n';
         return false;
     }
 
@@ -1032,7 +1048,7 @@ bool jobStorageMigratesAndSavesAtomically()
     stale.setups.front().confirmation.confirmed = true;
     stale.setups.front().confirmation.confirmedInputFingerprint =
         manufacturing::MachiningJobStorage::setupInputFingerprint(
-            stale.part, stale.setups.front()).toStdString();
+            stale.part, stale.setups.front());
     stale.part.sourceFingerprint = "changed-part-fingerprint";
     stale.holeOperations.front().state =
         manufacturing::JobOperationState::Generated;
@@ -1049,22 +1065,26 @@ bool jobStorageMigratesAndSavesAtomically()
         return false;
     }
 
-    QTemporaryDir directory;
-    if (!expect(directory.isValid(),
+    struct TestDirectory {
+        std::filesystem::path path = std::filesystem::temp_directory_path() /
+                                     ("oap-test-" + oap::randomUuid());
+        ~TestDirectory()
+        {
+            std::error_code ignored;
+            std::filesystem::remove_all(path, ignored);
+        }
+    } directory;
+    if (!expect(std::filesystem::create_directory(directory.path),
                 "the Job storage test directory should be available")) {
         return false;
     }
-    const QString path = directory.filePath(QStringLiteral("job.oapjob"));
-    QFile sentinel(path);
-    if (!sentinel.open(QIODevice::WriteOnly) ||
-        sentinel.write("old-content") != 11) {
+    const auto path = oap::pathUtf8(directory.path / "job.oapjob");
+    if (!oap::writeFileAtomically(path, "old-content"))
         return expect(false, "the pre-existing Job file should be writable");
-    }
-    sentinel.close();
 
     if (!expect(manufacturing::MachiningJobStorage::save(
                     path, migrated, &error),
-                error.toStdString().c_str())) {
+                error.c_str())) {
         return false;
     }
     manufacturing::MachiningJobDefinition loaded;
@@ -1077,10 +1097,10 @@ bool jobStorageMigratesAndSavesAtomically()
                 "an atomically saved Job should round-trip unchanged")) {
         return false;
     }
-    const QStringList files = QDir(directory.path()).entryList(
-        QDir::Files | QDir::NoDotAndDotDot);
-    return expect(files == QStringList{QStringLiteral("job.oapjob")},
-                  "QSaveFile should not leave a temporary sibling behind");
+    const std::filesystem::directory_iterator first(directory.path), end;
+    return expect(first != end && first->path().filename() == "job.oapjob" &&
+                  std::next(first) == end,
+                  "atomic writes should not leave a temporary sibling behind");
 }
 
 bool jobApplicationServiceSynchronizesSetupsAndStates()
@@ -1213,7 +1233,8 @@ bool jobApplicationServiceSynchronizesSetupsAndStates()
 
 int main()
 {
-    const bool ok = helixPrecisionSurvivesStorageAndChangesExecutionIdentity() &&
+    const bool ok = existingSetupConfirmationKeepsItsFingerprint() &&
+                    helixPrecisionSurvivesStorageAndChangesExecutionIdentity() &&
                     ipwSessionInvalidatesOnlyChangedSuffix() &&
                     machiningJobBuildsSharedGlobalPlan() &&
                     profileExecutorPublishesMaterialCheckpoint() &&

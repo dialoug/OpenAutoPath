@@ -1,3 +1,5 @@
+#include <format>
+#include <string>
 #include "tooling/adapter/profile/ProfileAutomaticToolpath.h"
 #include "toolpath/core/ToolpathParallel.h"
 #include "toolpath/pocket/simulation/PocketCamSimulationScene.h"
@@ -73,7 +75,7 @@ oap::toolpath::ProfileRegion lShapedExternalProfile()
 void addTool(
     oap::tooling::ToolLibrary& library,
     int toolNumber,
-    const QString& id,
+    const std::string& id,
     double diameter,
     oap::tooling::ToolType type = oap::tooling::ToolType::EndMill,
     double cornerRadius = 0.0,
@@ -82,17 +84,16 @@ void addTool(
 {
     oap::tooling::ToolBit tool;
     tool.id = id;
-    tool.name = QStringLiteral("T%1 D%2")
-        .arg(toolNumber).arg(diameter);
+    tool.name = std::format("T{0} D{1}", toolNumber, diameter);
     tool.type = type;
     tool.geometry.diameter = diameter;
     tool.geometry.cornerRadius = cornerRadius;
     tool.geometry.cuttingEdgeLength = cuttingLength;
     tool.geometry.overallLength = overallLength;
-    QString error;
+    std::string error;
     if (!library.upsertTool(tool, &error)) {
         std::cerr << "FAIL: could not add profile test tool: "
-                  << error.toStdString() << '\n';
+                  << error << '\n';
         return;
     }
     oap::tooling::LibraryToolSlot slot;
@@ -103,7 +104,7 @@ void addTool(
     slot.cuttingDefaults.verticalFeed = 150.0 + toolNumber;
     if (!library.assignToolToSlot(slot, &error)) {
         std::cerr << "FAIL: could not assign profile test tool: "
-                  << error.toStdString() << '\n';
+                  << error << '\n';
     }
 }
 
@@ -206,13 +207,13 @@ bool sameAutomaticProgram(
 bool selectsLargeToolThenSmallRestTool()
 {
     oap::tooling::ToolLibrary library(
-        QStringLiteral("profile-auto-test"),
-        QStringLiteral("Profile Automatic Test"));
-    addTool(library, 1, QStringLiteral("flat-20"), 20.0);
-    addTool(library, 2, QStringLiteral("flat-4"), 4.0);
+        std::string("profile-auto-test"),
+        std::string("Profile Automatic Test"));
+    addTool(library, 1, std::string("flat-20"), 20.0);
+    addTool(library, 2, std::string("flat-4"), 4.0);
     // 钻头不能进入外轮廓铣削候选集。
     addTool(
-        library, 3, QStringLiteral("drill-2"), 2.0,
+        library, 3, std::string("drill-2"), 2.0,
         oap::tooling::ToolType::Drill, 0.0);
 
     const auto result = oap::tooling::ProfileAutomaticToolpath().generate(
@@ -324,9 +325,9 @@ bool selectsLargeToolThenSmallRestTool()
 bool reportsConcreteSmallestToolFailure()
 {
     oap::tooling::ToolLibrary library(
-        QStringLiteral("profile-auto-failure-test"),
-        QStringLiteral("Profile Automatic Failure Test"));
-    addTool(library, 7, QStringLiteral("flat-4-failure"), 4.0);
+        std::string("profile-auto-failure-test"),
+        std::string("Profile Automatic Failure Test"));
+    addTool(library, 7, std::string("flat-4-failure"), 4.0);
 
     oap::toolpath::ProfileRegion region = lShapedExternalProfile();
     // 毛坯与成品边界完全重合，没有可供外轮廓粗加工去除的材料。
@@ -355,12 +356,12 @@ bool reportsConcreteSmallestToolFailure()
 bool reusesMaterialSectionsAcrossAutomaticStages()
 {
     oap::tooling::ToolLibrary library(
-        QStringLiteral("profile-auto-cache-test"),
-        QStringLiteral("Profile Automatic Cache Test"));
-    addTool(library, 11, QStringLiteral("flat-10-cache"), 10.0);
-    addTool(library, 12, QStringLiteral("flat-8-cache"), 8.0);
-    addTool(library, 13, QStringLiteral("flat-6-cache"), 6.0);
-    addTool(library, 14, QStringLiteral("flat-4-cache"), 4.0);
+        std::string("profile-auto-cache-test"),
+        std::string("Profile Automatic Cache Test"));
+    addTool(library, 11, std::string("flat-10-cache"), 10.0);
+    addTool(library, 12, std::string("flat-8-cache"), 8.0);
+    addTool(library, 13, std::string("flat-6-cache"), 6.0);
+    addTool(library, 14, std::string("flat-4-cache"), 4.0);
 
     oap::toolpath::ProfileRegion region;
     region.openDir = gp_Dir(0.0, 0.0, 1.0);
@@ -487,12 +488,12 @@ bool reusesMaterialSectionsAcrossAutomaticStages()
 bool parallelEvaluationPreservesSerialProgram()
 {
     oap::tooling::ToolLibrary library(
-        QStringLiteral("profile-auto-parallel-test"),
-        QStringLiteral("Profile Automatic Parallel Test"));
-    addTool(library, 31, QStringLiteral("flat-20-parallel"), 20.0);
-    addTool(library, 32, QStringLiteral("flat-10-parallel"), 10.0);
-    addTool(library, 33, QStringLiteral("flat-6-parallel"), 6.0);
-    addTool(library, 34, QStringLiteral("flat-4-parallel"), 4.0);
+        std::string("profile-auto-parallel-test"),
+        std::string("Profile Automatic Parallel Test"));
+    addTool(library, 31, std::string("flat-20-parallel"), 20.0);
+    addTool(library, 32, std::string("flat-10-parallel"), 10.0);
+    addTool(library, 33, std::string("flat-6-parallel"), 6.0);
+    addTool(library, 34, std::string("flat-4-parallel"), 4.0);
 
     oap::toolpath::ToolpathGenerationControl serialControl;
     serialControl.tryAcquireParallelWorkers =
@@ -557,15 +558,15 @@ bool parallelEvaluationPreservesSerialProgram()
 bool prunesLargeToolLibraryWithStableLatency()
 {
     oap::tooling::ToolLibrary library(
-        QStringLiteral("profile-auto-large-library-test"),
-        QStringLiteral("Profile Automatic Large Library Test"));
+        std::string("profile-auto-large-library-test"),
+        std::string("Profile Automatic Large Library Test"));
     const std::vector<double> diameters = {
         24.0, 20.0, 18.0, 16.0, 14.0, 12.0,
         10.0, 8.0, 7.0, 6.0, 5.0, 4.0};
     for (std::size_t index = 0u; index < diameters.size(); ++index) {
         addTool(
             library, 60 + static_cast<int>(index),
-            QStringLiteral("flat-large-library-%1").arg(index),
+            std::format("flat-large-library-{0}", index),
             diameters[index]);
     }
     const auto region = lShapedExternalProfile();
@@ -634,12 +635,12 @@ bool prunesLargeToolLibraryWithStableLatency()
 bool cancelsInsideParallelEvaluationBatch()
 {
     oap::tooling::ToolLibrary library(
-        QStringLiteral("profile-auto-parallel-cancel-test"),
-        QStringLiteral("Profile Automatic Parallel Cancel Test"));
-    addTool(library, 41, QStringLiteral("flat-20-cancel"), 20.0);
-    addTool(library, 42, QStringLiteral("flat-10-cancel"), 10.0);
-    addTool(library, 43, QStringLiteral("flat-6-cancel"), 6.0);
-    addTool(library, 44, QStringLiteral("flat-4-cancel"), 4.0);
+        std::string("profile-auto-parallel-cancel-test"),
+        std::string("Profile Automatic Parallel Cancel Test"));
+    addTool(library, 41, std::string("flat-20-cancel"), 20.0);
+    addTool(library, 42, std::string("flat-10-cancel"), 10.0);
+    addTool(library, 43, std::string("flat-6-cancel"), 6.0);
+    addTool(library, 44, std::string("flat-4-cancel"), 4.0);
 
     std::atomic_size_t progressCount{0u};
     std::atomic_bool cancel{false};
@@ -677,12 +678,12 @@ bool cancelsInsideParallelEvaluationBatch()
 bool replansAfterSelectedSafetyFailure()
 {
     oap::tooling::ToolLibrary library(
-        QStringLiteral("profile-auto-replan-test"),
-        QStringLiteral("Profile Automatic Replan Test"));
-    addTool(library, 21, QStringLiteral("flat-20-collision"), 20.0);
-    addTool(library, 22, QStringLiteral("flat-4-safe"), 4.0);
+        std::string("profile-auto-replan-test"),
+        std::string("Profile Automatic Replan Test"));
+    addTool(library, 21, std::string("flat-20-collision"), 20.0);
+    addTool(library, 22, std::string("flat-4-safe"), 4.0);
     oap::tooling::ToolBit* large =
-        library.toolById(QStringLiteral("flat-20-collision"));
+        library.toolById(std::string("flat-20-collision"));
     if (!expect(large != nullptr,
                 "replan fixture should expose its large cutter")) {
         return false;
@@ -723,9 +724,9 @@ bool replansAfterSelectedSafetyFailure()
 bool separatesDirectionAndDepthRequirements()
 {
     oap::tooling::ToolLibrary library;
-    addTool(library, 1, QStringLiteral("short-small"), 5.0,
+    addTool(library, 1, std::string("short-small"), 5.0,
         oap::tooling::ToolType::EndMill, 0.0, 2.0, 3.0);
-    addTool(library, 2, QStringLiteral("long-large"), 10.0);
+    addTool(library, 2, std::string("long-large"), 10.0);
     auto top = lShapedExternalProfile();
     top.source.rootFaceId = "shallow-top";
     auto side = top;
@@ -768,10 +769,10 @@ bool separatesDirectionAndDepthRequirements()
 bool retriesLargerValidatedFinishingTool()
 {
     oap::tooling::ToolLibrary library;
-    addTool(library, 51, QStringLiteral("safe-large"), 20.0);
+    addTool(library, 51, std::string("safe-large"), 20.0);
     auto referenceLibrary = library;
-    addTool(library, 52, QStringLiteral("unsafe-small"), 4.0);
-    auto* small = library.toolById(QStringLiteral("unsafe-small"));
+    addTool(library, 52, std::string("unsafe-small"), 4.0);
+    auto* small = library.toolById(std::string("unsafe-small"));
     small->geometry.cuttingEdgeLength = 2.0;
     small->geometry.overallLength = 2.0;
     small->geometry.holderDiameter = 80.0;
@@ -799,7 +800,7 @@ bool acceptsRoundedMillingTools()
         oap::tooling::ToolLibrary library;
         const double radius = type == oap::tooling::ToolType::BallEndMill ? 2.0 : 0.5;
         // Ball libraries may leave the derived radius at zero.
-        addTool(library, 1, QStringLiteral("rounded"), 4.0, type,
+        addTool(library, 1, std::string("rounded"), 4.0, type,
             type == oap::tooling::ToolType::BallEndMill ? 0.0 : radius);
         auto result = oap::tooling::ProfileAutomaticToolpath().generate(
             library, {lShapedExternalProfile()}, externalClearingParams(), "ROUNDED_");
@@ -807,22 +808,22 @@ bool acceptsRoundedMillingTools()
                 "rounded milling tool should generate: " + result.error)) return false;
         for (const auto& operation : result.batch.operations)
             if (!expect(operation.tool.cornerRadius == radius &&
-                        operation.tool.toolType == oap::tooling::toolTypeId(type).toStdString(),
+                        operation.tool.toolType == oap::tooling::toolTypeId(type),
                     "rounded cutter geometry was flattened")) return false;
         if (!expect(std::any_of(result.batch.diagnostics.begin(), result.batch.diagnostics.end(),
                 [](const auto& diagnostic) { return diagnostic.code ==
                     oap::toolpath::ToolpathDiagnosticCode::RoundedCutterResidual; }),
                 "rounded cutter must report possible residual material")) return false;
         // A same-diameter flat tool has fuller floor coverage even with a larger T number.
-        addTool(library, 2, QStringLiteral("flat"), 4.0);
+        addTool(library, 2, std::string("flat"), 4.0);
         result = oap::tooling::ProfileAutomaticToolpath().generate(
             library, {lShapedExternalProfile()}, externalClearingParams(), "SAME_DIAMETER_");
         if (!expect(result.ok() && result.batch.operations.front().tool.toolNumber == 2,
                 "same-diameter preference should preserve fuller floor coverage")) return false;
         oap::tooling::ToolLibrary roundedChain;
-        addTool(roundedChain, 1, QStringLiteral("large-rounded"), 12.0, type,
+        addTool(roundedChain, 1, std::string("large-rounded"), 12.0, type,
             type == oap::tooling::ToolType::BallEndMill ? 6.0 : 1.0);
-        addTool(roundedChain, 2, QStringLiteral("small-rounded"), 4.0, type, radius);
+        addTool(roundedChain, 2, std::string("small-rounded"), 4.0, type, radius);
         const auto chain = oap::tooling::ProfileAutomaticToolpath().generate(
             roundedChain, {lShapedExternalProfile()}, externalClearingParams(), "ROUNDED_CHAIN_");
         if (!expect(chain.ok(), "rounded chain failed: " + chain.error)) return false;
@@ -840,7 +841,7 @@ int main()
     if (!acceptsRoundedMillingTools()) return 1;
     {
         oap::tooling::ToolLibrary library("unknown-reach", "Unknown reach");
-        addTool(library, 1, QStringLiteral("unknown-length"), 5.0,
+        addTool(library, 1, std::string("unknown-length"), 5.0,
                 oap::tooling::ToolType::EndMill, 0.0, 20.0, 0.0);
         if (!expect(!oap::tooling::ProfileAutomaticToolpath::hasCandidateTool(
                 library, lShapedExternalProfile(), externalClearingParams()),

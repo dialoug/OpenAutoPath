@@ -285,7 +285,7 @@ private:
 
 // 完整识别入口：构建 compound + AAG -> 运行孔识别 -> 经 faceIdOf 反查
 // "F<n>" 面 id -> 生成 instances / holeGeometries -> 去重并重建派生数据。
-// 全程 try/catch 兜底，退化拓扑的异常不会冒泡到 Qt 事件循环。
+// 全程 try/catch 兜底，退化拓扑的异常不会中断识别任务。
 RecognitionResult FeatureRecognizer::recognize(const Model& model,
                                                const StepIndexer& indexer) {
     RecognitionResult out;
@@ -293,7 +293,7 @@ RecognitionResult FeatureRecognizer::recognize(const Model& model,
     // 构建 compound 与 AAG 邻接图。这一前置阶段同样会做 OCCT 拓扑遍历
     // (TopExp::MapShapesAndAncestors 等),退化/非流形 STEP 数据可能抛
     // Standard_Failure —— 必须与下方孔/槽识别一样兜底,否则异常会冒泡到
-    // Qt 事件循环触发 abort 弹窗(GUI 的三个识别入口都经此路径)。
+    // 中断调用方的识别任务。
     HoleRecognitionSession session;
     try {
         session.build(model, indexer);
@@ -316,7 +316,7 @@ RecognitionResult FeatureRecognizer::recognize(const Model& model,
 
     // 当前自动识别仅保留孔：把孔涉及的面按通/盲/沉细分标记。
     // 整体用 try/catch 兜底:大模型的退化拓扑可能让识别算法抛 OCCT/STL 异常,
-    // 不能让它冒泡到 Qt 事件循环触发 abort 弹窗 —— 失败时返回已识别的部分。
+    // 失败时返回已识别的部分。
     try {
         const std::vector<HoleResult>& holes =
             session.holes(model, indexer);

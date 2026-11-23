@@ -1,4 +1,6 @@
 // 纯孔几何 -> 显式加工决策 -> 当前加工输入的映射契约。
+#include <vector>
+#include <string>
 #include "tooling/adapter/hole/HoleMachiningInputMapper.h"
 #include "tooling/adapter/hole/HoleToolSelectionPlanner.h"
 #include "tooling/adapter/AssignedToolContext.h"
@@ -108,10 +110,10 @@ bool unresolvedStateNeverDefaultsSilently()
 oap::tooling::ToolLibrary drillLibrary()
 {
     oap::tooling::ToolLibrary library(
-        QStringLiteral("dto-test"), QStringLiteral("DTO test"));
+        std::string("dto-test"), std::string("DTO test"));
     oap::tooling::ToolBit drill;
-    drill.id = QStringLiteral("drill-5");
-    drill.name = QStringLiteral("D5 drill");
+    drill.id = std::string("drill-5");
+    drill.name = std::string("D5 drill");
     drill.type = oap::tooling::ToolType::Drill;
     drill.geometry.diameter = 5.0;
     drill.geometry.cuttingEdgeLength = 20.0;
@@ -127,7 +129,7 @@ oap::tooling::ToolLibrary drillLibrary()
 
     oap::tooling::LibraryToolSlot slot;
     slot.toolNumber = 5;
-    slot.toolId = QStringLiteral("drill-5");
+    slot.toolId = std::string("drill-5");
     slot.cuttingDefaults.verticalFeed = 100.0;
     slot.cuttingDefaults.horizontalFeed = 200.0;
     slot.cuttingDefaults.spindleSpeed = 3000.0;
@@ -143,7 +145,7 @@ oap::tooling::ToolLibrary drillLibrary()
 bool assignedToolCreatesIndependentCamSnapshot()
 {
     oap::tooling::ToolLibrary library = drillLibrary();
-    QVector<oap::tooling::AssignedTool> assigned = library.assignedTools();
+    std::vector<oap::tooling::AssignedTool> assigned = library.assignedTools();
     if (!expect(assigned.size() == 1,
                 "the test library should expose one occupied T slot")) {
         return false;

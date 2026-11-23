@@ -104,7 +104,7 @@ oap::manufacturing::SetupDefinition setup(
     result.confirmation.confirmedAt = "2026-08-24T00:00:00Z";
     result.confirmation.confirmedInputFingerprint =
         oap::manufacturing::MachiningJobStorage::setupInputFingerprint(
-            part, result).toStdString();
+            part, result);
     return result;
 }
 
@@ -228,7 +228,7 @@ oap::manufacturing::MachiningJob validJob()
     job.setHoleResult(
         std::move(holeBatch),
         manufacturing::MachiningJobStorage::holeExecutionFingerprint(
-            definition).toStdString());
+            definition));
 
     toolpath::PocketToolpathBatch pocketBatch;
     toolpath::PocketToolpathOperation pocketOperation;
@@ -246,7 +246,7 @@ oap::manufacturing::MachiningJob validJob()
     job.setPocketResult(
         std::move(pocketBatch),
         manufacturing::MachiningJobStorage::pocketExecutionFingerprint(
-            definition).toStdString());
+            definition));
 
     toolpath::ProfileToolpathBatch profileBatch;
     toolpath::ProfileToolpathOperation profileOperation;
@@ -264,7 +264,7 @@ oap::manufacturing::MachiningJob validJob()
     job.setProfileResult(
         std::move(profileBatch),
         manufacturing::MachiningJobStorage::profileExecutionFingerprint(
-            definition).toStdString());
+            definition));
 
     auto finishRuntime = job.profileResult()->operations.front();
     finishRuntime.operationId = "profile-finish";
@@ -332,13 +332,13 @@ oap::manufacturing::MachiningJob partitioningJob()
 
     job.runtime().holeExecutionFingerprint =
         manufacturing::MachiningJobStorage::holeExecutionFingerprint(
-            definition).toStdString();
+            definition);
     job.runtime().pocketExecutionFingerprint =
         manufacturing::MachiningJobStorage::pocketExecutionFingerprint(
-            definition).toStdString();
+            definition);
     job.runtime().profileExecutionFingerprint =
         manufacturing::MachiningJobStorage::profileExecutionFingerprint(
-            definition).toStdString();
+            definition);
     return job;
 }
 
@@ -562,7 +562,7 @@ bool rejectsMissingDirtyAndStaleIpw()
         "profile-input-v2";
     stale.runtime().profileExecutionFingerprint =
         oap::manufacturing::MachiningJobStorage::profileExecutionFingerprint(
-            stale.definition()).toStdString();
+            stale.definition());
     const auto staleResult = partitioner.partition(stale);
 
     auto missingCheckpoint = partitioningJob();

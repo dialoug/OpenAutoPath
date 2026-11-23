@@ -1,5 +1,8 @@
 // IpwExecutor 的实现:统一 IPW 顺序执行器。流程见 execute():含孔/槽腔的
 // 运行时分派、检查点复用、根检查点重建与节点状态推进。属于 oap_manufacturing::ipw。
+#include "analysis/ContentHash.h"
+#include <vector>
+#include <string>
 #include "manufacturing/ipw/IpwExecutor.h"
 
 #include <algorithm>
@@ -12,8 +15,6 @@
 #include <unordered_set>
 #include <utility>
 
-#include <QByteArray>
-#include <QCryptographicHash>
 #include <Standard_Failure.hxx>
 
 #include "manufacturing/job/MachiningJob.h"
@@ -78,11 +79,7 @@ struct NodeSimulation {
 
 std::string hashText(const std::string& value)
 {
-    return QCryptographicHash::hash(
-               QByteArray::fromStdString(value),
-               QCryptographicHash::Sha256)
-        .toHex()
-        .toStdString();
+    return oap::sha256Hex(value);
 }
 
 void appendSimulationOptions(
@@ -569,7 +566,7 @@ NodeSimulation simulateFixedAxisDexel(
 {
     NodeSimulation output;
     output.backend =
-        std::string(kPocketDexelBackend);
+        kPocketDexelBackend;
     if (!parent.dexelStock ||
         !parent.dexelStock->valid()) {
         output.error =
@@ -765,7 +762,7 @@ NodeSimulation simulateNode(
                     batch->effectiveParams,
                     brepOptions, nestedControl));
         output.backend =
-            std::string(kPocketTransitionBackend);
+            kPocketTransitionBackend;
         output.result = simulation;
         if (!simulation->complete ||
             simulation->finalStock.IsNull()) {
@@ -810,7 +807,7 @@ NodeSimulation simulateNode(
                 parent, profileOperations,
                 batch->effectiveParams,
                 options, control);
-            result.backend = std::string(kProfileDexelBackend);
+            result.backend = kProfileDexelBackend;
             return result;
         }
         if (!options.safeMixedTopologyFallback &&
@@ -845,7 +842,7 @@ NodeSimulation simulateNode(
                     parentShape, operations,
                     batch->effectiveParams,
                     brepOptions, nestedControl));
-        output.backend = std::string(kProfileTransitionBackend);
+        output.backend = kProfileTransitionBackend;
         output.result = simulation;
         if (!simulation->complete ||
             simulation->finalStock.IsNull()) {
@@ -876,7 +873,7 @@ NodeSimulation simulateNode(
         }
         auto result = simulateFixedAxisDexel(parent, operations,
             operations.front().result.toolpathParams(), options, control);
-        result.backend = std::string(kFinishingDexelBackend);
+        result.backend = kFinishingDexelBackend;
         return result;
     }
 
@@ -913,7 +910,7 @@ NodeSimulation simulateNode(
                 parent.dexelStock, operations,
                 batch->effectiveParams,
                 options.hole, control);
-        output.backend = std::string(kHoleDexelBackend);
+        output.backend = kHoleDexelBackend;
         output.result = std::move(updated.simulation);
         output.dexelStock = std::move(updated.stock);
         output.error = updated.cancelled
@@ -1095,7 +1092,7 @@ IpwExecutionResult IpwExecutor::execute(
     IpwStockCheckpoint root;
     root.stateKey = session.initialStateKey();
     root.backendId =
-        std::string(kInitialBackend);
+        kInitialBackend;
     root.dexelStock = rootDexel;
     root.stock = initialStock;
     root.volume = rootDexel->volume();

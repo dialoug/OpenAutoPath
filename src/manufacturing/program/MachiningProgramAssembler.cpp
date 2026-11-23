@@ -59,16 +59,16 @@ std::string expectedExecutionFingerprint(
     switch (kind) {
         case JobOperationKind::Hole:
             return MachiningJobStorage::holeExecutionFingerprint(
-                definition).toStdString();
+                definition);
         case JobOperationKind::Pocket:
             return MachiningJobStorage::pocketExecutionFingerprint(
-                definition).toStdString();
+                definition);
         case JobOperationKind::Profile:
             return MachiningJobStorage::profileExecutionFingerprint(
-                definition).toStdString();
+                definition);
         case JobOperationKind::SurfaceFinishing:
             return MachiningJobStorage::finishingExecutionFingerprint(
-                definition).toStdString();
+                definition);
     }
     return {};
 }
@@ -183,8 +183,7 @@ MachiningProgramAssemblyResult MachiningProgramAssembler::assemble(
         return result;
 
     result.jobDefinitionFingerprint =
-        MachiningJobStorage::definitionFingerprint(definition)
-            .toStdString();
+        MachiningJobStorage::definitionFingerprint(definition);
     const std::vector<JobOperationDescriptor> allOperations =
         MachiningOperationService::operations(definition);
     std::vector<JobOperationDescriptor> operations;
@@ -221,7 +220,7 @@ MachiningProgramAssemblyResult MachiningProgramAssembler::assemble(
         } else {
             const std::string expectedConfirmation =
                 MachiningJobStorage::setupInputFingerprint(
-                    definition.part, *setup).toStdString();
+                    definition.part, *setup);
             if (!setup->valid || !setup->confirmation.confirmed ||
                 setup->confirmation.confirmedInputFingerprint !=
                     expectedConfirmation) {

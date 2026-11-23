@@ -1,6 +1,10 @@
 // 刀库领域模型实现：维护刀具唯一标识、类型字段和增删改查的一致性约束。
+#include "support/Text.h"
+#include <format>
+#include <map>
+#include <vector>
+#include <string>
 #include "tooling/library/ToolLibrary.h"
-#include <QCoreApplication>
 
 #include <algorithm>
 #include <cmath>
@@ -10,9 +14,9 @@ namespace oap::tooling {
 namespace {
 
 // 归一化字符串键：去首尾空白并转小写，用于 ID 容错解析与比较。
-QString normalizedId(QString value)
+std::string normalizedId(std::string value)
 {
-    return value.trimmed().toLower();
+    return oap::lowerAscii(oap::trim(value));
 }
 
 // 几何/切削参数校验规则：必须是有限且非负的数值。
@@ -23,50 +27,50 @@ bool finiteNonNegative(double value)
 
 } // namespace
 
-QString toolTypeId(ToolType type)
+std::string toolTypeId(ToolType type)
 {
     switch (type) {
-        case ToolType::CenterDrill: return QStringLiteral("center_drill");
-        case ToolType::Drill: return QStringLiteral("drill");
-        case ToolType::IndexableDrill: return QStringLiteral("indexable_drill");
-        case ToolType::EndMill: return QStringLiteral("end_mill");
-        case ToolType::BallEndMill: return QStringLiteral("ball_end_mill");
-        case ToolType::BullNose: return QStringLiteral("bull_nose");
-        case ToolType::FaceMill: return QStringLiteral("face_mill");
-        case ToolType::ChamferMill: return QStringLiteral("chamfer_mill");
-        case ToolType::BoringBar: return QStringLiteral("boring_bar");
-        case ToolType::Reamer: return QStringLiteral("reamer");
-        case ToolType::Tap: return QStringLiteral("tap");
-        case ToolType::Probe: return QStringLiteral("probe");
-        case ToolType::Unknown: return QStringLiteral("unknown");
+        case ToolType::CenterDrill: return std::string("center_drill");
+        case ToolType::Drill: return std::string("drill");
+        case ToolType::IndexableDrill: return std::string("indexable_drill");
+        case ToolType::EndMill: return std::string("end_mill");
+        case ToolType::BallEndMill: return std::string("ball_end_mill");
+        case ToolType::BullNose: return std::string("bull_nose");
+        case ToolType::FaceMill: return std::string("face_mill");
+        case ToolType::ChamferMill: return std::string("chamfer_mill");
+        case ToolType::BoringBar: return std::string("boring_bar");
+        case ToolType::Reamer: return std::string("reamer");
+        case ToolType::Tap: return std::string("tap");
+        case ToolType::Probe: return std::string("probe");
+        case ToolType::Unknown: return std::string("unknown");
     }
-    return QStringLiteral("unknown");
+    return std::string("unknown");
 }
 
-QString toolTypeDisplayName(ToolType type)
+std::string toolTypeDisplayName(ToolType type)
 {
     switch (type) {
-        case ToolType::CenterDrill: return QCoreApplication::translate("OpenAutoPath", "中心钻");
-        case ToolType::Drill: return QCoreApplication::translate("OpenAutoPath", "钻头");
-        case ToolType::IndexableDrill: return QCoreApplication::translate("OpenAutoPath", "U钻");
-        case ToolType::EndMill: return QCoreApplication::translate("OpenAutoPath", "平底刀");
-        case ToolType::BallEndMill: return QCoreApplication::translate("OpenAutoPath", "球刀");
-        case ToolType::BullNose: return QCoreApplication::translate("OpenAutoPath", "圆鼻刀");
-        case ToolType::FaceMill: return QCoreApplication::translate("OpenAutoPath", "飞刀");
-        case ToolType::ChamferMill: return QCoreApplication::translate("OpenAutoPath", "倒角刀");
-        case ToolType::BoringBar: return QCoreApplication::translate("OpenAutoPath", "镗刀");
-        case ToolType::Reamer: return QCoreApplication::translate("OpenAutoPath", "铰刀");
-        case ToolType::Tap: return QCoreApplication::translate("OpenAutoPath", "丝锥");
-        case ToolType::Probe: return QCoreApplication::translate("OpenAutoPath", "分中棒");
-        case ToolType::Unknown: return QCoreApplication::translate("OpenAutoPath", "其他");
+        case ToolType::CenterDrill: return std::string("中心钻");
+        case ToolType::Drill: return std::string("钻头");
+        case ToolType::IndexableDrill: return std::string("U钻");
+        case ToolType::EndMill: return std::string("平底刀");
+        case ToolType::BallEndMill: return std::string("球刀");
+        case ToolType::BullNose: return std::string("圆鼻刀");
+        case ToolType::FaceMill: return std::string("飞刀");
+        case ToolType::ChamferMill: return std::string("倒角刀");
+        case ToolType::BoringBar: return std::string("镗刀");
+        case ToolType::Reamer: return std::string("铰刀");
+        case ToolType::Tap: return std::string("丝锥");
+        case ToolType::Probe: return std::string("分中棒");
+        case ToolType::Unknown: return std::string("其他");
     }
-    return QCoreApplication::translate("OpenAutoPath", "其他");
+    return std::string("其他");
 }
 
 // 反向解析：与 toolTypeId 保持一一对应，未知 ID 一律回退为 Unknown。
-ToolType toolTypeFromId(const QString& id)
+ToolType toolTypeFromId(const std::string& id)
 {
-    const QString key = normalizedId(id);
+    const std::string key = normalizedId(id);
     for (ToolType type : {ToolType::CenterDrill, ToolType::Drill,
                           ToolType::IndexableDrill, ToolType::EndMill,
                           ToolType::BallEndMill, ToolType::BullNose,
@@ -83,14 +87,14 @@ ToolType toolTypeFromId(const QString& id)
 ToolTypeParameterSchema toolTypeParameterSchema(ToolType type)
 {
     ToolTypeParameterSchema schema;
-    schema.diameterLabel = QCoreApplication::translate("OpenAutoPath", "刀具直径");
-    schema.cuttingEdgeLengthLabel = QCoreApplication::translate("OpenAutoPath", "刀刃长度");
-    schema.fluteCountLabel = QCoreApplication::translate("OpenAutoPath", "刃数");
-    schema.tipAngleLabel = QCoreApplication::translate("OpenAutoPath", "刀尖角");
+    schema.diameterLabel = std::string("刀具直径");
+    schema.cuttingEdgeLengthLabel = std::string("刀刃长度");
+    schema.fluteCountLabel = std::string("刃数");
+    schema.tipAngleLabel = std::string("刀尖角");
 
     switch (type) {
         case ToolType::CenterDrill:
-            schema.diameterLabel = QCoreApplication::translate("OpenAutoPath", "切削直径");
+            schema.diameterLabel = std::string("切削直径");
             schema.tipAngleVisible = true;
             schema.tipCompensationVisible = true;
             schema.drillingDefaultsVisible = true;
@@ -113,33 +117,33 @@ ToolTypeParameterSchema toolTypeParameterSchema(ToolType type)
             schema.cornerRadiusVisible = true;
             break;
         case ToolType::FaceMill:
-            schema.diameterLabel = QCoreApplication::translate("OpenAutoPath", "切削直径");
-            schema.fluteCountLabel = QCoreApplication::translate("OpenAutoPath", "刀片数");
+            schema.diameterLabel = std::string("切削直径");
+            schema.fluteCountLabel = std::string("刀片数");
             break;
         case ToolType::ChamferMill:
-            schema.diameterLabel = QCoreApplication::translate("OpenAutoPath", "最大切削直径");
-            schema.tipAngleLabel = QCoreApplication::translate("OpenAutoPath", "包含角");
+            schema.diameterLabel = std::string("最大切削直径");
+            schema.tipAngleLabel = std::string("包含角");
             schema.tipAngleVisible = true;
             schema.defaultTipAngle = 90.0;
             break;
         case ToolType::BoringBar:
-            schema.diameterLabel = QCoreApplication::translate("OpenAutoPath", "镗削直径");
-            schema.cuttingEdgeLengthLabel = QCoreApplication::translate("OpenAutoPath", "最大镗深");
+            schema.diameterLabel = std::string("镗削直径");
+            schema.cuttingEdgeLengthLabel = std::string("最大镗深");
             schema.fluteCountVisible = false;
             break;
         case ToolType::Reamer:
-            schema.diameterLabel = QCoreApplication::translate("OpenAutoPath", "铰削直径");
+            schema.diameterLabel = std::string("铰削直径");
             break;
         case ToolType::Tap:
-            schema.diameterLabel = QCoreApplication::translate("OpenAutoPath", "公称直径");
-            schema.fluteCountLabel = QCoreApplication::translate("OpenAutoPath", "槽数");
+            schema.diameterLabel = std::string("公称直径");
+            schema.fluteCountLabel = std::string("槽数");
             schema.tipAngleVisible = true;
             schema.defaultTipAngle = 90.0;
             schema.threadSpecificationVisible = true;
             break;
         case ToolType::Probe:
-            schema.diameterLabel = QCoreApplication::translate("OpenAutoPath", "测球直径");
-            schema.cuttingEdgeLengthLabel = QCoreApplication::translate("OpenAutoPath", "测杆长度");
+            schema.diameterLabel = std::string("测球直径");
+            schema.cuttingEdgeLengthLabel = std::string("测杆长度");
             schema.diameterRequired = false;
             schema.fluteCountVisible = false;
             break;
@@ -170,10 +174,10 @@ ToolGeometry normalizedToolGeometry(ToolType type,
     return geometry;
 }
 
-QStringList toolGeometryValidationErrors(ToolType type,
+std::vector<std::string> toolGeometryValidationErrors(ToolType type,
                                          const ToolGeometry& g)
 {
-    QStringList errors;
+    std::vector<std::string> errors;
     if (!finiteNonNegative(g.diameter) ||
         !finiteNonNegative(g.cuttingEdgeLength) ||
         !finiteNonNegative(g.overallLength) ||
@@ -185,117 +189,117 @@ QStringList toolGeometryValidationErrors(ToolType type,
         !finiteNonNegative(g.holderLength) ||
         !finiteNonNegative(g.spindleEnvelopeDiameter) ||
         !finiteNonNegative(g.spindleEnvelopeLength)) {
-        errors << QCoreApplication::translate("OpenAutoPath", "刀具几何参数必须为有限非负数");
+        errors.push_back(std::string("刀具几何参数必须为有限非负数"));
         return errors;
     }
 
     const ToolTypeParameterSchema schema = toolTypeParameterSchema(type);
     if (schema.diameterRequired && g.diameter <= 0.0)
-        errors << QCoreApplication::translate("OpenAutoPath", "该刀型的直径必须大于 0");
+        errors.push_back(std::string("该刀型的直径必须大于 0"));
     if (g.cornerRadius > 0.5 * g.diameter && g.diameter > 0.0)
-        errors << QCoreApplication::translate("OpenAutoPath", "刀尖圆角不能大于刀具半径");
+        errors.push_back(std::string("刀尖圆角不能大于刀具半径"));
     if (schema.cornerRadiusDerivedFromDiameter && g.diameter > 0.0 &&
         g.cornerRadius > 0.0 &&
         std::abs(g.cornerRadius - 0.5 * g.diameter) > 1.0e-6) {
-        errors << QCoreApplication::translate("OpenAutoPath", "球刀圆角半径必须等于刀具半径");
+        errors.push_back(std::string("球刀圆角半径必须等于刀具半径"));
     }
     if (schema.tipAngleVisible && g.tipAngle >= 180.0)
-        errors << QCoreApplication::translate("OpenAutoPath", "刀尖角必须小于 180°");
+        errors.push_back(std::string("刀尖角必须小于 180°"));
     if (g.overallLength > 0.0 && g.cuttingEdgeLength > g.overallLength)
-        errors << QCoreApplication::translate("OpenAutoPath", "刀刃长度不能大于刀具总长");
+        errors.push_back(std::string("刀刃长度不能大于刀具总长"));
     if ((g.holderDiameter > 0.0) != (g.holderLength > 0.0))
-        errors << QCoreApplication::translate("OpenAutoPath", "刀柄直径和刀柄长度必须同时填写");
+        errors.push_back(std::string("刀柄直径和刀柄长度必须同时填写"));
     if (g.holderDiameter > 0.0 && g.overallLength <= 0.0)
-        errors << QCoreApplication::translate("OpenAutoPath", "建立刀柄包络前必须填写刀具总长");
+        errors.push_back(std::string("建立刀柄包络前必须填写刀具总长"));
     if ((g.spindleEnvelopeDiameter > 0.0) !=
         (g.spindleEnvelopeLength > 0.0)) {
-        errors << QCoreApplication::translate("OpenAutoPath", "主轴头包络直径和长度必须同时填写");
+        errors.push_back(std::string("主轴头包络直径和长度必须同时填写"));
     }
     if (g.spindleEnvelopeDiameter > 0.0 && g.holderDiameter <= 0.0)
-        errors << QCoreApplication::translate("OpenAutoPath", "建立主轴头包络前必须填写刀柄包络");
+        errors.push_back(std::string("建立主轴头包络前必须填写刀柄包络"));
     return errors;
 }
 
-QString coolantModeId(CoolantMode mode)
+std::string coolantModeId(CoolantMode mode)
 {
     switch (mode) {
-        case CoolantMode::Flood: return QStringLiteral("flood");
-        case CoolantMode::ThroughTool: return QStringLiteral("through_tool");
-        case CoolantMode::Off: return QStringLiteral("off");
+        case CoolantMode::Flood: return std::string("flood");
+        case CoolantMode::ThroughTool: return std::string("through_tool");
+        case CoolantMode::Off: return std::string("off");
     }
-    return QStringLiteral("off");
+    return std::string("off");
 }
 
-QString coolantModeDisplayName(CoolantMode mode)
+std::string coolantModeDisplayName(CoolantMode mode)
 {
     switch (mode) {
-        case CoolantMode::Flood: return QCoreApplication::translate("OpenAutoPath", "外冷");
-        case CoolantMode::ThroughTool: return QCoreApplication::translate("OpenAutoPath", "中心出水");
-        case CoolantMode::Off: return QCoreApplication::translate("OpenAutoPath", "关闭");
+        case CoolantMode::Flood: return std::string("外冷");
+        case CoolantMode::ThroughTool: return std::string("中心出水");
+        case CoolantMode::Off: return std::string("关闭");
     }
-    return QCoreApplication::translate("OpenAutoPath", "关闭");
+    return std::string("关闭");
 }
 
-CoolantMode coolantModeFromId(const QString& id)
+CoolantMode coolantModeFromId(const std::string& id)
 {
-    const QString key = normalizedId(id);
-    if (key == QStringLiteral("flood")) return CoolantMode::Flood;
-    if (key == QStringLiteral("through_tool")) return CoolantMode::ThroughTool;
+    const std::string key = normalizedId(id);
+    if (key == std::string("flood")) return CoolantMode::Flood;
+    if (key == std::string("through_tool")) return CoolantMode::ThroughTool;
     return CoolantMode::Off;
 }
 
-QString drillCycleId(DrillCycle cycle)
+std::string drillCycleId(DrillCycle cycle)
 {
     switch (cycle) {
-        case DrillCycle::G73Peck: return QStringLiteral("g73");
-        case DrillCycle::G83Peck: return QStringLiteral("g83");
-        case DrillCycle::G81Direct: return QStringLiteral("g81");
-        case DrillCycle::Auto: return QStringLiteral("auto");
+        case DrillCycle::G73Peck: return std::string("g73");
+        case DrillCycle::G83Peck: return std::string("g83");
+        case DrillCycle::G81Direct: return std::string("g81");
+        case DrillCycle::Auto: return std::string("auto");
     }
-    return QStringLiteral("auto");
+    return std::string("auto");
 }
 
-QString drillCycleDisplayName(DrillCycle cycle)
+std::string drillCycleDisplayName(DrillCycle cycle)
 {
     switch (cycle) {
-        case DrillCycle::G73Peck: return QCoreApplication::translate("OpenAutoPath", "G73 断屑钻");
-        case DrillCycle::G83Peck: return QCoreApplication::translate("OpenAutoPath", "G83 深孔啄钻");
-        case DrillCycle::G81Direct: return QCoreApplication::translate("OpenAutoPath", "G81 直钻");
-        case DrillCycle::Auto: return QCoreApplication::translate("OpenAutoPath", "自动");
+        case DrillCycle::G73Peck: return std::string("G73 断屑钻");
+        case DrillCycle::G83Peck: return std::string("G83 深孔啄钻");
+        case DrillCycle::G81Direct: return std::string("G81 直钻");
+        case DrillCycle::Auto: return std::string("自动");
     }
-    return QCoreApplication::translate("OpenAutoPath", "自动");
+    return std::string("自动");
 }
 
-DrillCycle drillCycleFromId(const QString& id)
+DrillCycle drillCycleFromId(const std::string& id)
 {
-    const QString key = normalizedId(id);
-    if (key == QStringLiteral("g73")) return DrillCycle::G73Peck;
-    if (key == QStringLiteral("g83")) return DrillCycle::G83Peck;
-    if (key == QStringLiteral("g81")) return DrillCycle::G81Direct;
+    const std::string key = normalizedId(id);
+    if (key == std::string("g73")) return DrillCycle::G73Peck;
+    if (key == std::string("g83")) return DrillCycle::G83Peck;
+    if (key == std::string("g81")) return DrillCycle::G81Direct;
     return DrillCycle::Auto;
 }
 
-ToolLibrary::ToolLibrary(QString id, QString name, QString machine)
+ToolLibrary::ToolLibrary(std::string id, std::string name, std::string machine)
     : m_id(std::move(id)), m_name(std::move(name)), m_machine(std::move(machine))
 {
 }
 
-const ToolBit* ToolLibrary::toolById(const QString& id) const
+const ToolBit* ToolLibrary::toolById(const std::string& id) const
 {
-    const auto it = m_tools.constFind(id);
-    return it == m_tools.cend() ? nullptr : &it.value();
+    const auto it = m_tools.find(id);
+    return it == m_tools.cend() ? nullptr : &it->second;
 }
 
-ToolBit* ToolLibrary::toolById(const QString& id)
+ToolBit* ToolLibrary::toolById(const std::string& id)
 {
     auto it = m_tools.find(id);
-    return it == m_tools.end() ? nullptr : &it.value();
+    return it == m_tools.end() ? nullptr : &it->second;
 }
 
 const LibraryToolSlot* ToolLibrary::slotByNumber(int toolNumber) const
 {
-    const auto it = m_slots.constFind(toolNumber);
-    return it == m_slots.cend() ? nullptr : &it.value();
+    const auto it = m_slots.find(toolNumber);
+    return it == m_slots.cend() ? nullptr : &it->second;
 }
 
 const ToolBit* ToolLibrary::toolByNumber(int toolNumber) const
@@ -304,70 +308,70 @@ const ToolBit* ToolLibrary::toolByNumber(int toolNumber) const
     return slot ? toolById(slot->toolId) : nullptr;
 }
 
-const LibraryToolSlot* ToolLibrary::slotForTool(const QString& toolId) const
+const LibraryToolSlot* ToolLibrary::slotForTool(const std::string& toolId) const
 {
     for (auto it = m_slots.cbegin(); it != m_slots.cend(); ++it) {
-        if (it.value().toolId == toolId)
-            return &it.value();
+        if (it->second.toolId == toolId)
+            return &it->second;
     }
     return nullptr;
 }
 
-int ToolLibrary::toolNumberFor(const QString& toolId) const
+int ToolLibrary::toolNumberFor(const std::string& toolId) const
 {
     const LibraryToolSlot* slot = slotForTool(toolId);
     return slot ? slot->toolNumber : 0;
 }
 
-QVector<AssignedTool> ToolLibrary::assignedTools() const
+std::vector<AssignedTool> ToolLibrary::assignedTools() const
 {
-    QVector<AssignedTool> result;
+    std::vector<AssignedTool> result;
     result.reserve(m_slots.size());
-    // QMap 按 T 号升序迭代，保证后续选刀与日志结果可重复。
+    // std::map 按 T 号升序迭代，保证后续选刀与日志结果可重复。
     for (auto it = m_slots.cbegin(); it != m_slots.cend(); ++it) {
-        const ToolBit* tool = toolById(it.value().toolId);
+        const ToolBit* tool = toolById(it->second.toolId);
         if (tool)
-            result.push_back(AssignedTool{*tool, it.value()});
+            result.push_back(AssignedTool{*tool, it->second});
     }
     return result;
 }
 
-bool ToolLibrary::upsertTool(ToolBit tool, QString* error)
+bool ToolLibrary::upsertTool(ToolBit tool, std::string* error)
 {
-    tool.id = tool.id.trimmed();
-    tool.name = tool.name.trimmed();
-    if (tool.id.isEmpty()) {
-        if (error) *error = QCoreApplication::translate("OpenAutoPath", "刀具 ID 不能为空");
+    tool.id = oap::trim(tool.id);
+    tool.name = oap::trim(tool.name);
+    if (tool.id.empty()) {
+        if (error) *error = std::string("刀具 ID 不能为空");
         return false;
     }
-    if (tool.name.isEmpty()) {
-        if (error) *error = QCoreApplication::translate("OpenAutoPath", "刀具名称不能为空");
+    if (tool.name.empty()) {
+        if (error) *error = std::string("刀具名称不能为空");
         return false;
     }
-    m_tools.insert(tool.id, std::move(tool));
+    m_tools.insert_or_assign(tool.id, std::move(tool));
     return true;
 }
 
-bool ToolLibrary::removeTool(const QString& toolId, QString* error)
+bool ToolLibrary::removeTool(const std::string& toolId, std::string* error)
 {
     if (!m_tools.contains(toolId)) {
-        if (error) *error = QCoreApplication::translate("OpenAutoPath", "刀具不存在：%1").arg(toolId);
+        if (error) *error = std::format("刀具不存在：{0}", toolId);
         return false;
     }
     unassignToolSlot(toolId);
-    m_tools.remove(toolId);
+    m_tools.erase(toolId);
     return true;
 }
 
-bool ToolLibrary::assignToolToSlot(LibraryToolSlot slot, QString* error)
+bool ToolLibrary::assignToolToSlot(LibraryToolSlot slot, std::string* error)
 {
-    slot.toolId = slot.toolId.trimmed();
+    slot.toolId = oap::trim(slot.toolId);
     if (!m_tools.contains(slot.toolId)) {
-        if (error) *error = QCoreApplication::translate("OpenAutoPath", "刀号引用了不存在的刀具：%1").arg(slot.toolId);
+        if (error) *error = std::format("刀号引用了不存在的刀具：{0}", slot.toolId);
         return false;
     }
     if (slot.toolNumber <= 0) {
-        if (error) *error = QCoreApplication::translate("OpenAutoPath", "刀号必须大于 0");
+        if (error) *error = std::string("刀号必须大于 0");
         return false;
     }
 
@@ -378,86 +382,84 @@ bool ToolLibrary::assignToolToSlot(LibraryToolSlot slot, QString* error)
         return true;
     }
     if (oldNumber > 0)
-        m_slots.remove(oldNumber);
+        m_slots.erase(oldNumber);
 
     // 目标 T 号已占用时，不丢弃原刀具，而是把它顺延到下一个空闲号。
     LibraryToolSlot displaced;
     bool hasDisplaced = false;
     const auto occupied = m_slots.find(slot.toolNumber);
     if (occupied != m_slots.end()) {
-        displaced = occupied.value();
+        displaced = occupied->second;
         hasDisplaced = true;
         m_slots.erase(occupied);
     }
-    m_slots.insert(slot.toolNumber, std::move(slot));
+    m_slots.insert_or_assign(slot.toolNumber, std::move(slot));
     if (hasDisplaced) {
         displaced.toolNumber = nextAvailableToolNumber();
-        m_slots.insert(displaced.toolNumber, std::move(displaced));
+        m_slots.insert_or_assign(displaced.toolNumber, std::move(displaced));
     }
     return true;
 }
 
-bool ToolLibrary::unassignToolSlot(const QString& toolId)
+bool ToolLibrary::unassignToolSlot(const std::string& toolId)
 {
     const int number = toolNumberFor(toolId);
-    return number > 0 && m_slots.remove(number) > 0;
+    return number > 0 && m_slots.erase(number) > 0;
 }
 
 int ToolLibrary::nextAvailableToolNumber() const
 {
-    return m_slots.isEmpty() ? 1 : (m_slots.lastKey() + 1);
+    return m_slots.empty() ? 1 : (m_slots.rbegin()->first + 1);
 }
 
-QStringList ToolLibrary::validationErrors() const
+std::vector<std::string> ToolLibrary::validationErrors() const
 {
     // 一次收集全部结构问题，便于 UI/导入流程向用户完整展示而非逐条失败。
-    QStringList errors;
-    if (m_id.trimmed().isEmpty()) errors << QCoreApplication::translate("OpenAutoPath", "刀库 ID 不能为空");
-    if (m_name.trimmed().isEmpty()) errors << QCoreApplication::translate("OpenAutoPath", "刀库名称不能为空");
+    std::vector<std::string> errors;
+    if (oap::trim(m_id).empty()) errors.push_back(std::string("刀库 ID 不能为空"));
+    if (oap::trim(m_name).empty()) errors.push_back(std::string("刀库名称不能为空"));
 
     for (auto it = m_tools.cbegin(); it != m_tools.cend(); ++it) {
-        const ToolBit& tool = it.value();
-        const QString label = tool.name.isEmpty() ? it.key() : tool.name;
-        if (it.key() != tool.id)
-            errors << QCoreApplication::translate("OpenAutoPath", "刀具映射键与 ID 不一致：%1").arg(label);
-        if (tool.id.trimmed().isEmpty())
-            errors << QCoreApplication::translate("OpenAutoPath", "存在空刀具 ID");
-        if (tool.name.trimmed().isEmpty())
-            errors << QCoreApplication::translate("OpenAutoPath", "刀具名称不能为空：%1").arg(tool.id);
-        const QStringList geometryErrors =
+        const ToolBit& tool = it->second;
+        const std::string label = tool.name.empty() ? it->first : tool.name;
+        if (it->first != tool.id)
+            errors.push_back(std::format("刀具映射键与 ID 不一致：{0}", label));
+        if (oap::trim(tool.id).empty())
+            errors.push_back(std::string("存在空刀具 ID"));
+        if (oap::trim(tool.name).empty())
+            errors.push_back(std::format("刀具名称不能为空：{0}", tool.id));
+        const std::vector<std::string> geometryErrors =
             toolGeometryValidationErrors(tool.type, tool.geometry);
-        for (const QString& geometryError : geometryErrors)
-            errors << QStringLiteral("%1：%2").arg(geometryError, label);
+        for (const std::string& geometryError : geometryErrors)
+            errors.push_back(std::format("{0}：{1}", geometryError, label));
     }
 
-    QMap<QString, int> assigned;
+    std::map<std::string, int> assigned;
     for (auto it = m_slots.cbegin(); it != m_slots.cend(); ++it) {
-        const LibraryToolSlot& slot = it.value();
-        if (it.key() <= 0 || slot.toolNumber != it.key())
-            errors << QCoreApplication::translate("OpenAutoPath", "刀号映射无效：%1").arg(it.key());
+        const LibraryToolSlot& slot = it->second;
+        if (it->first <= 0 || slot.toolNumber != it->first)
+            errors.push_back(std::format("刀号映射无效：{0}", it->first));
         if (!m_tools.contains(slot.toolId))
-            errors << QCoreApplication::translate("OpenAutoPath", "刀号 %1 引用了不存在的刀具 %2")
-                          .arg(it.key()).arg(slot.toolId);
+            errors.push_back(std::format("刀号 {0} 引用了不存在的刀具 {1}", it->first, slot.toolId));
         if (assigned.contains(slot.toolId))
-            errors << QCoreApplication::translate("OpenAutoPath", "刀具 %1 被重复分配到刀号 %2 和 %3")
-                          .arg(slot.toolId).arg(assigned.value(slot.toolId)).arg(it.key());
-        assigned.insert(slot.toolId, it.key());
+            errors.push_back(std::format("刀具 {0} 被重复分配到刀号 {1} 和 {2}", slot.toolId, assigned.at(slot.toolId), it->first));
+        assigned.insert_or_assign(slot.toolId, it->first);
 
         const CuttingParameters& c = slot.cuttingDefaults;
         if (!finiteNonNegative(c.spindleSpeed) || !finiteNonNegative(c.horizontalFeed) ||
             !finiteNonNegative(c.verticalFeed) || !finiteNonNegative(c.horizontalRapid) ||
             !finiteNonNegative(c.verticalRapid) || !finiteNonNegative(c.peckDepth)) {
-            errors << QCoreApplication::translate("OpenAutoPath", "刀号 %1 的切削参数必须为有限非负数").arg(it.key());
+            errors.push_back(std::format("刀号 {0} 的切削参数必须为有限非负数", it->first));
         }
     }
     return errors;
 }
 
-bool ToolLibrary::isValid(QString* error) const
+bool ToolLibrary::isValid(std::string* error) const
 {
-    const QStringList errors = validationErrors();
-    if (error) *error = errors.join(QLatin1Char('\n'));
-    return errors.isEmpty();
+    const std::vector<std::string> errors = validationErrors();
+    if (error) *error = oap::joinLines(errors);
+    return errors.empty();
 }
 
 } // namespace oap::tooling

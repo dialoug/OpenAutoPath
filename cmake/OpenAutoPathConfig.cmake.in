@@ -1,6 +1,5 @@
 @PACKAGE_INIT@
 include(CMakeFindDependencyMacro)
-find_dependency(Qt6 6.11 COMPONENTS Core)
 find_dependency(Threads)
 
 # The dependency location belongs to the consuming machine. Never embed the

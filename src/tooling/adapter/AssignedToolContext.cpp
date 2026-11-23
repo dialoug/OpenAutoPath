@@ -16,7 +16,7 @@ bool isSupportedMillingToolType(ToolType type)
 bool hasSupportedMillingGeometry(const ToolBit& tool)
 {
     if (!isSupportedMillingToolType(tool.type) ||
-        !toolGeometryValidationErrors(tool.type, tool.geometry).isEmpty()) return false;
+        !toolGeometryValidationErrors(tool.type, tool.geometry).empty()) return false;
     const auto& geometry = tool.geometry;
     const double radius = tool.type == ToolType::BallEndMill
         ? geometry.diameter * 0.5 : geometry.cornerRadius;
@@ -35,9 +35,9 @@ oap::toolpath::ToolpathToolContext makeToolpathToolContext(
         std::isfinite(assigned.tool.geometry.diameter) &&
         assigned.tool.geometry.diameter > 0.0;
     result.toolNumber = assigned.slot.toolNumber;
-    result.toolId = assigned.tool.id.toUtf8().toStdString();
-    result.toolName = assigned.tool.name.toUtf8().toStdString();
-    result.toolType = toolTypeId(assigned.tool.type).toUtf8().toStdString();
+    result.toolId = assigned.tool.id;
+    result.toolName = assigned.tool.name;
+    result.toolType = toolTypeId(assigned.tool.type);
     result.diameter = assigned.tool.geometry.diameter;
     result.cornerRadius = assigned.tool.geometry.cornerRadius;
     if (assigned.tool.type == ToolType::BallEndMill && result.cornerRadius == 0.0)

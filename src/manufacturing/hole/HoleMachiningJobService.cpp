@@ -1,7 +1,9 @@
 // Capture and atomically install hole Job definitions.
+#include "support/Identity.h"
+#include <vector>
+#include <string>
 #include "manufacturing/hole/HoleMachiningJobService.h"
 #include <utility>
-#include <QDateTime>
 #include "manufacturing/job/MachiningJobStorage.h"
 
 #include "manufacturing/hole/detail/HoleJobTypes.h"
@@ -39,8 +41,7 @@ MachiningJob HoleMachiningJobService::capture(
     definition.recognizedPhysicalHoleCount =
         request.generated->coverage.physicalHoleCount;
     const std::string now =
-        QDateTime::currentDateTimeUtc()
-            .toString(Qt::ISODateWithMs).toStdString();
+        oap::utcTimestamp();
     if (definition.createdAt.empty())
         definition.createdAt = now;
     definition.modifiedAt = now;
@@ -61,7 +62,7 @@ MachiningJob HoleMachiningJobService::capture(
     job.setHoleResult(
         bindCapturedRuntimeIdentities(definition, *request.generated),
         MachiningJobStorage::holeExecutionFingerprint(
-            definition).toStdString());
+            definition));
     return job;
 }
 
@@ -101,14 +102,14 @@ bool HoleMachiningJobService::capture(
     replacement.setHoleResult(
         std::move(candidate.runtime().holeResult),
         MachiningJobStorage::holeExecutionFingerprint(
-            replacement.definition()).toStdString());
+            replacement.definition()));
     if (replacement.hasPocketResult()) {
         toolpath::PocketToolpathBatch retainedPocket =
             replacement.runtime().pocketResult;
         replacement.setPocketResult(
             std::move(retainedPocket),
             MachiningJobStorage::pocketExecutionFingerprint(
-                replacement.definition()).toStdString());
+                replacement.definition()));
     }
     // 新孔定义若无法重配置 IPW（如前缀被破坏）则整体放弃本次安装。
     if (!restoreActiveIpwPlan(replacement, activeIpw)) {

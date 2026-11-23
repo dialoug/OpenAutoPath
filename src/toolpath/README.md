@@ -21,8 +21,7 @@ lists are the source of truth for source ownership and direct dependencies; see
 
 The persistent operation model and ordered material-state chain are described in
 [manufacturing](../manufacturing/README.md). See [surface finishing](finishing/README.md)
-for engraving capabilities and [app/workflows](../app/workflows/README.md) for desktop
-orchestration rules. The [FreePath design contract](pocket/planning/detail/ADAPTIVE_FREEPATH_DESIGN.md)
+for engraving capabilities and [the Web server](../../server/README.md) for task orchestration rules. The [FreePath design contract](pocket/planning/detail/ADAPTIVE_FREEPATH_DESIGN.md)
 describes the current pocket planning algorithm.
 
 ## Dependency direction
@@ -37,7 +36,7 @@ app / manufacturing / tooling adapter
       -> core
 ```
 
-Feature kernels do not depend on Job, Qt widgets, presentation objects or app
+Feature kernels are independent of Job, presentation objects and app
 sessions. `program` consumes only the neutral core program model. `algorithms`
 selects feature kernels but does not own project state. `workflow` composes
 complete UI-independent batches but does not persist or display them.
@@ -142,11 +141,11 @@ Every production toolpath change must preserve:
 6. module ownership, public-header and direct-dependency checks;
 7. explicit sample/parallel budgets rather than unbounded work.
 
-From the repository root, after configuring the desktop preset as described in [BUILDING.md](../../BUILDING.md). For VS 2026, replace both the preset name and build directory with `windows-vs2026`. Core configurations and full-suite commands are documented in the same guide:
+From the repository root, after configuring the native preset as described in [BUILDING.md](../../BUILDING.md). For VS 2026, replace both the preset name and build directory with `windows-core-vs2026`. Core configurations and full-suite commands are documented in the same guide:
 
 ```powershell
-cmake --build --preset windows-vs2022
-ctest --test-dir build/windows-vs2022 -C RelWithDebInfo --output-on-failure --parallel 1 --no-tests=error
+cmake --build --preset windows-core
+ctest --test-dir build/windows-core -C RelWithDebInfo --output-on-failure --parallel 1 --no-tests=error
 cmake -DOAP_SOURCE_DIR="$PWD" -P cmake/CheckDocumentationLinks.cmake
 ```
 
@@ -174,7 +173,7 @@ ordered because later states depend on earlier states.
 `OAP_CAM_MAX_THREADS` optionally caps this toolpath worker budget per process
 (e.g. `1`, `4`, `14` for comparative runs); unset it for hardware-based allocation.
 Root workflow threads and memory samplers are outside the additional-worker budget.
-It is not a CPU-affinity setting or a hard cap on OCCT, Qt, rendering or IPW threads.
+It is not a CPU-affinity setting or a hard cap on OCCT or IPW threads.
 Boolean-only OCCT operations now share a nonblocking admission gate and require
 the verified native backend's complete pool demand. Unknown/TBB backends or a pool
 larger than the configured budget fall back to serial, without reconfiguring the
@@ -187,7 +186,7 @@ builder has been removed; playback retains its existing request coalescing.
 `core/HeavyJobScheduler.h` admits independent expensive jobs before execution:
 one persistent worker, at most 32 pending jobs, FIFO start order, and immediate
 queued cancellation through `cancelHeavyJob`. Pocket/Hole/Profile async services,
-automatic desktop runners, recognition and stock/IPW simulation share this queue.
+automatic toolpath tasks, recognition and stock/IPW simulation share this queue.
 Pending jobs do not create waiting threads. Queue-full and shutdown results are
 explicit failures; callers can cancel without waiting for a preceding job.
 Input captures are released before futures become ready. Synchronous runners use

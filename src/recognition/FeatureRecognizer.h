@@ -61,7 +61,7 @@ struct HoleGeometryRecognitionResult {
 class FeatureRecognizer {
 public:
     // Optional process-wide presentation sink. Install before starting workers;
-    // reset after workers stop. The core keeps a stderr fallback and no Qt dependency.
+    // reset after workers stop. The core keeps a stderr fallback.
     using DiagnosticHandler = void (*)(const char* prefix, const char* detail);
     static void setDiagnosticHandler(DiagnosticHandler handler) noexcept;
     // 对已索引的 model 运行孔识别。槽、腔等类别只保留人工标记与下游加工支持。

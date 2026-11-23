@@ -2,6 +2,8 @@
 // 属于 hole 模块 detail 私有实现:对外仅经 HoleToolCatalog.h 的公共 API,
 // 内部把 AssignedTool 翻译为刀路刀具上下文,并提供“直径升序 + Drill 优先”
 // 的稳定排序,使上层选刀结果不依赖刀库遍历顺序。
+#include <vector>
+#include <string>
 #include "tooling/adapter/hole/HoleToolCatalog.h"
 #include "tooling/adapter/AssignedToolContext.h"
 
@@ -16,7 +18,7 @@ namespace {
 // 按类型筛选后统一排序:直径升序 -> 同直径 Drill 优先 -> T 号升序。
 // 该顺序是后续“最大不超径”查找与批次稳定排序的前提。
 std::vector<HoleToolCandidate> collectTools(
-    const QVector<AssignedTool>& assigned,
+    const std::vector<AssignedTool>& assigned,
     std::initializer_list<ToolType> types)
 {
     std::vector<HoleToolCandidate> result;
@@ -58,7 +60,7 @@ std::vector<HoleToolCandidate> collectTools(
 
 HoleToolCatalog buildHoleToolCatalog(const ToolLibrary& library)
 {
-    const QVector<AssignedTool> assigned = library.assignedTools();
+    const std::vector<AssignedTool> assigned = library.assignedTools();
     HoleToolCatalog catalog;
     catalog.centerDrills =
         collectTools(assigned, {ToolType::CenterDrill});
@@ -73,7 +75,7 @@ bool assignedHoleToolContext(const ToolLibrary& library,
                              const std::string& toolId,
                              HoleToolCandidate& result)
 {
-    const QString id = QString::fromUtf8(toolId.c_str());
+    const std::string id = std::string(toolId.c_str());
     for (const AssignedTool& assigned : library.assignedTools()) {
         if (assigned.tool.id != id)
             continue;
