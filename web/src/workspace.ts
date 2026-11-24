@@ -9,6 +9,47 @@ export type Job = {
   stage?: string;
   error?: string;
 };
+
+const stageLabels: Record<string, string> = {
+  reading_step: "正在读取 STEP 文件",
+  transferring_step: "正在转换 STEP 几何",
+  indexing: "正在建立模型拓扑索引",
+  previewing: "正在准备模型预览",
+  preparing_project: "正在准备加工项目",
+  recognizing_holes: "正在识别孔特征",
+  recognizing_regions: "正在识别槽腔和外轮廓",
+  meshing: "正在生成模型预览网格",
+  generating: "正在计算刀路",
+  engraving: "正在计算雕刻刀路",
+  rebuilding: "正在重建工序刀路",
+  preparing_stock: "正在准备仿真毛坯",
+  simulating: "正在仿真加工余料",
+  building_stock_view: "正在生成余料视图",
+  comparing_stock: "正在比较余料与成品",
+  building_replay: "正在生成余料回放帧",
+  exporting_nc: "正在生成参考 NC",
+  reviewing_nc: "正在检查参考 NC",
+  saving_project: "正在保存加工项目",
+};
+
+export function isPending(job: Job | null): job is Job & { state: "queued" | "running" } {
+  return job?.state === "queued" || job?.state === "running";
+}
+
+export function jobStatus(job: Job): string {
+  switch (job.state) {
+    case "queued": return "任务排队中";
+    case "running": return stageLabels[job.stage ?? ""] ?? "任务执行中";
+    case "done": return "任务已完成";
+    case "cancelled": return "任务已取消";
+    case "failed": return "任务失败";
+    default: return "任务状态未知";
+  }
+}
+
+export class JobCancelled extends Error {
+  constructor() { super("任务已取消"); }
+}
 export type Bit = {
   id: string;
   name: string;
@@ -127,7 +168,7 @@ export async function submit(
   url: string,
   body: unknown,
   signal: AbortSignal,
-  onQueued: (job: Job) => void,
+  onUpdate: (job: Job) => void,
 ): Promise<Job> {
   await response("/api/session", { signal });
   let job = await json<Job>(url, {
@@ -136,21 +177,23 @@ export async function submit(
     body: JSON.stringify(body),
     signal,
   });
-  return waitForJob(job, signal, onQueued);
+  return waitForJob(job, signal, onUpdate);
 }
 export async function waitForJob(
   job: Job,
   signal: AbortSignal,
-  onQueued: (job: Job) => void,
+  onUpdate: (job: Job) => void,
 ) {
-  onQueued(job);
-  while (job.state === "queued" || job.state === "running") {
+  onUpdate(job);
+  while (isPending(job)) {
     await new Promise((resolve) => setTimeout(resolve, 350));
     job = await json<Job>("/api/jobs/" + job.id, { signal });
+    onUpdate(job);
   }
+  if (job.state === "cancelled") throw new JobCancelled();
   if (job.state !== "done")
     throw Error(
-      job.error || (job.state === "cancelled" ? "任务已取消" : job.state),
+      job.error || jobStatus(job),
     );
   return job;
 }

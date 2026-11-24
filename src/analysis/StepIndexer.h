@@ -32,6 +32,8 @@ struct StepIndexBuildControl {
     std::function<bool()> isCancellationRequested;
     // 回调按完成数串行调用，但可能运行于任意计算线程。
     std::function<void(std::size_t, std::size_t)> reportProgress;
+    // Optional private cache for this model's exact face bounds across worker processes.
+    std::string faceBoundsCachePath;
     bool cancelled() const { return isCancellationRequested && isCancellationRequested(); }
 };
 

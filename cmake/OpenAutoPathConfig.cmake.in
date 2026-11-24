@@ -25,5 +25,11 @@ else()
     set(OpenAutoPath_NOT_FOUND_MESSAGE "Unknown OAP_OCCT_PROVIDER: ${OAP_OCCT_PROVIDER}")
     return()
 endif()
+if(@OAP_FINISHING_TBB@)
+    find_dependency(TBB CONFIG HINTS
+        "${OAP_THIRDPARTY_ROOT}/tbb-2021.13.0-x64"
+        "$ENV{OAP_THIRDPARTY_ROOT}/tbb-2021.13.0-x64"
+        "${OAP_OCCT_ROOT}/../3rdparty-vc14-64/tbb-2021.13.0-x64")
+endif()
 include("${CMAKE_CURRENT_LIST_DIR}/OpenAutoPathTargets.cmake")
 check_required_components(OpenAutoPath)

@@ -95,6 +95,16 @@ add_library(OAP::FinishingToolpath ALIAS oap_toolpath_finishing)
 target_link_libraries(oap_toolpath_finishing
     PUBLIC ${OAP_INTERNAL_DEPS_oap_toolpath_finishing}
     PRIVATE OAP::OpenCAMLib)
+# Use the same TBB runtime as the Windows OCCT SDK to bound its mesher.
+set(OAP_FINISHING_TBB FALSE)
+if(OAP_OCCT_PROVIDER STREQUAL "WINDOWS_SDK")
+    find_package(TBB QUIET CONFIG PATHS "${OAP_THIRDPARTY_ROOT}/tbb-2021.13.0-x64" NO_DEFAULT_PATH)
+    if(TARGET TBB::tbb)
+        set(OAP_FINISHING_TBB TRUE)
+        target_compile_definitions(oap_toolpath_finishing PRIVATE OAP_FINISHING_TBB __TBB_NO_IMPLICIT_LINKAGE)
+        target_link_libraries(oap_toolpath_finishing PRIVATE TBB::tbb)
+    endif()
+endif()
 
 add_library(oap_toolpath_algorithms STATIC ${OAP_TOOLPATH_ALGORITHM_SOURCES})
 add_library(OAP::ToolpathAlgorithms ALIAS oap_toolpath_algorithms)

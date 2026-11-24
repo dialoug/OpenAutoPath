@@ -32,22 +32,15 @@ import { WorkspacePanel } from "./WorkspacePanel";
 import {
   assignedTools,
   artifact,
+  jobStatus,
+  JobCancelled,
+  isPending,
   json,
   submit,
   type Project,
   type Library,
+  type Job,
 } from "./workspace";
-
-type Job = {
-  name?: string;
-  files?: string[];
-  id: string;
-  modelId: string;
-  action: string;
-  state: string;
-  stage?: string;
-  error?: string;
-};
 type Recognition = {
   throughFaces: string[];
   axes: {
@@ -78,16 +71,6 @@ type Review = {
   coverageComplete: boolean;
   sweepComplete: boolean;
   moves: number;
-};
-const states: Record<string, string> = {
-  queued: "等待计算",
-  running: "计算中",
-  done: "完成",
-  failed: "失败",
-  cancelled: "已取消",
-  analyzing: "正在识别特征",
-  meshing: "正在生成网格",
-  generating: "正在计算刀路",
 };
 async function request(url: string, options?: RequestInit) {
   const response = await fetch(url, options);
@@ -148,7 +131,9 @@ function App() {
     () => localStorage.getItem("cam.name") || "",
   );
   const [job, setJob] = useState<Job | null>(null);
+  const [openedJob, setOpenedJob] = useState("");
   const [error, setError] = useState("");
+  const [planCancelled, setPlanCancelled] = useState(false);
   const [busy, setBusy] = useState(false);
   const [features, setFeatures] = useState<CamFeature[]>([]);
   const [mode, setMode] = useState<"hole" | CamFeature["kind"]>("hole");
@@ -158,9 +143,10 @@ function App() {
   const [floor, setFloor] = useState("");
   const [regionID, setRegionID] = useState("");
   const [featureState, setFeatureState] = useState<
-    "loading" | "ready" | "error"
+    "loading" | "ready" | "error" | "cancelled"
   >("loading");
   const [featureError, setFeatureError] = useState("");
+  const [featureJob, setFeatureJob] = useState<Job | null>(null);
   const [retryFeatures, retry] = useState(0);
   const [planningJob, setPlanningJob] = useState<Job | null>(null);
   const regionNames = { pocket: "槽腔", profile: "外轮廓", engrave: "雕刻" };
@@ -230,13 +216,29 @@ function App() {
     setRPM(review.rpm);
   }, [review, holes]);
   const hole = holes.find((h) => h.id === selected);
-  const active =
-    busy ||
-    Boolean(
-      saved &&
-        (!job || job.id !== saved || ["queued", "running"].includes(job.state)),
-    );
+  const trackedJob = job?.id === saved ? job : null;
+  const readingResult = trackedJob?.state === "done" && openedJob !== saved;
+  const active = busy || Boolean(saved && !trackedJob) || isPending(trackedJob) || readingResult;
+  const loadingFeatures = Boolean(model) && featureState === "loading";
+  const featureStatus = isPending(featureJob) ? jobStatus(featureJob) : "正在读取模型结果";
+  const currentTask = planningJob ?? (isPending(trackedJob) ? trackedJob : null);
+  const cancelTask = currentTask ?? (!active && loadingFeatures ? featureJob : null);
+  function statusText() {
+    if (currentTask) return jobStatus(currentTask);
+    if (busy) return "正在处理请求";
+    if (saved && !trackedJob) return "正在读取任务状态";
+    if (readingResult) return "正在读取任务结果";
+    if (error) return trackedJob?.state === "failed" && error === (trackedJob.error || "任务失败")
+      ? "任务失败" : "操作出错";
+    if (loadingFeatures) return featureStatus;
+    if (planCancelled || trackedJob?.state === "cancelled") return "任务已取消";
+    if (model && featureState === "cancelled") return "加工信息加载已取消";
+    if (model && featureState === "error") return "加工信息加载失败";
+    return "就绪";
+  }
   function track(j: Job) {
+    setPlanCancelled(false);
+    setOpenedJob("");
     setReplay(null);
     setReview(null);
     setPath([]);
@@ -256,7 +258,7 @@ function App() {
         const j: Job = await (await request("/api/jobs/" + saved)).json();
         if (!live) return;
         setJob(j);
-        if (["queued", "running"].includes(j.state)) {
+        if (isPending(j)) {
           timer = setTimeout(poll, 700);
           return;
         }
@@ -317,6 +319,7 @@ function App() {
             setPath(p);
           }
         }
+        if (live) setOpenedJob(j.id);
       } catch (e) {
         if (live) {
           setError(String(e));
@@ -337,6 +340,7 @@ function App() {
     let live = true;
     const controller = new AbortController();
     setFeatureState("loading");
+    setFeatureJob(null);
     setFeatureError("");
     setRegionID("");
     setRecognition(null);
@@ -387,7 +391,7 @@ function App() {
                 "/api/models/" + model + "/features",
                 {},
                 signal,
-                () => {},
+                (updated) => { if (live) setFeatureJob(updated); },
               ));
             regions = await json<{
               features: CamFeature[];
@@ -403,6 +407,10 @@ function App() {
       })
       .catch((e) => {
         if (live) {
+          if (e instanceof JobCancelled) {
+            setFeatureState("cancelled");
+            return;
+          }
           setError(String(e));
           setFeatureError(String(e));
           setFeatureState("error");
@@ -443,6 +451,7 @@ function App() {
     }
   }
   async function plan(options?: PlanOptions) {
+    setPlanCancelled(false);
     setBusy(true);
     setError("");
     const signal = new AbortController().signal;
@@ -469,7 +478,8 @@ function App() {
       localStorage.setItem(key, planned.id);
       setPanel("project");
     } catch (e) {
-      setError(String(e));
+      if (e instanceof JobCancelled) setPlanCancelled(true);
+      else setError(String(e));
     } finally {
       setBusy(false);
       setPlanningJob(null);
@@ -573,7 +583,8 @@ function App() {
       count: features.filter((f) => f.kind === "engrave").length,
     },
   ] as const;
-  const ModeIcon = modes.find((m) => m.key === mode)!.icon;
+  const currentMode = modes.find((m) => m.key === mode)!;
+  const ModeIcon = currentMode.icon;
   const items =
     mode === "hole"
       ? holes.map((h) => ({
@@ -731,7 +742,7 @@ function App() {
                         ? "装夹方向"
                         : "识别区域"}
                   </h3>
-                  <span>{items.length}</span>
+                  <span>{currentMode.count}</span>
                 </div>
                 <div
                   className="featureList"
@@ -762,8 +773,11 @@ function App() {
                   {!items.length && (
                     <p>
                       {featureState === "loading"
-                        ? "正在识别…"
-                        : "暂无匹配特征"}
+                        ? featureStatus
+                        : featureState === "error"
+                          ? "加工信息加载失败"
+                          : featureState === "cancelled" ? "加工信息加载已取消"
+                          : mode === "engrave" ? "暂无可用装夹方向" : "暂无匹配特征"}
                     </p>
                   )}
                 </div>
@@ -895,11 +909,13 @@ function App() {
                 <span className="viewHint">/</span>{" "}
                 {replayVisible
                   ? "拖动进度条检查余料"
-                  : mode === "engrave"
-                    ? "从列表选择装夹方向"
-                    : mode === "hole"
-                      ? "点击孔壁"
-                      : "点击" + regionLabel + "面"}
+                  : stock && showStock
+                    ? "查看仿真余料"
+                    : mode === "engrave"
+                      ? "从列表选择装夹方向"
+                      : mode === "hole"
+                        ? "点击孔壁"
+                        : manual && mode === "pocket" ? "点击加工底面" : "点击" + regionLabel + "面"}
               </footer>
             </section>
             <aside className="inspector">
@@ -930,7 +946,7 @@ function App() {
                     <ModeIcon size={19} />
                   </span>
                   <div>
-                    <small>当前特征</small>
+                    <small>{mode === "engrave" ? "当前装夹方向" : "当前特征"}</small>
                     <h3>
                       {mode === "hole"
                         ? hole?.kind || "孔加工"
@@ -1068,14 +1084,16 @@ function App() {
                         )}
                       </>
                     ) : !model ? (
-                      <p>上传 STEP 或打开历史模型以识别{regionLabel}。</p>
+                      <p>上传 STEP 或打开历史模型以选择加工目标。</p>
                     ) : featureState === "loading" ? (
-                      <p role="status">正在识别{regionLabel}…</p>
-                    ) : featureState === "error" ? (
+                      <p role="status">{featureStatus}</p>
+                    ) : featureState === "error" || featureState === "cancelled" ? (
                       <>
-                        <p role="alert">{featureError}</p>
-                        <button onClick={() => retry((n) => n + 1)}>
-                          重新识别
+                        {featureState === "cancelled"
+                          ? <p>加工信息加载已取消</p>
+                          : <p role="alert">{featureError}</p>}
+                        <button onClick={() => { setError(""); retry((n) => n + 1); }}>
+                          重试
                         </button>
                       </>
                     ) : region ? (
@@ -1088,7 +1106,7 @@ function App() {
                         />
                       </>
                     ) : (
-                      <p>该模型未识别到{regionLabel}。</p>
+                      <p>{mode === "engrave" ? "暂无可用装夹方向。" : `该模型未识别到${regionLabel}。`}</p>
                     )}
                   </fieldset>
                 )}
@@ -1167,7 +1185,7 @@ function App() {
                       段移动 · {replay.frames.length} 帧余料
                     </p>
                     <p>
-                      刀路逐步播放，毛坯更新到最近的已计算帧。可在任一移动处查看该步的精确余料。
+                      回放显示当前移动处或之前最近的余料帧。选择“查看此步余料”可按当前回放精度计算到这一步。
                     </p>
                   </section>
                 )}
@@ -1301,21 +1319,13 @@ function App() {
         )}
         <div className="statusStrip" role="status">
           <span
-            className={"statusDot " + (error ? "bad" : active ? "pending" : "")}
+            className={"statusDot " + (error ? "bad" : active || loadingFeatures ? "pending" : "")}
           />
-          <strong>
-            {planningJob
-              ? "正在规划" + regionLabel
-              : active
-                ? (job && states[job.stage || job.state]) || "处理中"
-                : error
-                  ? "任务提示"
-                  : "就绪"}
-          </strong>
-          {(planningJob || (active && job)) && (
+          <strong>{statusText()}</strong>
+          {isPending(cancelTask) && (
             <button
               onClick={() =>
-                void request("/api/jobs/" + (planningJob || job)!.id, {
+                void request("/api/jobs/" + cancelTask.id, {
                   method: "DELETE",
                 }).catch((e) => setError(String(e)))
               }

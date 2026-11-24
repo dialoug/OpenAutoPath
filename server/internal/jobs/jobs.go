@@ -22,6 +22,7 @@ import (
 )
 
 type Request struct {
+	CacheFaceBounds bool            `json:"cacheFaceBounds,omitempty"`
 	Quality         *int            `json:"quality,omitempty"`
 	AutoTool        bool            `json:"autoTool,omitempty"`
 	CompletedMoves  *int            `json:"completedMoves,omitempty"`
@@ -246,6 +247,7 @@ func (m *Manager) Submit(owner, modelID string, req Request, upload io.Reader) (
 		}
 	}()
 	req.Model = filepath.Join(m.dir(owner, modelID), "model.step")
+	req.CacheFaceBounds = req.Action != "library"
 	req.Version = 1
 	var sourceHash string
 	if upload != nil {

@@ -7,6 +7,7 @@
 #include <string>
 #include "Project.h"
 #include "Planning.h"
+#include "Progress.h"
 #include "Simulation.h"
 #include "toolpath/pocket/simulation/IpwQuality.h"
 #include "recognition/FeatureRecognizer.h"
@@ -51,6 +52,7 @@ std::string modelHash(const oap::JsonObject &request)
 }
 void saveDefinition(const MachiningJobDefinition &def)
 {
+    reportStage("saving_project");
     std::string error;
     if (!MachiningJobStorage::save("project.oapjob", def, &error))
         throw std::runtime_error(error);
@@ -164,6 +166,7 @@ RebuiltOperation rebuildFamily(MachiningJob &job, JobOperationKind kind, const S
                                const toolpath::HoleRapidPlanningContext &context,
                                const std::string &stockPath)
 {
+    reportStage("rebuilding");
     toolpath::ToolpathProgram program;
     toolpath::ToolpathParams params;
     toolpath::ToolpathValidationReport report;
@@ -227,6 +230,7 @@ ipw::IpwExecutionResult executeProject(MachiningJob &job, const StepIndexer &ind
         throw std::runtime_error("没有启用的加工工序");
     for (auto kind : kinds)
         parameters.emplace(kind, rebuildFamily(job, kind, index, context, stockPath).params);
+    reportStage("preparing_stock");
     std::vector<TopoDS_Shape> units;
     for (TopoDS_Iterator it(context.obstacleShape); it.More(); it.Next())
         units.push_back(it.Value());
@@ -235,6 +239,7 @@ ipw::IpwExecutionResult executeProject(MachiningJob &job, const StepIndexer &ind
                                                                          &error, nullptr, stockPath);
     if (stock.IsNull())
         throw std::runtime_error(error);
+    reportStage("simulating");
     const auto simulation = ipw::IpwExecutor().execute(
         job, stock, MachiningJobStorage::definitionFingerprint(job.definition()),
         ipw::kHybridIpwEngineId, options);
@@ -363,7 +368,9 @@ oap::JsonObject planHoles(MachiningJob &job, const Model &model, const StepIndex
     Bbox bounds;
     for (const auto &unit : model.units)
         bounds.merge(unit.bbox);
+    reportStage("recognizing_holes");
     const auto holes = FeatureRecognizer().recognizeHoleGeometries(model, index);
+    reportStage("generating");
     const auto inputs =
         tooling::HoleMachiningInputMapper().resolve(holes.geometries, bounds, *context.moldFrame);
     if (inputs.empty())
@@ -472,7 +479,7 @@ oap::JsonObject processProject(const oap::JsonObject &request, const StepIndexer
     if (computing && def.stock.sourceKind == StockSourceKind::StepModel && stockPath.empty())
         throw std::runtime_error("请在加工项目中绑定与毛坯指纹匹配的 STEP");
     if (computing && !def.collisionScene.models.empty())
-        throw std::runtime_error("该项目含外部碰撞模型，请在桌面端复核");
+        throw std::runtime_error("当前 Web 版不支持计算含外部碰撞模型的项目");
     if (request.contains("appendFile"))
         appendGeneratedHole(def, request["appendFile"].toString());
     if (action == "setups")
@@ -527,10 +534,14 @@ oap::JsonObject processProject(const oap::JsonObject &request, const StepIndexer
         }
         std::map<JobOperationKind, toolpath::ToolpathParams> parameters;
         const auto simulation = executeProject(job, index, context, parameters, stockPath, options);
-        if (action == "replay")
+        if (action == "replay") {
+            reportStage("building_replay");
             return replayResult(job, !through.empty(), quality);
-        if (action == "export")
+        }
+        if (action == "export") {
+            reportStage("exporting_nc");
             return exportPrograms(job, frames, parameters);
+        }
         result = stockResult(job, simulation, request, context.obstacleShape);
         result.insert("throughOperation", through);
         return result;
@@ -563,6 +574,7 @@ oap::JsonObject processProject(const oap::JsonObject &request, const StepIndexer
         *original = *actual;
         saveDefinition(def);
     }
+    reportStage("exporting_nc");
     const auto *setup = frames.forFace(program.operations.front().setupFace);
     if (!setup || !setup->valid)
         throw std::runtime_error("装夹坐标无效");

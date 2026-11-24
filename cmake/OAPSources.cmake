@@ -20,7 +20,7 @@ oap_module_sources(oap_support OAP_SUPPORT_SOURCES
     src/support/Files.cpp src/support/Files.h src/support/Identity.cpp src/support/Identity.h
     src/support/Text.h src/support/Json.h src/support/Utf8Path.h)
 oap_module_sources(oap-worker OAP_WORKER_SOURCES
-    src/worker/main.cpp src/worker/Project.cpp src/worker/Project.h
+    src/worker/main.cpp src/worker/Progress.h src/worker/Project.cpp src/worker/Project.h
     src/worker/NcReview.cpp src/worker/NcReview.h
     src/worker/Planning.cpp src/worker/Planning.h
     src/worker/Simulation.cpp src/worker/Simulation.h)

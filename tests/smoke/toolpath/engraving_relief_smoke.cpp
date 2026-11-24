@@ -120,7 +120,10 @@ void validateResult(const SurfaceFinishingResult& result, bool requireRelief, co
     std::cout << std::setprecision(10)
         << "triangles=" << result.metrics.triangleCount
         << " samples=" << result.metrics.sampleCount
+        << " meshing_workers=" << result.metrics.meshingWorkerCount
+        << " conversion_workers=" << result.metrics.conversionWorkerCount
         << " projection_workers=" << result.metrics.projectionWorkerCount
+        << " assembly_workers=" << result.metrics.assemblyWorkerCount
         << " rows=" << result.metrics.scanLineCount
         << " contact_runs=" << result.metrics.segmentCount
         << " moves=" << result.moves.size()

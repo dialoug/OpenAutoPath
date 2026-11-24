@@ -54,6 +54,10 @@ struct SurfaceFinishingMetrics {
     double meshMilliseconds = 0;
     double projectionMilliseconds = 0;
     double totalMilliseconds = 0;
+    // Admitted concurrency, including the caller, rather than sampled CPU usage.
+    std::size_t meshingWorkerCount = 1;
+    std::size_t conversionWorkerCount = 1;
+    std::size_t assemblyWorkerCount = 1;
 };
 
 struct SurfaceFinishingResult {

@@ -29,7 +29,7 @@ void meshTarget(const TopoDS_Shape& target,
                 const gp_Ax3& frame,
                 const SurfaceFinishingParams& params,
                 const ToolpathGenerationControl* control,
-                SurfaceMesh& output);
+                SurfaceMesh& output, SurfaceFinishingMetrics& metrics);
 
 // Geometry-only conservative stock bounds in the requested machining frame.
 // The returned object contains bounds only; no stock triangles are generated.

@@ -2,6 +2,9 @@ import { FolderKanban, Wrench, X, Save } from "lucide-react";
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import {
   artifact,
+  jobStatus,
+  JobCancelled,
+  isPending,
   json,
   submit,
   waitForJob,
@@ -69,6 +72,7 @@ export function WorkspacePanel({
     [busy, setBusy] = useState(false),
     [error, setError] = useState("");
   const [pending, setPending] = useState<Job | null>(null);
+  const [cancelled, setCancelled] = useState(false);
   const life = useRef(new AbortController());
   const file = isLib ? "library.oaptl" : "project.oapjob";
   const saved = items.filter((j) =>
@@ -120,10 +124,14 @@ export function WorkspacePanel({
   async function work(fn: () => Promise<void>) {
     setBusy(true);
     setError("");
+    setCancelled(false);
     try {
       await fn();
     } catch (e) {
-      if (!life.current.signal.aborted) setError(String(e));
+      if (!life.current.signal.aborted) {
+        if (e instanceof JobCancelled) setCancelled(true);
+        else setError(String(e));
+      }
     } finally {
       setPending(null);
       setBusy(false);
@@ -506,8 +514,8 @@ export function WorkspacePanel({
       </div>
       {busy && (
         <p role="status">
-          正在处理…{" "}
-          {pending && (
+          {pending ? pending.state === "done" ? "正在读取任务结果" : jobStatus(pending) : "正在处理请求"}{" "}
+          {isPending(pending) && (
             <button
               onClick={() =>
                 void response("/api/jobs/" + pending.id, {
@@ -521,6 +529,7 @@ export function WorkspacePanel({
           )}
         </p>
       )}
+      {cancelled && <p role="status">任务已取消</p>}
       {error && <pre role="alert">{error}</pre>}
     </dialog>
   );

@@ -20,6 +20,8 @@ oap_module_sources(oap_analysis OAP_ANALYSIS_SOURCES
     src/analysis/StepIndexer.h
     src/analysis/detail/StepIndexGeometry.cpp
     src/analysis/detail/StepIndexGeometry.h
+    src/analysis/detail/FaceBoundsCache.cpp
+    src/analysis/detail/FaceBoundsCache.h
     src/analysis/Utf8Path.h
     src/analysis/ContentHash.cpp
     src/analysis/ContentHash.h

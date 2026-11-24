@@ -5,6 +5,7 @@
 #include <string>
 #include <cstdint>
 #include "Simulation.h"
+#include "Progress.h"
 #include "toolpath/pocket/simulation/IpwQuality.h"
 #include "toolpath/pocket/simulation/PocketZMapComparison.h"
 #include "manufacturing/job/MachiningJob.h"
@@ -324,6 +325,7 @@ oap::JsonObject stockResult(const MachiningJob &job, const ipw::IpwExecutionResu
 {
     const auto &nodes = job.ipwSession().nodes();
     auto stock = simulation.finalCheckpoint->dexelStock;
+    reportStage("building_stock_view");
     oap::JsonObject result;
     int completeOperations = static_cast<int>(nodes.size());
     if (request.contains("completedMoves"))
@@ -347,6 +349,7 @@ oap::JsonObject stockResult(const MachiningJob &job, const ipw::IpwExecutionResu
     if (!stock->buildDisplayMesh(mesh, &metrics, &error, {}, opts) || mesh.IsNull())
         throw std::runtime_error("IPW mesh: " + error);
     writeMeshData("stock.json", oap::JsonDocument(meshJson(mesh, "IPW")));
+    reportStage("comparing_stock");
     result.insert("comparison", compareStock(job, stock, target, opts));
     result.insert("volume", stock->volume());
     result.insert("quality", quality);

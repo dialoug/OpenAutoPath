@@ -1,4 +1,5 @@
 #include "StepIndexGeometry.h"
+#include "FaceBoundsCache.h"
 
 #include <chrono>
 #include <mutex>
@@ -62,6 +63,14 @@ bool buildFaceBounds(const Handle(TDocStd_Document)& document,
     const auto count = static_cast<std::size_t>(faces.Extent());
     statistics.faceCount = count;
     std::vector<Bbox> results(count);
+    const auto key = control.faceBoundsCachePath.empty() ? std::string{} : faceBoundsKey(faces);
+    if (!key.empty() && readFaceBounds(control.faceBoundsCachePath, key, results)) {
+        for (std::size_t i = 0; i < count; ++i)
+            bounds.Bind(faces(static_cast<int>(i + 1)), results[i]);
+        statistics.boundsPreparationMillis = millis(preparationStart);
+        if (control.reportProgress) control.reportProgress(count, count);
+        return !control.cancelled();
+    }
     std::vector<TopoDS_Shape> isolated(count);
     std::vector<std::size_t> parallel;
     if (control.executeRange) {
@@ -104,6 +113,7 @@ bool buildFaceBounds(const Handle(TDocStd_Document)& document,
     });
     statistics.faceBoundsMillis = millis(boundsStart);
     if (control.cancelled()) return false;
+    if (!key.empty()) writeFaceBounds(control.faceBoundsCachePath, key, results);
     // OCCT 映射只在此串行写入，工作线程只访问自己的结果槽。
     for (std::size_t i=0; i<count; ++i)
         bounds.Bind(faces(static_cast<int>(i+1)),results[i]);

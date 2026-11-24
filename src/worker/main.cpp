@@ -10,10 +10,12 @@
 #include "Project.h"
 #include "NcReview.h"
 #include "Planning.h"
+#include "Progress.h"
 #include "recognition/FeatureRecognizer.h"
 #include "tooling/adapter/hole/HoleMachiningInputMapper.h"
 #include "tooling/adapter/hole/HoleAutomaticToolpath.h"
 #include "tooling/library/ToolLibraryStorage.h"
+#include "toolpath/core/ToolpathParallel.h"
 #include "toolpath/workflow/hole/HoleToolpathService.h"
 #include "toolpath/program/ToolpathProgramExport.h"
 #include "toolpath/core/setup/MoldSetupWorkFrames.h"
@@ -27,6 +29,11 @@
 #include <stdexcept>
 #include <set>
 
+void oap::worker::reportStage(const char* name)
+{
+    std::cout << JsonDocument(JsonObject{{"stage", name}}).toJson(JsonDocument::Compact) << std::endl;
+}
+
 namespace {
 using namespace oap;
 
@@ -35,12 +42,6 @@ void writeJson(const std::string& path, const oap::JsonDocument& json)
     const std::string data = json.toJson(oap::JsonDocument::Compact);
     if (!oap::writeFileAtomically(path, data))
         throw std::runtime_error("Cannot save worker result");
-}
-
-void stage(const char* name)
-{
-    std::cout << oap::JsonDocument(oap::JsonObject{{"stage", name}}).toJson(oap::JsonDocument::Compact).c_str()
-              << std::endl;
 }
 
 oap::JsonArray xyz(const gp_Pnt& p)
@@ -135,6 +136,7 @@ oap::JsonObject generate(const RecognizedHoleGeometry& hole, const oap::JsonObje
     options.programName = "OpenAutoPath hole " + request.value("hole").toString();
     options.toolId = bit->id;
     options.toolName = bit->name;
+    worker::reportStage("exporting_nc");
     if (!toolpath::ToolpathProgramExport().writeGCode(program, batch.effectiveParams,
             setup->machiningSetup(), options, "reference.nc", error))
         throw std::runtime_error(error);
@@ -147,6 +149,7 @@ oap::JsonObject generate(const RecognizedHoleGeometry& hole, const oap::JsonObje
     }
     writeJson("path.json", oap::JsonDocument(segments));
     worker::captureProject(request, generated, inputs, frames, library);
+    worker::reportStage("reviewing_nc");
     oap::JsonArray issues;
     for (const auto& issue : batch.validation.issues) {
         issues.append(oap::JsonObject{{"code", issue.code},
@@ -199,12 +202,27 @@ void run(const std::string& fileName)
         writeJson("result.json", oap::JsonDocument(oap::JsonObject{{"version", 1}, {"name", library.name()}}));
         return;
     }
-    stage("analyzing");
+    AnalysisPipelineControl progress;
+    if (toolpath::toolpathHardwareParallelism() > 1) {
+        progress.index.executeRange = [](std::size_t count, const auto& task) {
+            toolpath::toolpathParallelForBudgeted(count, task);
+        };
+    }
+    if (request["cacheFaceBounds"].toBool())
+        progress.index.faceBoundsCachePath = request["model"].toString() + ".bounds";
+    progress.reportStage = [](AnalysisStage stage) {
+        switch (stage) {
+        case AnalysisStage::Reading: worker::reportStage("reading_step"); break;
+        case AnalysisStage::Transferring: worker::reportStage("transferring_step"); break;
+        case AnalysisStage::Indexing: worker::reportStage("indexing"); break;
+        case AnalysisStage::PreparingPreview: worker::reportStage("previewing"); break;
+        }
+    };
     Model model;
     Document document;
     StepIndexer index;
     const auto report = AnalysisPipeline().execute(request.value("model").toString(),
-                                                   document.value, index, model);
+                                                   document.value, index, model, &progress);
     if (!report.ok())
         throw std::runtime_error("STEP analysis failed");
     BRep_Builder builder;
@@ -220,6 +238,7 @@ void run(const std::string& fileName)
     context.obstacleShape = part;
     if (projectAction)
     {
+        worker::reportStage("preparing_project");
         Bbox bounds;
         for (const auto& unit : model.units) bounds.merge(unit.bbox);
         const auto frame = MoldCoordinateFrame::fromBounds(bounds);
@@ -230,6 +249,7 @@ void run(const std::string& fileName)
         writeJson("result.json", oap::JsonDocument(project));
         return;
     }
+    worker::reportStage("recognizing_holes");
     const auto geometries = FeatureRecognizer().recognizeHoleGeometries(model, index).geometries;
     oap::JsonObject result;
     if (action == "analyze" || action == "features") {
@@ -273,7 +293,7 @@ void run(const std::string& fileName)
             selected = &hole;
     }
     if (action == "analyze") {
-        stage("meshing");
+        worker::reportStage("meshing");
         writeMesh(index, part);
         result.insert("holes", holes);
         oap::JsonArray units;
@@ -290,7 +310,7 @@ void run(const std::string& fileName)
     } else {
         if (!selected)
             throw std::runtime_error("Unknown hole in this model version");
-        stage("generating");
+        worker::reportStage("generating");
         result = generate(*selected, request, model, context, library);
     }
     result.insert("version", 1);

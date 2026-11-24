@@ -26,7 +26,8 @@ func TestNativeCAMWorkflow(t *testing.T) {
 	if worker == "" {
 		t.Skip("set OAP_TEST_WORKER for native integration")
 	}
-	manager, err := jobs.New(t.TempDir(), worker, 1)
+	root := t.TempDir()
+	manager, err := jobs.New(root, worker, 1)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -82,6 +83,20 @@ func TestNativeCAMWorkflow(t *testing.T) {
 	defer sample.Close()
 	model := wait(call("POST", "/api/models", sample, 202), "done")
 	base := "/api/jobs/" + model.ID + "/files/"
+	cacheFiles, err := filepath.Glob(filepath.Join(root, "*", model.ID, "model.step.bounds"))
+	if err != nil || len(cacheFiles) != 1 {
+		t.Fatalf("expected private face bounds for uploaded model: %v, %v", cacheFiles, err)
+	}
+	cachePath := cacheFiles[0]
+	originalBounds, err := os.ReadFile(cachePath)
+	if err != nil || len(originalBounds) <= 64 {
+		t.Fatalf("missing cached bounds: %v", err)
+	}
+	// A warm worker must use the existing entry, even across independent jobs.
+	stamp := time.Unix(1000000000, 0)
+	if err := os.Chtimes(cachePath, stamp, stamp); err != nil {
+		t.Fatal(err)
+	}
 	var result struct {
 		Features []struct{ ID, Kind string }
 		Holes    []struct {
@@ -101,6 +116,19 @@ func TestNativeCAMWorkflow(t *testing.T) {
 	var regions struct{ Features []struct{ ID, Kind string } }
 	if err := json.Unmarshal(call("GET", "/api/jobs/"+backfill.ID+"/files/result.json", nil, 200), &regions); err != nil || !slices.Equal(regions.Features, result.Features) || backfill.ModelID != model.ID {
 		t.Fatal("backfilled features differ from initial analysis")
+	}
+	if stat, err := os.Stat(cachePath); err != nil || !stat.ModTime().Equal(stamp) {
+		t.Fatal("second worker rebuilt the face bounds")
+	}
+	call("GET", base+"model.step.bounds", nil, 404)
+	damaged := bytes.Clone(originalBounds)
+	damaged[len(damaged)-1] ^= 1
+	if err := os.WriteFile(cachePath, damaged, 0600); err != nil {
+		t.Fatal(err)
+	}
+	wait(call("POST", "/api/models/"+model.ID+"/features", strings.NewReader("{}"), 202), "done")
+	if repaired, err := os.ReadFile(cachePath); err != nil || !bytes.Equal(repaired, originalBounds) {
+		t.Fatal("worker did not recover the original bounds from a corrupt cache")
 	}
 	var mesh []struct {
 		ID      string

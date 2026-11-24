@@ -4,6 +4,11 @@
 #include <algorithm>
 #include <cmath>
 #include <stdexcept>
+#include <mutex>
+#include <vector>
+#ifdef OAP_FINISHING_TBB
+#include <oneapi/tbb/task_arena.h>
+#endif
 
 #include <BRepBuilderAPI_Copy.hxx>
 #include <BRepBndLib.hxx>
@@ -70,7 +75,7 @@ void meshTarget(const TopoDS_Shape& target,
                 const gp_Ax3& frame,
                 const SurfaceFinishingParams& params,
                 const ToolpathGenerationControl* control,
-                SurfaceMesh& output)
+                SurfaceMesh& output, SurfaceFinishingMetrics& metrics)
 {
     checkCancellation(control);
     // Copy geometry as well as topology: cleaning/meshing must never replace
@@ -101,19 +106,36 @@ void meshTarget(const TopoDS_Shape& target,
         output.maxZ = std::max(output.maxZ, local.Z());
     }
     {
-        // Meshing owns a deep copy. Admit OCCT's whole internal pool through the
-        // shared budget, and release it before raster projection borrows workers.
-        // A single face cannot amortize face-level scheduling.
-        TopExp_Explorer faces(snapshot, TopAbs_FACE);
-        if (faces.More()) faces.Next();
-        ToolpathOcctParallelLease lease(faces.More(), control);
-        BRepMesh_IncrementalMesh mesher(snapshot, params.meshDeflection,
-                                      Standard_False, 0.3, lease.enabled());
+        std::size_t faceCount = 0;
+        for (TopExp_Explorer faces(snapshot, TopAbs_FACE); faces.More(); faces.Next()) ++faceCount;
+        const auto mesh = [&](bool parallel) {
+            BRepMesh_IncrementalMesh mesher(snapshot, params.meshDeflection, Standard_False, 0.3, parallel);
+            if (!mesher.IsDone()) throw std::runtime_error("Target surface meshing failed.");
+        };
+#ifdef OAP_FINISHING_TBB
+        if (faceCount > 1 && !OSD_Parallel::ToUseOcctThreads()) {
+            const auto extra = toolpathParallelismFor(faceCount) - 1;
+            ToolpathParallelLease lease(control, extra, extra);
+            metrics.meshingWorkerCount = lease.parallelism();
+            oneapi::tbb::task_arena arena(static_cast<int>(lease.parallelism()));
+            arena.execute([&] { mesh(lease.count() > 0); });
+        } else
+#endif
+        {
+            ToolpathOcctParallelLease lease(faceCount > 1, control);
+            if (lease.enabled()) metrics.meshingWorkerCount = toolpathOcctParallelism();
+            mesh(lease.enabled());
+        }
         checkCancellation(control);
-        if (!mesher.IsDone())
-            throw std::runtime_error("Target surface meshing failed.");
     }
 
+    struct TriangleBlock {
+        Handle(Poly_Triangulation) mesh;
+        gp_Trsf transform;
+        bool reversed;
+        Standard_Integer first, last;
+    };
+    std::vector<TriangleBlock> blocks;
     std::size_t triangleCount = 0;
     for (TopExp_Explorer faces(snapshot, TopAbs_FACE); faces.More(); faces.Next()) {
         checkCancellation(control);
@@ -126,27 +148,52 @@ void meshTarget(const TopoDS_Shape& target,
         if (static_cast<std::size_t>(mesh->NbTriangles()) > params.maxTriangles - triangleCount)
             throw std::runtime_error("Engraving triangle budget exceeded; increase mesh deflection.");
         triangleCount += static_cast<std::size_t>(mesh->NbTriangles());
-        const gp_Trsf transform = location.Transformation();
-        for (Standard_Integer index = 1; index <= mesh->NbTriangles(); ++index) {
-            if (index % 256 == 0)
-                checkCancellation(control);
+        constexpr std::size_t blockSize = 1024;
+        const auto count = static_cast<std::size_t>(mesh->NbTriangles());
+        for (std::size_t begin = 0; begin < count; begin += blockSize)
+            blocks.push_back({mesh, location.Transformation(), face.Orientation() == TopAbs_REVERSED,
+                static_cast<Standard_Integer>(begin + 1), static_cast<Standard_Integer>(std::min(begin + blockSize, count))});
+    }
+    std::vector<SurfaceMesh> converted(blocks.size());
+    const auto desired = std::max<std::size_t>(1, std::min(toolpathParallelismFor(blocks.size()),
+        (triangleCount + 1023) / 1024));
+    ToolpathParallelLease lease(control, desired - 1, desired - 1);
+    metrics.conversionWorkerCount = lease.parallelism();
+    std::mutex cancellationMutex;
+    toolpathParallelForWorkers(blocks.size(), lease.parallelism(), [&](std::size_t blockIndex) {
+        const auto& [mesh, transform, reversed, first, last] = blocks[blockIndex];
+        auto& part = converted[blockIndex];
+        if (control && control->isCancellationRequested) {
+            std::lock_guard<std::mutex> lock(cancellationMutex);
+            checkCancellation(control);
+        }
+        for (Standard_Integer offset = 0; offset <= last - first; ++offset) {
             Standard_Integer a, b, c;
-            mesh->Triangle(index).Get(a, b, c);
-            if (face.Orientation() == TopAbs_REVERSED)
+            mesh->Triangle(first + offset).Get(a, b, c);
+            if (reversed)
                 std::swap(b, c);
             const gp_Pnt p = localPoint(mesh->Node(a).Transformed(transform), frame);
             const gp_Pnt q = localPoint(mesh->Node(b).Transformed(transform), frame);
             const gp_Pnt r = localPoint(mesh->Node(c).Transformed(transform), frame);
             // Include even degenerate vertices in the complete-model safe plane.
-            includePoint(output, p);
-            includePoint(output, q);
-            includePoint(output, r);
+            includePoint(part, p);
+            includePoint(part, q);
+            includePoint(part, r);
             if (gp_Vec(p, q).Crossed(gp_Vec(p, r)).SquareMagnitude() <= 1.e-24)
                 continue;
-            output.surface.addTriangle(ocl::Triangle(
+            part.surface.addTriangle(ocl::Triangle(
                 ocl::Point(p.X(), p.Y(), p.Z()), ocl::Point(q.X(), q.Y(), q.Z()),
                 ocl::Point(r.X(), r.Y(), r.Z())));
         }
+    });
+    for (auto& part : converted) {
+        checkCancellation(control);
+        includePoint(output, gp_Pnt(part.minX, part.minY, part.minZ));
+        includePoint(output, gp_Pnt(part.maxX, part.maxY, part.maxZ));
+        if (part.surface.tris.empty()) continue;
+        output.surface.bb.addPoint(part.surface.bb.minpt);
+        output.surface.bb.addPoint(part.surface.bb.maxpt);
+        output.surface.tris.splice(output.surface.tris.end(), part.surface.tris);
     }
     if (output.surface.tris.empty())
         throw std::runtime_error("Target has no usable surface triangles.");

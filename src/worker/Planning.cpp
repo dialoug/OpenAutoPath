@@ -2,6 +2,7 @@
 #include <vector>
 #include <string>
 #include "Planning.h"
+#include "Progress.h"
 #include "analysis/ModelIndex.h"
 #include "analysis/MoldSurfaceClassifier.h"
 #include "manufacturing/finishing/SurfaceFinishingMachiningJobService.h"
@@ -22,6 +23,7 @@ using namespace manufacturing;
 ThreeAxisWireTraceUseCaseResult traceRegions(const Model &model, const StepIndexer &index,
                                              const std::vector<RecognizedHoleGeometry> &holes)
 {
+    reportStage("recognizing_regions");
     ModelIndex lookup;
     lookup.build(model);
     ThreeAxisWireTraceRequest request;
@@ -87,6 +89,7 @@ void planFeature(MachiningJob &job, const oap::JsonObject &request, const Model 
     std::string error;
     if (feature.starts_with("engrave-"))
     {
+        reportStage("engraving");
         const bool allFaces = feature == "engrave-all";
         std::vector<toolpath::SurfaceFinishingResult> results;
         results.reserve(6);
@@ -156,10 +159,12 @@ void planFeature(MachiningJob &job, const oap::JsonObject &request, const Model 
             throw std::runtime_error(error);
         return;
     }
+    reportStage("recognizing_holes");
     const auto holes = FeatureRecognizer().recognizeHoleGeometries(model, index);
     const auto trace = traceRegions(model, index, holes.geometries);
     if (!trace.ok())
         throw std::runtime_error(trace.error);
+    reportStage("generating");
     tooling::ToolLibrary single(library.id(), library.name());
     if (!automatic && (!single.upsertTool(*bit) || !single.assignToolToSlot(*slot)))
         throw std::runtime_error("刀位无效");

@@ -47,6 +47,8 @@ export function Viewport({
   } | null>(null);
   const [follow, setFollow] = useState(false);
   const [showCutter, setShowCutter] = useState(true);
+  const [showPath, setShowPath] = useState(true);
+  const pathVisuals = useRef<THREE.Group | null>(null);
   const cutter = useRef<THREE.Mesh | null>(null);
   const pick = useRef(onPick);
   const renderMove = useRef<((count: number) => void) | null>(null);
@@ -260,8 +262,6 @@ export function Viewport({
       new THREE.LineBasicMaterial({ color: 0xd95a17, depthTest: false }),
     );
     line.renderOrder = 1;
-    view.scene.add(line);
-    view.draw();
     const marker = new THREE.Points(
       new THREE.BufferGeometry().setFromPoints([new THREE.Vector3()]),
       new THREE.PointsMaterial({
@@ -272,7 +272,10 @@ export function Viewport({
       }),
     );
     marker.renderOrder = 2;
-    view.scene.add(marker);
+    const group = new THREE.Group();
+    group.add(line, marker);
+    pathVisuals.current = group;
+    view.scene.add(group);
     renderMove.current = (count) => {
       geometry.setDrawRange(0, 2 * count);
       marker.position.set(...(count ? path[count - 1][1] : path[0][0]));
@@ -282,15 +285,21 @@ export function Viewport({
     renderMove.current(initial);
     return () => {
       renderMove.current = null;
-      view.scene.remove(marker);
+      pathVisuals.current = null;
+      view.scene.remove(group);
       marker.geometry.dispose();
       marker.material.dispose();
-      view.scene.remove(line);
       geometry.dispose();
       line.material.dispose();
       if (state.current === view) view.draw();
     };
   }, [path, faces, replay]);
+  useEffect(() => {
+    if (pathVisuals.current) {
+      pathVisuals.current.visible = showPath;
+      state.current?.draw();
+    }
+  }, [showPath, path, faces, replay]);
   useEffect(() => {
     if (!path.length || position > path.length) return;
     if (follow) {
@@ -523,6 +532,12 @@ export function Viewport({
                   : "继续播放"}
           </button>
           <button
+            aria-pressed={showPath}
+            onClick={() => setShowPath((value) => !value)}
+          >
+            显示刀路
+          </button>
+          <button
             aria-pressed={follow}
             onClick={() => setFollow((value) => !value)}
           >
@@ -589,7 +604,7 @@ export function Viewport({
               <span>
                 {shown
                   ? `余料帧 ${shown.frame.move} · ${shown.frame.volume.toFixed(2)} mm³`
-                  : "正在读取余料"}
+                  : frameError ? "余料帧读取失败" : "正在读取余料"}
                 {shown?.frame.displaySpacing &&
                   ` · 网格 ${shown.frame.displaySpacing.toFixed(3)} mm`}
                 {shown && waiting && !frameError && " · 正在更新"}
@@ -620,7 +635,7 @@ export function Viewport({
           )}
         </div>
       )}
-      {!faces.length && <span>上传 STEP 模型以查看几何与加工特征</span>}
+      {!faces.length && <span>暂无可显示的几何网格</span>}
     </div>
   );
 }

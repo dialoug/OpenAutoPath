@@ -7,6 +7,7 @@
 #include <cstdint>
 #include <functional>
 #include <limits>
+#include <list>
 #include <memory>
 #include <map>
 #include <mutex>
@@ -20,7 +21,7 @@
 #include <bullcutter.hpp>
 #include <clpoint.hpp>
 #include <cylcutter.hpp>
-#include <pointdropcutter.hpp>
+#include <kdtree.hpp>
 
 #include "detail/SurfaceFinishingMesh.h"
 #include "toolpath/core/ToolpathParallel.h"
@@ -129,6 +130,212 @@ std::unique_ptr<ocl::MillingCutter> makeCutter(const SurfaceFinishingParams& p)
     throw std::runtime_error("Unsupported engraving cutter kind.");
 }
 
+// The mesh outlives every query. OCL's KDTree copies bucket entries during
+// construction and search, so store references instead of copying triangles.
+struct TriangleRef {
+    const ocl::Triangle& triangle;
+    const ocl::Bbox& bb;
+};
+
+class ProjectionIndex {
+public:
+    explicit ProjectionIndex(const ocl::STLSurf& surface)
+    {
+        std::list<TriangleRef> entries;
+        for (const auto& triangle : surface.tris)
+            entries.push_back({triangle, triangle.bb});
+        tree.setXYDimensions();
+        tree.setBucketSize(8);
+        tree.build(entries);
+    }
+
+    void drop(ocl::CLPoint& point, const ocl::MillingCutter& cutter)
+    {
+        // The pinned OCL search only reads the built tree and returns a new
+        // list per query. Preserve PointDropCutter's candidate order and tests.
+        const std::unique_ptr<std::list<TriangleRef>> hits(tree.search_cutter_overlap(&cutter, &point));
+        for (const auto& hit : *hits) {
+            if (cutter.overlaps(point, hit.triangle) && point.below(hit.triangle))
+                cutter.dropCutter(point, hit.triangle);
+        }
+    }
+
+private:
+    ocl::KDTree<TriangleRef> tree;
+};
+
+struct RasterNode {
+    double x = 0;
+    std::optional<double> contact;
+    bool startsRun = false;
+};
+
+struct AssembledRow {
+    std::vector<ToolpathMove> moves;
+    std::optional<gp_Pnt> firstSafe, lastSafe, incomingSafe;
+    std::size_t segments = 0;
+    std::size_t moveOffset = 0, segmentOffset = 0;
+};
+
+void mergeRows(std::vector<AssembledRow>& batch, std::size_t first, const gp_Ax3& frame,
+               std::optional<gp_Pnt>& previousSafe, SurfaceFinishingResult& result,
+               const std::function<void()>& poll)
+{
+    auto count = result.moves.size();
+    for (auto& out : batch) {
+        out.moveOffset = count;
+        out.segmentOffset = result.metrics.segmentCount;
+        if (out.firstSafe) {
+            if (previousSafe && previousSafe->SquareDistance(*out.firstSafe) > 1.e-18) {
+                out.incomingSafe = previousSafe;
+                ++count;
+            }
+            previousSafe = out.lastSafe;
+        }
+        count += out.moves.size();
+        if (count > result.effectiveParams.maxMoves)
+            throw std::runtime_error("Engraving move budget exceeded; reduce layer or raster density.");
+        result.metrics.segmentCount += out.segments;
+    }
+    result.moves.resize(count);
+    result.primitives.resize(count);
+    toolpathParallelFor(batch.size(), [&](std::size_t i) {
+        const auto& out = batch[i];
+        auto dest = out.moveOffset;
+        const auto write = [&](ToolpathMove move) {
+            move.loopSequence += static_cast<int>(out.segmentOffset);
+            move.from = worldPoint(move.from, frame);
+            move.to = worldPoint(move.to, frame);
+            result.moves[dest] = move;
+            result.primitives[dest++] = makeLinearPrimitive(move);
+        };
+        if (out.incomingSafe) {
+            ToolpathMove rapid;
+            rapid.type = ToolpathMoveType::Rapid;
+            rapid.ring = static_cast<int>(first + i);
+            rapid.loopSequence = 0;
+            rapid.from = *out.incomingSafe;
+            rapid.to = *out.firstSafe;
+            write(rapid);
+        }
+        for (const auto& move : out.moves) {
+            if (dest % 256 == 0) poll();
+            write(move);
+        }
+    });
+}
+
+void assembleRaster(std::vector<std::vector<RasterNode>>& projectedRows, std::size_t layers,
+                    std::size_t desiredWorkers, const finishing_detail::SurfaceMesh& domain,
+                    const gp_Ax3& frame, const ToolpathGenerationControl* control,
+                    SurfaceFinishingResult& result)
+{
+    const std::size_t rows = projectedRows.size();
+    const std::size_t totalRows = rows + rows * (layers + 1);
+    const double safeZ = result.safePlaneOffset;
+    const auto& params = result.effectiveParams;
+    using Coverage = std::vector<std::vector<std::pair<double, double>>>;
+    Coverage previousCoverage;
+    std::optional<gp_Pnt> previousSafe;
+    ToolpathParallelScope assemblyScope(control);
+    ToolpathParallelLease assemblyLease(control, desiredWorkers - 1, desiredWorkers - 1);
+    const auto workers = assemblyLease.parallelism();
+    result.metrics.assemblyWorkerCount = workers;
+    std::mutex cancellationMutex;
+    const auto poll = [&] {
+        if (control && control->isCancellationRequested) {
+            std::lock_guard<std::mutex> lock(cancellationMutex);
+            checkCancellation(control);
+        }
+    };
+    for (std::size_t pass = 0; pass <= layers; ++pass) {
+        const bool roughing = pass < layers;
+        const double layerZ = roughing ? std::max(domain.minZ,
+            domain.maxZ - params.maxStepDown * static_cast<double>(pass + 1)) : 0;
+        Coverage currentCoverage(roughing ? rows : 0);
+        const auto passStartSegments = result.metrics.segmentCount;
+        // Bound temporary row storage. Allocate final slices only after the
+        // preceding safe point, segment IDs and move budget are known.
+        for (std::size_t first = 0; first < rows; first += workers) {
+            checkCancellation(control);
+            std::vector<AssembledRow> batch(std::min(workers, rows - first));
+            const auto remaining = params.maxMoves - result.moves.size();
+            std::atomic_size_t staged{0};
+            toolpathParallelFor(batch.size(), [&](std::size_t i) {
+                const auto row = first + i;
+                auto& out = batch[i];
+                const auto append = [&](ToolpathMoveType type, const gp_Pnt& a, const gp_Pnt& b, double feed) {
+                    if (a.SquareDistance(b) <= 1.e-18) return;
+                    if (staged.fetch_add(1, std::memory_order_relaxed) >= remaining)
+                        throw std::runtime_error("Engraving move budget exceeded; reduce layer or raster density.");
+                    ToolpathMove move;
+                    move.type = type;
+                    move.from = a;
+                    move.to = b;
+                    move.feed = feed;
+                    move.loopSequence = static_cast<int>(out.segments);
+                    move.ring = static_cast<int>(row);
+                    out.moves.push_back(move);
+                };
+                std::vector<gp_Pnt> run;
+                const auto flush = [&] {
+                    if (run.size() >= 2) {
+                        const std::pair<double, double> extent = std::minmax(run.front().X(), run.back().X());
+                        if (!previousCoverage.empty()) {
+                            const auto& covered = previousCoverage[row];
+                            if (std::none_of(covered.begin(), covered.end(), [&](const auto& interval) {
+                                return extent.first >= interval.first - 1.e-8 && extent.second <= interval.second + 1.e-8;
+                            }))
+                                throw std::runtime_error("Layered engraving cannot establish prior-layer entry coverage across a discontinuity; no path was published.");
+                        }
+                        const gp_Pnt start(run.front().X(), run.front().Y(), safeZ);
+                        const gp_Pnt end(run.back().X(), run.back().Y(), safeZ);
+                        if (out.lastSafe) append(ToolpathMoveType::Rapid, *out.lastSafe, start, 0);
+                        else out.firstSafe = start;
+                        append(ToolpathMoveType::Plunge, start, run.front(), params.plungeFeed);
+                        for (std::size_t n = 1; n < run.size(); ++n) {
+                            if (n % 256 == 0) poll();
+                            append(ToolpathMoveType::Cut, run[n - 1], run[n], params.feed);
+                        }
+                        append(ToolpathMoveType::Retract, run.back(), end, 0);
+                        out.lastSafe = end;
+                        ++out.segments;
+                        if (roughing) currentCoverage[row].push_back(extent);
+                    }
+                    run.clear();
+                };
+                const double y = domain.minY + (domain.maxY - domain.minY) *
+                    (static_cast<double>(row) / static_cast<double>(rows - 1u));
+                const auto& nodes = projectedRows[row];
+                for (std::size_t n = 0; n < nodes.size(); ++n) {
+                    if (n % 256 == 0) poll();
+                    const auto& node = nodes[n];
+                    if (node.startsRun || (!roughing && !node.contact)) flush();
+                    if (!roughing && !node.contact) continue;
+                    const double targetZ = node.contact ? *node.contact + params.allowance +
+                        (roughing ? params.roughingAllowance : 0.0) : domain.minZ;
+                    const double z = roughing ? std::max(layerZ, targetZ) : targetZ;
+                    if (!std::isfinite(z) || z >= safeZ)
+                        throw std::runtime_error("Projected cutter contact exceeds the target safe plane.");
+                    run.emplace_back(node.x, y, z);
+                }
+                flush();
+                if (!roughing) std::vector<RasterNode>().swap(projectedRows[row]);
+            });
+            mergeRows(batch, first, frame, previousSafe, result, poll);
+            result.metrics.scanLineCount += batch.size();
+            if (control) control->progress(rows + result.metrics.scanLineCount, totalRows);
+        }
+        if (result.metrics.segmentCount == passStartSegments)
+            throw std::runtime_error("An engraving pass has no continuous safe runs; no path was published.");
+        if (roughing) {
+            previousCoverage = std::move(currentCoverage);
+            ++result.metrics.roughingLayerCount;
+            result.metrics.roughingMoveCount = result.moves.size();
+        }
+    }
+}
+
 // Independent raster rows own their OCL state; layers are assembled in order.
 void projectRaster(const finishing_detail::SurfaceMesh& mesh,
                    const gp_Ax3& frame, const SurfaceFinishingParams& params,
@@ -174,67 +381,6 @@ void projectRaster(const finishing_detail::SurfaceMesh& mesh,
         throw std::runtime_error("Engraving safe height or cutter dimensions exceed numeric range.");
     result.safePlaneOffset = safeZ;
 
-    bool roughing = false;
-    double layerZ = 0;
-    auto projectContact = [&](double x, double y, const std::optional<double>& contact) -> std::optional<gp_Pnt> {
-        if (!contact && !roughing) return std::nullopt;
-        const double targetZ = contact ? *contact + params.allowance +
-            (roughing ? params.roughingAllowance : 0.0) : stock->minZ;
-        const double z = roughing ? std::max(layerZ, targetZ) : targetZ;
-        if (!std::isfinite(z) || z >= safeZ)
-            throw std::runtime_error("Projected cutter contact exceeds the target safe plane.");
-        return gp_Pnt(x, y, z);
-    };
-
-    std::vector<gp_Pnt> run;
-    std::optional<gp_Pnt> previousSafe;
-    std::size_t row = 0;
-    using Coverage = std::vector<std::vector<std::pair<double, double>>>;
-    Coverage previousCoverage, currentCoverage;
-    auto appendMove = [&](ToolpathMoveType type, const gp_Pnt& a,
-                          const gp_Pnt& b, double feed) {
-        if (a.SquareDistance(b) <= 1.e-18)
-            return;
-        checkCancellation(control);
-        if (result.moves.size() >= params.maxMoves)
-            throw std::runtime_error("Engraving move budget exceeded; reduce layer or raster density.");
-        ToolpathMove move;
-        move.type = type;
-        move.from = worldPoint(a, frame);
-        move.to = worldPoint(b, frame);
-        move.feed = feed;
-        move.loopSequence = static_cast<int>(result.metrics.segmentCount);
-        move.ring = static_cast<int>(row);
-        result.moves.push_back(move);
-        result.primitives.push_back(makeLinearPrimitive(move));
-    };
-    auto flushRun = [&] {
-        if (run.size() >= 2u) {
-            const std::pair<double, double> extent = std::minmax(run.front().X(), run.back().X());
-            if (fromStock && !previousCoverage.empty()) {
-                const auto& covered = previousCoverage[row];
-                if (std::none_of(covered.begin(), covered.end(), [&](const auto& interval) {
-                        return extent.first >= interval.first - 1.e-8 && extent.second <= interval.second + 1.e-8;
-                    }))
-                    throw std::runtime_error("Layered engraving cannot establish prior-layer entry coverage across a discontinuity; no path was published.");
-            }
-            const gp_Pnt startSafe(run.front().X(), run.front().Y(), safeZ);
-            const gp_Pnt endSafe(run.back().X(), run.back().Y(), safeZ);
-            if (previousSafe)
-                appendMove(ToolpathMoveType::Rapid, *previousSafe, startSafe, 0);
-            // The first move explicitly starts at clearance; reference NC must
-            // establish that initial position before making this vertical plunge.
-            appendMove(ToolpathMoveType::Plunge, startSafe, run.front(), params.plungeFeed);
-            for (std::size_t index = 1; index < run.size(); ++index)
-                appendMove(ToolpathMoveType::Cut, run[index - 1u], run[index], params.feed);
-            appendMove(ToolpathMoveType::Retract, run.back(), endSafe, 0);
-            previousSafe = endSafe;
-            ++result.metrics.segmentCount;
-            if (roughing) currentCoverage[row].emplace_back(extent.first, extent.second);
-        }
-        run.clear();
-    };
-
     // Midpoint refinement reduces chord gouging on curved profiles. This remains
     // discrete verification, not a swept-tool or assembly collision certificate.
     // Unresolved discontinuities are separated by full safe-plane retractions.
@@ -244,11 +390,8 @@ void projectRaster(const finishing_detail::SurfaceMesh& mesh,
     // acquire a moving corner at each layer; independently refining those
     // corners produces incompatible gaps even though the target is unchanged.
     // Discover all phase-specific gaps first and preserve them at every height.
-    struct RasterNode {
-        double x = 0;
-        std::optional<double> contact;
-        bool startsRun = false;
-    };
+    const std::size_t desiredWorkers = std::min(toolpathParallelismFor(rows),
+        std::max<std::size_t>(1u, baseSamples / 1024u));
     std::vector<std::vector<RasterNode>> projectedRows;
     const std::size_t templateRows = rows;
     const std::size_t totalRows = templateRows + rows * (layers + 1u);
@@ -263,10 +406,11 @@ void projectRaster(const finishing_detail::SurfaceMesh& mesh,
         ToolpathGenerationControl rowControl;
         rowControl.isCancellationRequested = [&] {
             if (failed.load(std::memory_order_relaxed)) return true;
+            if (!control || !control->isCancellationRequested) return false;
             // Serialize callbacks as callers may share state between progress
             // and cancellation. OCL work runs outside this short critical section.
             std::lock_guard<std::mutex> lock(callbackMutex);
-            return control && control->cancelled();
+            return control->cancelled();
         };
         const std::uint64_t verificationBudget =
             4u * (static_cast<std::uint64_t>(params.maxSamples) + params.maxMoves);
@@ -275,15 +419,7 @@ void projectRaster(const finishing_detail::SurfaceMesh& mesh,
                 std::abs(b - a) > distance * 4.0;
         };
         ToolpathParallelScope scope(control);
-        // Small grids do not amortize building one private KD tree per worker.
-        // Bound tree replication as well as the process-wide thread budget.
-        // Finish-only rows are contact-query heavy: on the relief benchmark,
-        // four workers outperform eight while retaining fewer private KD trees.
-        const auto rowWorkers = fromStock ? toolpathParallelismFor(rows) :
-            std::min<std::size_t>(4u, toolpathParallelismFor(rows));
-        const std::size_t desiredWorkers = std::min({rowWorkers,
-            std::max<std::size_t>(1u, baseSamples / 4096u),
-            std::max<std::size_t>(1u, 2000000u / mesh.surface.tris.size())});
+        ProjectionIndex index(mesh.surface);
         ToolpathParallelLease lease(control, desiredWorkers - 1u, desiredWorkers - 1u);
         result.metrics.projectionWorkerCount = lease.parallelism();
         std::exception_ptr projectionFailure;
@@ -292,11 +428,6 @@ void projectRaster(const finishing_detail::SurfaceMesh& mesh,
           try {
             checkCancellation(&rowControl);
             auto workerCutter = makeCutter(params);
-            ocl::PointDropCutter workerDrop;
-            workerDrop.setThreads(1);
-            workerDrop.setBucketSize(8);
-            workerDrop.setSTL(mesh.surface);
-            workerDrop.setCutter(workerCutter.get());
             std::map<double, std::optional<double>> heights;
             auto rowContact = [&](double x, double y) -> std::optional<double> {
                 checkCancellation(&rowControl);
@@ -307,7 +438,7 @@ void projectRaster(const finishing_detail::SurfaceMesh& mesh,
                 if (samples.fetch_add(1u, std::memory_order_relaxed) >= params.maxSamples)
                     throw std::runtime_error("Engraving adaptive verification sample budget exceeded.");
                 ocl::CLPoint point(x, y, seedZ);
-                workerDrop.run(point);
+                index.drop(point, *workerCutter);
                 const auto contact = point.getCC();
                 if (!fromStock && contact.type == ocl::NONE) return std::nullopt;
                 if (contact.type == ocl::ERROR || !std::isfinite(point.z))
@@ -439,38 +570,7 @@ void projectRaster(const finishing_detail::SurfaceMesh& mesh,
         result.metrics.sampleCount = std::min(params.maxSamples, samples.load(std::memory_order_relaxed));
         if (projectionFailure) std::rethrow_exception(projectionFailure);
     }
-    for (std::size_t pass = 0; pass <= layers; ++pass) {
-      roughing = pass < layers;
-      if (roughing) {
-          layerZ = std::max(stock->minZ, stock->maxZ - params.maxStepDown * static_cast<double>(pass + 1u));
-          currentCoverage.assign(rows, {});
-      }
-      const std::size_t passStartSegments = result.metrics.segmentCount;
-      for (row = 0; row < rows; ++row) {
-        checkCancellation(control);
-        const double y = domain.minY + (domain.maxY - domain.minY) *
-            (static_cast<double>(row) / static_cast<double>(rows - 1u));
-        for (const auto& node : projectedRows[row]) {
-            checkCancellation(control);
-            if (node.startsRun) flushRun();
-            const auto point = projectContact(node.x, y, node.contact);
-            if (point) run.push_back(*point);
-            else flushRun();
-        }
-        flushRun();
-        if (pass == layers) std::vector<RasterNode>().swap(projectedRows[row]);
-        ++result.metrics.scanLineCount;
-        if (control)
-            control->progress(templateRows + result.metrics.scanLineCount, totalRows);
-      }
-      if (result.metrics.segmentCount == passStartSegments)
-          throw std::runtime_error("An engraving pass has no continuous safe runs; no path was published.");
-      if (roughing) {
-          previousCoverage = std::move(currentCoverage);
-          ++result.metrics.roughingLayerCount;
-          result.metrics.roughingMoveCount = result.moves.size();
-      }
-    }
+    assembleRaster(projectedRows, layers, desiredWorkers, domain, frame, control, result);
     checkCancellation(control);
     if (result.metrics.segmentCount == 0 ||
         std::none_of(result.moves.begin(), result.moves.end(), [](const ToolpathMove& move) {
@@ -499,7 +599,7 @@ SurfaceFinishingResult SurfaceFinishing::generate(
         checkCancellation(control);
         finishing_detail::SurfaceMesh mesh;
         const auto meshStart = Clock::now();
-        finishing_detail::meshTarget(target, machiningFrame, params, control, mesh);
+        finishing_detail::meshTarget(target, machiningFrame, params, control, mesh, result.metrics);
         result.metrics.meshMilliseconds = milliseconds(meshStart);
         result.metrics.triangleCount = mesh.surface.tris.size();
         const auto projectionStart = Clock::now();

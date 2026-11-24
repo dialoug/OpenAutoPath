@@ -98,7 +98,7 @@ void parallelProjection(bool fromStock)
     ToolpathGenerationControl serialControl;
     serialControl.tryAcquireParallelWorkers = [](std::size_t) { return 0u; };
     serialControl.releaseParallelWorkers = [](std::size_t) {};
-    ToolpathParallelBudget budget(2);
+    ToolpathParallelBudget budget(5);
     std::size_t acquired = 0, released = 0;
     ToolpathGenerationControl parallelControl;
     parallelControl.tryAcquireParallelWorkers = [&](std::size_t requested) {
@@ -116,9 +116,10 @@ void parallelProjection(bool fromStock)
         const auto parallel = SurfaceFinishing().generate(target, gp_Ax3(), p, &parallelControl, planningStock);
         structure(serial);
         structure(parallel);
-        require(serial.metrics.projectionWorkerCount == 1 && parallel.metrics.projectionWorkerCount <= 3 &&
-            (toolpathHardwareParallelism() == 1 || parallel.metrics.projectionWorkerCount > 1) && acquired == released,
-            "projection ignored the shared worker budget or leaked its lease");
+        const auto expected = std::min<std::size_t>(toolpathHardwareParallelism(), 6);
+        require(serial.metrics.projectionWorkerCount == 1 && serial.metrics.assemblyWorkerCount == 1 &&
+            parallel.metrics.projectionWorkerCount == expected && parallel.metrics.assemblyWorkerCount == expected &&
+            acquired == released, "engraving stages ignored the shared worker budget or leaked their lease");
         require(serial.moves.size() == parallel.moves.size() && serial.primitives.size() == parallel.primitives.size() &&
             serial.metrics.sampleCount == parallel.metrics.sampleCount &&
             serial.metrics.roughingMoveCount == parallel.metrics.roughingMoveCount &&
@@ -151,6 +152,13 @@ void parallelProjection(bool fromStock)
     const auto cancelled = SurfaceFinishing().generate(target, gp_Ax3(), p, &parallelControl, planningStock);
     require(cancelled.cancelled && !cancelled.ok && cancelled.moves.empty() && cancelled.primitives.empty() &&
         acquired == released, "parallel cancellation published paths or leaked workers");
+    cancel.store(false);
+    parallelControl.reportProgress = [&](std::size_t completed, std::size_t total) {
+        if (completed > total / 2) cancel.store(true);
+    };
+    const auto stoppedAssembly = SurfaceFinishing().generate(target, gp_Ax3(), p, &parallelControl, planningStock);
+    require(stoppedAssembly.cancelled && stoppedAssembly.moves.empty() && stoppedAssembly.primitives.empty() &&
+        acquired == released, "assembly cancellation published paths or leaked workers");
     cancel.store(false);
     parallelControl.reportProgress = [](std::size_t completed, std::size_t) {
         if (completed > 0) throw std::runtime_error("projection progress failure");
@@ -359,9 +367,20 @@ void parallelCurvesAndGaps()
     structure(parallel);
     require(budget.available() == budget.capacity(), "meshing or projection leaked worker slots");
     const auto after = toolpathOcctParallelStatistics();
-    require(after.requested >= before.requested + 2u, "meshing bypassed OCCT parallel admission");
-    if (toolpathOcctParallelism() > 1u && toolpathOcctParallelism() <= toolpathHardwareParallelism())
-        require(after.admitted > before.admitted, "multi-face meshing did not use available workers");
+    require(serial.metrics.meshingWorkerCount == 1 && serial.metrics.conversionWorkerCount == 1 &&
+        parallel.metrics.meshingWorkerCount <= 1 + budget.capacity() &&
+        parallel.metrics.conversionWorkerCount <= 1 + budget.capacity(),
+        "mesh stages exceeded their worker budget");
+    if (after.requested == before.requested) {
+        // The bounded TBB arena can accept a partial lease. This fixture
+        // contains one spherical face and the six faces of a box.
+        require(!OSD_Parallel::ToUseOcctThreads() && parallel.metrics.meshingWorkerCount ==
+            std::min<std::size_t>(7, toolpathHardwareParallelism()), "incorrect bounded TBB meshing quota");
+    } else {
+        require(after.requested >= before.requested + 2u, "meshing bypassed OCCT pool admission");
+        if (toolpathOcctParallelism() > 1u && toolpathOcctParallelism() <= toolpathHardwareParallelism())
+            require(after.admitted > before.admitted, "multi-face meshing did not use available workers");
+    }
     require(serial.moves.size() == parallel.moves.size() &&
         serial.metrics.sampleCount == parallel.metrics.sampleCount &&
         serial.metrics.segmentCount == parallel.metrics.segmentCount,
