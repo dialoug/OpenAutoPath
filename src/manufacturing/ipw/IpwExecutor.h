@@ -35,7 +35,12 @@ struct IpwExecutionOptions {
     // 映射到本次 IPW 计划。用于桌面端按单个 Setup 验证固定轴闭环，
     // 不修改或复制 Job 的持久化工序定义。
     std::vector<std::string> includedOperationIds;
+    // Admit the generated engraving path within the native sweep's hard limit.
+    bool budgetEngravingByToolpath = false;
 };
+
+toolpath::StockSimulationOptions engravingSweepOptions(
+    toolpath::StockSimulationOptions options, std::size_t moveCount);
 
 // 执行结果状态:完整完成 / 失败 / 取消。
 enum class IpwExecutionStatus {

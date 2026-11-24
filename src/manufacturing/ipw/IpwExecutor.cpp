@@ -8,6 +8,7 @@
 #include <algorithm>
 #include <chrono>
 #include <cmath>
+#include <limits>
 #include <memory>
 #include <sstream>
 #include <string_view>
@@ -124,6 +125,8 @@ std::string effectiveEngineFingerprint(
     input << '|';
     appendSimulationOptions(input, options.pocket);
     input << '|';
+    if (options.budgetEngravingByToolpath)
+        input << "engraving-toolpath-budget|";
     return hashText(input.str());
 }
 
@@ -871,8 +874,14 @@ NodeSimulation simulateNode(
             output.error = "Engraving requires the native Multi-Dexel IPW method";
             return output;
         }
+        auto finishingOptions = options;
+        if (options.budgetEngravingByToolpath) {
+            for (const auto& operation : operations)
+                finishingOptions.pocket = engravingSweepOptions(
+                    finishingOptions.pocket, operation.result.moves.size());
+        }
         auto result = simulateFixedAxisDexel(parent, operations,
-            operations.front().result.toolpathParams(), options, control);
+            operations.front().result.toolpathParams(), finishingOptions, control);
         result.backend = kFinishingDexelBackend;
         return result;
     }
@@ -976,6 +985,15 @@ std::vector<std::string> retainedStateKeys(
 }
 
 } // namespace
+
+toolpath::StockSimulationOptions engravingSweepOptions(
+    toolpath::StockSimulationOptions options, std::size_t moveCount)
+{
+    const auto moveBudget = static_cast<int>(
+        std::min<std::size_t>(moveCount, std::numeric_limits<int>::max()));
+    options.maxSweepSegments = std::max(options.maxSweepSegments, moveBudget);
+    return options;
+}
 
 const char* ipwExecutionStatusName(
     IpwExecutionStatus status) noexcept

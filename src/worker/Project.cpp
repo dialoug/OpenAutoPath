@@ -496,6 +496,7 @@ oap::JsonObject processProject(const oap::JsonObject &request, const StepIndexer
     {
         const int quality = request["quality"].toInt(5);
         ipw::IpwExecutionOptions options;
+        options.budgetEngravingByToolpath = true;
         if (action != "export") {
             if (quality < 1 || quality > 10)
                 throw std::runtime_error("仿真质量超出范围");

@@ -167,6 +167,12 @@ void verifyChain()
         return m::ipw::IpwExecutor{}.execute(job, stock, "stock-v1",
             m::ipw::kHybridIpwEngineId, options);
     };
+    options.pocket.maxSweepSegments = 1;
+    const auto limited = run();
+    require(!limited.complete() &&
+        limited.message.find("finish-top: multi-dexel cutting move budget exceeded") != std::string::npos,
+        "the configured sweep budget should reject an engraving with multiple cutting moves");
+    options.budgetEngravingByToolpath = true;
     const auto first = run();
     require(first.complete(), first.message);
     require(first.executedOperationIds == std::vector<std::string>({"rough", "finish-top", "finish-side"}),

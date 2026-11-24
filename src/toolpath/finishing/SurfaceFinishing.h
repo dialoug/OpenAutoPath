@@ -38,8 +38,8 @@ struct SurfaceFinishingParams {
     double plungeFeed = 150.0;
     double maxStepDown = 1.0;
     double roughingAllowance = 0.2; // Additional local +Z allowance before finishing.
-    std::size_t maxMoves = 2000000u;
-    std::size_t maxSamples = 1000000u;
+    std::size_t maxMoves = 5000000u;
+    std::size_t maxSamples = 10000000u;
     std::size_t maxTriangles = 1000000u;
 };
 

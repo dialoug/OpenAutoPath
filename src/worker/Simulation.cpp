@@ -11,6 +11,7 @@
 #include "toolpath/core/simulation/FixedAxisToolpathView.h"
 #include <algorithm>
 #include "manufacturing/ipw/HoleMultiDexelUpdater.h"
+#include "manufacturing/ipw/IpwExecutor.h"
 #include <map>
 #include <array>
 #include "toolpath/core/PocketToolBinding.h"
@@ -50,6 +51,7 @@ struct Cut
     toolpath::FixedAxisToolpathView path;
     toolpath::ToolpathParams params;
     toolpath::DexelToolProfileDefinition profile;
+    toolpath::StockSimulationOptions options;
 };
 
 std::vector<Cut> operationCuts(const MachiningJob &job, const ipw::IpwNode &node, const FamilyProgram &family)
@@ -76,7 +78,10 @@ std::vector<Cut> operationCuts(const MachiningJob &job, const ipw::IpwNode &node
             profile = ipw::holeDexelToolProfile(*hole, family.params);
             axis = gp_Vec(hole->bottom, hole->entry);
         }
-        cuts.push_back({{op.operationId, axis, op.moves}, std::move(params), profile});
+        auto options = toolpath::StockSimulationOptions{};
+        if (node.operation.kind == ipw::IpwOperationKind::SurfaceFinishing)
+            options = ipw::engravingSweepOptions(options, op.moves.size());
+        cuts.push_back({{op.operationId, axis, op.moves}, std::move(params), profile, options});
     }
     if (cuts.empty())
         throw std::runtime_error("工序缺少可回放的刀路");
@@ -97,7 +102,8 @@ Stock advanceStock(Stock stock, const Cut &cut, std::size_t start, std::size_t c
 {
     auto range = cut.path;
     range.moves = range.moves.subspan(start, count);
-    const auto result = stock->applyToolpathPrefix(range, cut.params, cut.profile, sequence, count, {});
+    const auto result = stock->applyToolpathPrefix(range, cut.params, cut.profile, sequence, count,
+        cut.options);
     if (!result.stock)
         throw std::runtime_error("无法计算此移动的余料");
     return result.stock;
